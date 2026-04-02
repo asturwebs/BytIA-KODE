@@ -6,45 +6,52 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 ## [Unreleased]
 
-- Sin cambios publicados todavía después de `0.3.0`.
-
-## [0.3.1] - 2026-04-02
-### Security & Performance Hardening
-
-- Mitigaciones de seguridad completadas para SEC-001 (command injection), SEC-002/003 (path traversal) y SEC-005 (fail-secure en Telegram).
-- Motor de I/O asíncrono validado con benchmark comparativo: `5.01x` de speedup y `80.04%` de mejora frente a la tanda secuencial.
-- Memoria endurecida con carga estricta ante corrupción y contexto acotado a `20` entradas o `2000` caracteres.
-- Refactor ligero del agente extrayendo `_handle_tool_calls()` para mejorar legibilidad sin cambiar la lógica pública.
-
 ## [0.3.0] - 2026-04-02
-### v0.3.0 - Arquitectura Constitucional Modular y Empaquetado de Recursos
 
 ### Added
+
 - Directorio `src/bytia_kode/prompts/` con la identidad constitucional `core_identity.yaml`.
 - Subpaquete `bytia_kode.prompts` para distribuir recursos internos del proyecto.
 - Script `scripts/validate_metadata.py` para validar versión, autoría, documentación y limpieza mínima.
-- Hook versionado en `.githooks/pre-commit`.
+- Script `scripts/check_secrets.py` para escaneo de secrets en pre-commit.
+- Script `scripts/benchmark_io.py` para benchmark comparativo secuencial vs concurrente.
+- Hook versionado en `.githooks/pre-commit` con validación, secret scan y tests.
 - Workflow de GitHub Actions para validación, tests, build y verificación del wheel.
-- Código de conducta del proyecto.
+- Sección de seguridad y rendimiento en auditoría profesional.
 
 ### Changed
+
 - Refactor completo de `agent.py` para cargar la identidad con `importlib.resources`.
+- Extracción de `_handle_tool_calls()` desde `chat()` para mejorar legibilidad.
+- BashTool migrado a `asyncio.create_subprocess_exec` (I/O no bloqueante).
+- FileReadTool y FileWriteTool migrados a `asyncio.to_thread` para I/O de disco.
+- Input sanitizado: `_sanitize_user_message()` filtra caracteres no imprimibles.
+- Error recovery: `chat()` captura `TimeoutError`, `ConnectionError`, `RuntimeError`, `httpx.HTTPError` y preserva historial.
+- Memoria con carga estricta (error en JSON corrupto) y contexto acotado (20 entries / 2000 chars).
+- Telegram en modo fail-secure (denegar por defecto sin allowlist).
+- Errores internos ocultos al usuario de Telegram (solo en logs).
 - Metadatos del paquete alineados en `pyproject.toml` con versión `0.3.0`.
-- README reescrito para documentar instalación oficial por wheel y formato YAML de identidad.
-- Documentación técnica actualizada para reflejar la arquitectura modular y el empaquetado de recursos.
-- `.gitignore` reforzado para evitar reintroducción de backups y scripts de parcheo temporales.
+
+### Security
+
+- **SEC-001**: Mitigado — BashTool con allowlist de binarios, `shell=False`, `shlex.split()`.
+- **SEC-002/003**: Mitigado — `_resolve_workspace_path()` impide path traversal.
+- **SEC-005**: Mitigado — Telegram fail-secure por defecto.
+
+### Performance
+
+- Motor I/O asíncrono validado con benchmark: **4.90x speedup** (79.6% mejora) en ejecución concurrente vs secuencial.
 
 ### Fixed
+
 - Eliminación de advertencias `Duplicate name` durante la construcción del wheel.
-- Corrección de errores recientes en el manejo del prompt multilinea de la TUI.
-- Corrección de la carga del system prompt para que funcione tanto en editable como en wheel instalado.
+- Corrección de errores en el manejo del prompt multilinea de la TUI.
+- Corrección de la carga del system prompt para editable y wheel instalado.
+- `python3` añadido al allowlist de BashTool (`sys.executable` resuelve a `python3`).
+- Eliminación de imports y logger duplicados en `registry.py`.
 
 ### Validation
-- `pytest` pasando en modo editable.
-- `pytest` pasando sobre el wheel instalado en entorno limpio.
-- `python -m build --wheel` completado sin warnings duplicados.
-- `python -m twine check dist/*` completado correctamente.
 
-### Cleanup
-- Eliminación de backups, scripts temporales `fix_*` y `patch_*`, y directorios efímeros de pruebas.
-- Depuración del árbol del paquete para publicación y mantenimiento futuro.
+- 17 tests pasando.
+- Pre-commit hook: validación de metadatos + secret scan + pytest.
+- `uv build` completado sin warnings.

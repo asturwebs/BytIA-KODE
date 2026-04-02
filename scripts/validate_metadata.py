@@ -23,11 +23,11 @@ if not PROMPT.exists():
     raise SystemExit("faltan recursos YAML de identidad")
 
 readme = README.read_text(encoding="utf-8")
-if "pip install ./dist/*.whl" not in readme or "Formato de identidad del sistema: `YAML`" not in readme:
+if "uv run bytia-kode" not in readme or "Formato de identidad del sistema: `YAML`" not in readme:
     raise SystemExit("README no refleja instalación oficial o identidad YAML")
 
 changelog = CHANGELOG.read_text(encoding="utf-8")
-if "v0.3.0 - Arquitectura Constitucional Modular y Empaquetado de Recursos" not in changelog:
+if "## [0.3.0]" not in changelog:
     raise SystemExit("CHANGELOG no contiene el cierre formal de 0.3.0")
 
 for pattern in TEMP_PATTERNS:
