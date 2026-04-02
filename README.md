@@ -20,7 +20,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal avanzada, 
 <p align="center">
   <img src="docs/img/bytia-kode-3-TUI-comandos.png" width="350">
   <img src="docs/img/bytia-kode-5-benchmark.png" width="350"><br>
-  <em>Comandos integrados · Benchmark: 5.01x speedup async</em>
+  <em>Comandos integrados · Benchmark: 4.90x speedup async</em>
 </p>
 
 > Release actual: `0.3.0`
@@ -171,7 +171,7 @@ identity:
 Después de editar, reconstruye el wheel para que los cambios se empaqueten:
 
 ```bash
-uv run python -m build --wheel
+uv build
 ```
 
 ## Seguridad
@@ -184,7 +184,7 @@ v0.3.0 incluye hardening de seguridad verificado con auditoría profesional:
 | SEC-002/003 — Path traversal | `_resolve_workspace_path()` con sandbox a `cwd` |
 | SEC-005 — Telegram abierto | Fail-secure por defecto (denegar sin allowlist) |
 
-Motor I/O asíncrono validado con benchmark: **5.01x speedup** (80% mejora) frente a ejecución secuencial.
+Motor I/O asíncrono validado con benchmark: **4.90x speedup** (80% mejora) frente a ejecución secuencial.
 
 ## Limitaciones conocidas
 

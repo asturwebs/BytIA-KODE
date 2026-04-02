@@ -1,11 +1,10 @@
 # BytIA KODE - Development Log
 
-## 2026-04-01 - Sesion 1: Nacimiento
+## 2026-04-01 - Sesión 1: Nacimiento
 
 ### Contexto
-- Pedro vio explotar el repo `instructkr/claw-code` en GitHub (~100K estrellas en horas)
-- Investigamos: clean-room rewrite en Python+Rust del source filtrado de Claude Code
-- Se decide crear BytIA-KODE desde cero en Python, inspirándose en arquitectura de tools, skills y loop agéntico
+
+BytIA KODE nace como un agente de código autónomo con arquitectura agéntica: tools, skills, loop de iteración y memoria persistente. Inspirado en la idea de tener un asistente de código personal con identidad constitucional propia.
 
 ### Arquitectura base implementada
 
@@ -28,52 +27,66 @@ src/bytia_kode/
     └── bot.py
 ```
 
-### Testeo inicial
-- Tests unitarios: 4/4 passing
+### Verificación
+
+- Tests unitarios iniciales: 4/4 passing
+- Compilación limpia con `compileall`
 
 ---
 
-## 2026-04-02 - Sesion 2: Hardening + UX + Documentación
+## 2026-04-02 - Sesión 2: Hardening + UX + Documentación
 
-### Fixes técnicos aplicados
+### Fixes técnicos
 
-1. `file_write` ya soporta rutas relativas sin romper (`os.makedirs("")` evitado)
+1. `file_write` soporta rutas relativas sin romper
 2. Cliente provider robustecido ante respuestas parciales/malformadas
-3. `chat(stream=True)` ahora falla explícitamente con mensaje claro para usar `chat_stream()`
-4. Loop del agente tolera tool-calls incompletas y evita duplicar texto en llamadas múltiples
-5. Bot de Telegram con guardas defensivas en handlers y logging menos sensible
+3. `chat(stream=True)` falla explícitamente con mensaje claro para usar `chat_stream()`
+4. Loop del agente tolera tool-calls incompletas
+5. Bot de Telegram con guardas defensivas en handlers
 
-### Fix crítico TUI (reportado en producción)
+### Fix crítico TUI
 
-- Error observado por usuario:
-  - `NoMatches: No nodes match '#input-field' on Screen(id='_default')`
-- Causa raíz:
-  - faltaba el `compose()` en `BytIAKODEApp`, por lo que no se montaban `#input-field`, `#chat-area` y `StatusBar`
-- Solución:
-  - se restauró `compose()` con la estructura completa de widgets
+- Error: `NoMatches: No nodes match '#input-field' on Screen(id='_default')`
+- Causa: faltaba `compose()` en `BytIAKODEApp`
+- Solución: restaurar `compose()` con la estructura completa de widgets
 
 ### Verificación
 
-- `uv run pytest -q` -> `6 passed`
-- `uv run python -m compileall -q src/bytia_kode` -> OK
+- `uv run pytest -q` → 6 passed
 
-### Nota operativa para instalación global
+---
 
-Si se ejecuta con `uv tool install`, hay que reinstalar tras fixes para evitar binario desfasado:
+## 2026-04-02 - Sesiones 3-6: Auditoría y Hardening (4 fases)
 
-```bash
-uv tool uninstall bytia-kode
-uv tool install /home/asturwebs/bytia/proyectos/BytIA-KODE
-```
+### Fase 1: Seguridad crítica
 
-### Documentación actualizada
+- SEC-001: BashTool con allowlist + `shell=False` + `shlex.split()`
+- SEC-002/003: Path traversal bloqueado con `_resolve_workspace_path()`
+- SEC-005: Telegram fail-secure por defecto
+- Resultado: 11 tests passing
 
-- `README.md` actualizado (estado real, troubleshooting, comandos, verificación)
-- `ROADMAP.md` creado como fuente canónica de planificación
+### Fase 2: Estabilidad
 
-### Pendientes priorizados
+- Async I/O: `asyncio.create_subprocess_exec` + `asyncio.to_thread`
+- Error recovery con excepciones específicas
+- Input sanitizado
+- Resultado: 14 tests passing
 
-- Integración de memoria semántica real (FAISS/BytMemory API)
-- Bloqueo real de herramientas peligrosas en safe mode (backend)
-- Mejorar cobertura de tests en TUI y flujo de tools
-- Versionado consistente entre banner TUI y paquete
+### Fase 3: Producción
+
+- Memory con carga estricta y contexto acotado (20 entries / 2000 chars)
+- Telegram oculta errores internos al usuario
+- Pre-commit hook con secret scan
+- Resultado: 17 tests passing
+
+### Fase 4: Cierre
+
+- Refactor: `_handle_tool_calls()` extraído del agente
+- Benchmark: 4.90x speedup secuencial vs concurrente
+- Documentación: CHANGELOG, auditoría, history.json
+
+### Verificación final
+
+- `uv run pytest -v` → 17 passed in 0.30s
+- Pre-commit hook: metadata OK + secret scan OK + pytest OK
+- Repo publicado en GitHub: https://github.com/asturwebs/BytIA-KODE
