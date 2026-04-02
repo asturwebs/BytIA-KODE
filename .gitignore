@@ -1,34 +1,26 @@
-# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 build/
 dist/
 *.egg-info/
-
-# Unit test / coverage reports
 .pytest_cache/
 .coverage
 htmlcov/
-
-# Environments
 .env
-.venv
+.venv/
 venv/
-
-# IDEs and Editors
 .idea/
 .vscode/
 .trae/
-
-# Project specific
 *.db
 *.sqlite
 data/
 logs/
 .DS_Store
+*.bak
+*.backup.*
+fix_*.py
+patch_*.py
+.pkg-wheel-test/
