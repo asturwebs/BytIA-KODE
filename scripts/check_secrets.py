@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SK_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]{10,}")
 HIGH_ENTROPY_PATTERN = re.compile(r"\b[A-Za-z0-9_\-=/+]{30,}\b")
-SKIP_FILES = {'.env.example'}
+SKIP_FILES = {'.env.example', 'uv.lock'}
 
 
 def staged_files() -> list[Path]:
