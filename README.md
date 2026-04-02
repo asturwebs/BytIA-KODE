@@ -6,6 +6,23 @@
 
 BytIA KODE es una TUI agéntica para desarrollo asistido con terminal avanzada, CLI simple y bot de Telegram. La versión 0.3.0 consolida una arquitectura constitucional modular basada en YAML, carga de identidad mediante recursos empaquetados y validación reproducible de build.
 
+<p align="center">
+  <img src="docs/img/bytia-kode-1-TUI-inicio.png" width="700"><br>
+  <em>TUI con identidad constitucional cargada</em>
+</p>
+
+<p align="center">
+  <img src="docs/img/bytia-kode-2-TUI-chat.png" width="350">
+  <img src="docs/img/bytia-kode-4-TUI-temas.png" width="350"><br>
+  <em>Chat con el agente · Temas disponibles</em>
+</p>
+
+<p align="center">
+  <img src="docs/img/bytia-kode-3-TUI-comandos.png" width="350">
+  <img src="docs/img/bytia-kode-5-benchmark.png" width="350"><br>
+  <em>Comandos integrados · Benchmark: 5.01x speedup async</em>
+</p>
+
 > Release actual: `0.3.0`
 >
 > Formato de identidad del sistema: `YAML`
