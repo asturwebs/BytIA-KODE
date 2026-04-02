@@ -276,7 +276,7 @@ class BytIAKODEApp(App):
             padding=(0, 1),
             expand=False,
         )
-        chat.mount(Static(info_panel))
+        chat.mount(Static(info_panel, id="info-panel"))
         
         chat.mount(Static(""))  # spacer
         chat.scroll_end(animate=False)
@@ -292,8 +292,20 @@ class BytIAKODEApp(App):
             self.theme = saved
 
     def _on_theme_change(self, event) -> None:
-        """Persist theme when user switches it."""
+        """Persist theme and update info panel when user switches it."""
         _save_theme(self.theme)
+        try:
+            info_widget = self.query_one("#info-panel", Static)
+            info_panel = Panel(
+                Text.from_markup(f"[cyan]Model:[/] {self.config.provider.model} | [cyan]Provider:[/] {self._provider_name()} | [cyan]Theme:[/] {self.theme} | [cyan]Version:[/] {__version__}\n[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"),
+                title="[dim]Session Info[/]",
+                border_style="cyan",
+                padding=(0, 1),
+                expand=False,
+            )
+            info_widget.update(info_panel)
+        except Exception:
+            pass
 
     def _provider_name(self) -> str:
         url = self.config.provider.base_url
