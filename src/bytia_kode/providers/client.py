@@ -1,0 +1,158 @@
+"""OpenAI-compatible provider client.
+
+Works with: Z.AI, OpenRouter, MiniMax, Ollama, llama.cpp server, vLLM, anything that speaks /v1/chat/completions.
+"""
+from __future__ import annotations
+
+import json
+import logging
+from typing import AsyncIterator
+
+import httpx
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
+
+class Message(BaseModel):
+    role: str
+    content: str | None = None
+    tool_calls: list[dict] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
+
+
+class ToolCall(BaseModel):
+    id: str
+    type: str = "function"
+    function: dict  # {"name": "...", "arguments": "{...}"}
+
+
+class ToolDef(BaseModel):
+    type: str = "function"
+    function: dict  # {"name", "description", "parameters"}
+
+
+class ProviderResponse(BaseModel):
+    content: str | None = None
+    tool_calls: list[ToolCall] | None = None
+    finish_reason: str | None = None
+    usage: dict | None = None
+
+
+class ProviderClient:
+    """Async OpenAI-compatible chat completions client."""
+
+    def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 120.0):
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.model = model
+        self.timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                timeout=httpx.Timeout(self.timeout, connect=10.0),
+            )
+        return self._client
+
+    async def chat(
+        self,
+        messages: list[Message],
+        tools: list[ToolDef] | None = None,
+        temperature: float = 0.3,
+        max_tokens: int = 8192,
+        stream: bool = False,
+    ) -> ProviderResponse:
+        """Send a chat completion request."""
+        if stream:
+            raise NotImplementedError("Use chat_stream() for streaming responses")
+
+        client = await self._get_client()
+
+        payload: dict = {
+            "model": self.model,
+            "messages": [m.model_dump(exclude_none=True) for m in messages],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": stream,
+        }
+        if tools:
+            payload["tools"] = [t.model_dump() for t in tools]
+
+        logger.debug(f"-> {self.model} | {len(messages)} msgs | tools={len(tools) if tools else 0}")
+
+        resp = await client.post("/chat/completions", json=payload)
+        resp.raise_for_status()
+
+        data = resp.json()
+        choices = data.get("choices") if isinstance(data, dict) else None
+        if not choices or not isinstance(choices, list):
+            raise RuntimeError("Provider response missing choices")
+
+        choice = choices[0] if isinstance(choices[0], dict) else {}
+        message = choice.get("message") if isinstance(choice, dict) else {}
+        if not isinstance(message, dict):
+            message = {}
+
+        tool_calls = []
+        raw_tool_calls = message.get("tool_calls")
+        if isinstance(raw_tool_calls, list):
+            for tc in raw_tool_calls:
+                try:
+                    tool_calls.append(ToolCall(**tc))
+                except Exception:
+                    continue
+
+        return ProviderResponse(
+            content=message.get("content"),
+            tool_calls=tool_calls or None,
+            finish_reason=choice.get("finish_reason") if isinstance(choice, dict) else None,
+            usage=data.get("usage") if isinstance(data, dict) else None,
+        )
+
+    async def chat_stream(
+        self,
+        messages: list[Message],
+        tools: list[ToolDef] | None = None,
+        temperature: float = 0.3,
+        max_tokens: int = 8192,
+    ) -> AsyncIterator[str]:
+        """Stream a chat completion, yielding text deltas."""
+        client = await self._get_client()
+
+        payload: dict = {
+            "model": self.model,
+            "messages": [m.model_dump(exclude_none=True) for m in messages],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        if tools:
+            payload["tools"] = [t.model_dump() for t in tools]
+
+        async with client.stream("POST", "/chat/completions", json=payload) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                data_str = line[6:]
+                if data_str.strip() == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                    delta = chunk["choices"][0].get("delta", {})
+                    if delta.get("content"):
+                        yield delta["content"]
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    continue
+
+    async def close(self):
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()

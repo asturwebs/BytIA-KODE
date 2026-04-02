@@ -1,0 +1,85 @@
+/* BytIA KODE TUI Theme v3 — Theme-friendly (uses $design tokens) */
+
+/* Header: only override icon color */
+Header {
+    text-style: bold;
+}
+
+Header .header--icon {
+    color: #7ee787;
+}
+
+/* Footer: only override key colors */
+Footer {
+    height: 1;
+}
+
+Footer .footer--key {
+    color: #58a6ff;
+    text-style: bold;
+}
+
+/* Chat area */
+#chat-area {
+    scrollbar-size: 1 1;
+    scrollbar-color: $panel;
+    scrollbar-background: $background;
+    padding: 0 2;
+}
+
+#chat-area > Static {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+#chat-area > ChatMessage {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* Status bar — thin, docked above input */
+#status-bar {
+    dock: bottom;
+    height: 1;
+    width: 100%;
+    background: $surface;
+    color: $text-muted;
+    padding: 0 2;
+    margin: 0;
+}
+
+/* Input area — zero-gap with footer */
+#input-area {
+    dock: bottom;
+    height: auto;
+    max-height: 8;
+    background: $surface;
+    border-top: solid $panel;
+    padding: 1 2;
+    margin-bottom: 0;
+}
+
+#input-field {
+    background: $background;
+    color: $text;
+    border: tall $panel;
+    padding: 0 1;
+}
+
+#input-field:focus {
+    border: tall $accent;
+}
+
+#input-field.-placeholder {
+    color: $text-disabled;
+}
+
+/* Processing state */
+#input-field.processing {
+    border: tall $warning;
+}
+
+/* Panels — compact */
+Panel {
+    padding: 0 1;
+}
