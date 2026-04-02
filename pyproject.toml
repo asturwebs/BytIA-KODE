@@ -1,7 +1,8 @@
 [project]
 name = "bytia-kode"
-version = "0.1.0"
+version = "0.3.0"
 description = "BytIA KODE - Agentic coding CLI & Telegram bot"
+authors = [{ name = "Asturwebs", email = "dev@asturwebs.com" }]
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -17,6 +18,11 @@ dependencies = [
     "python-docx>=1.2.0",
     "beautifulsoup4>=4.14.3",
 ]
+
+
+[project.urls]
+Repository = "https://github.com/asturwebs/BytIA-KODE"
+Issues = "https://github.com/asturwebs/BytIA-KODE/issues"
 
 [project.optional-dependencies]
 local = [
@@ -39,3 +45,15 @@ dev = [
     "pytest>=9.0.2",
     "textual-dev>=1.8.0",
 ]
+
+[tool.hatch.build]
+exclude = [
+    "src/bytia_kode/*.backup.*",
+    "src/bytia_kode/**/*.backup.*",
+    "src/bytia_kode/*.bak",
+    "src/bytia_kode/**/*.bak",
+    "src/bytia_kode/agent_new.py",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bytia_kode"]
