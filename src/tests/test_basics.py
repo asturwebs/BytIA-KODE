@@ -1,5 +1,7 @@
 """Test provider client."""
 import asyncio
+from importlib import resources
+
 import pytest
 from bytia_kode.providers.client import Message, ProviderClient, ToolDef
 
@@ -52,3 +54,33 @@ def test_chat_stream_flag_uses_chat_stream_api():
     client = ProviderClient(base_url="https://example.com", api_key="x", model="m")
     with pytest.raises(NotImplementedError):
         asyncio.run(client.chat(messages=[Message(role="user", content="hi")], stream=True))
+
+
+def test_agent_loads_system_prompt_from_package_resource(caplog):
+    from bytia_kode.agent import Agent, load_identity, load_system_prompt
+    from bytia_kode.config import load_config
+
+    with caplog.at_level("INFO"):
+        payload = load_identity()
+
+    assert payload["identity"]["version"] == "12.0.0"
+    assert "Identity loaded from package resource" in caplog.text
+
+    prompt = load_system_prompt()
+    assert "BytIA Core Identity" in prompt
+    assert "Pedro Luis Cuevas Villarrubia" in prompt
+
+    resource = resources.files("bytia_kode.prompts").joinpath("core_identity.yaml")
+    assert resource.is_file()
+
+    agent = Agent(load_config())
+    built_prompt = agent._build_system_prompt()
+    assert "12.0.0" in built_prompt
+
+
+def test_load_identity_missing_resource_raises_runtime_error(monkeypatch):
+    from bytia_kode import agent as agent_module
+
+    monkeypatch.setattr(agent_module, "CORE_IDENTITY_PACKAGE", "bytia_kode.missing_prompts")
+    with pytest.raises(RuntimeError, match="Core identity resource not found"):
+        agent_module.load_identity()

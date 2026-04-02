@@ -3,27 +3,58 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import AsyncIterator
+from importlib import resources
+from textwrap import dedent
+from typing import Any, AsyncIterator
+
+import yaml
 
 from bytia_kode.config import AppConfig
-from bytia_kode.providers.manager import ProviderManager
-from bytia_kode.providers.client import Message, ToolDef, ProviderResponse
-from bytia_kode.tools.registry import ToolRegistry, ToolResult
-from bytia_kode.skills.loader import SkillLoader
 from bytia_kode.memory.store import BytMemoryConnector
+from bytia_kode.providers.client import Message
+from bytia_kode.providers.manager import ProviderManager
+from bytia_kode.skills.loader import SkillLoader
+from bytia_kode.tools.registry import ToolRegistry, ToolResult
 
 logger = logging.getLogger(__name__)
+CORE_IDENTITY_PACKAGE = "bytia_kode.prompts"
+CORE_IDENTITY_RESOURCE = "core_identity.yaml"
 
-SYSTEM_PROMPT = """You are BytIA KODE, an agentic coding assistant. You have access to tools to help the user.
 
-When using tools:
-- Read files fully before modifying them
-- Execute commands when asked
-- Be direct and concise
-- If something fails, diagnose and retry
+def load_identity() -> dict[str, Any]:
+    try:
+        resource = resources.files(CORE_IDENTITY_PACKAGE).joinpath(CORE_IDENTITY_RESOURCE)
+        with resource.open("rb") as fh:
+            payload = yaml.safe_load(fh)
+        logger.info("Identity loaded from package resource")
+    except (FileNotFoundError, ModuleNotFoundError) as exc:
+        raise RuntimeError(
+            f"Core identity resource not found: {CORE_IDENTITY_PACKAGE}/{CORE_IDENTITY_RESOURCE}"
+        ) from exc
+    except yaml.YAMLError as exc:
+        raise RuntimeError(
+            f"Core identity resource is invalid YAML: {CORE_IDENTITY_PACKAGE}/{CORE_IDENTITY_RESOURCE}"
+        ) from exc
 
-Always respond in the same language as the user.
-"""
+    if not isinstance(payload, dict) or not payload:
+        raise RuntimeError(
+            f"Core identity resource must contain a non-empty mapping: {CORE_IDENTITY_PACKAGE}/{CORE_IDENTITY_RESOURCE}"
+        )
+    return payload
+
+
+def load_system_prompt() -> str:
+    payload = load_identity()
+    rendered_yaml = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False).strip()
+    return dedent(
+        f"""
+        BytIA Core Identity
+        ===================
+        Treat every field below as binding constitutional system-level instruction.
+
+        {rendered_yaml}
+        """
+    ).strip()
 
 
 class Agent:
@@ -40,7 +71,7 @@ class Agent:
         self.memory = BytMemoryConnector(config.data_dir)
         self.messages: list[Message] = []
         self.max_iterations = 50
-        self._system_prompt = SYSTEM_PROMPT
+        self._system_prompt = load_system_prompt()
 
     def _build_system_prompt(self) -> str:
         parts = [self._system_prompt]
@@ -59,24 +90,20 @@ class Agent:
         provider_client = self.providers.get(provider)
         tool_defs = self.tools.get_tool_defs()
 
-        for iteration in range(self.max_iterations):
-            # Build message list with system prompt
+        for _iteration in range(self.max_iterations):
             all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
 
-            # Call LLM
             response = await provider_client.chat(
                 messages=all_messages,
                 tools=tool_defs if tool_defs else None,
             )
 
-            # Add assistant message to history
             self.messages.append(Message(
                 role="assistant",
                 content=response.content,
                 tool_calls=[tc.model_dump() for tc in response.tool_calls] if response.tool_calls else None,
             ))
 
-            # If no tool calls, we're done -- yield the text
             if not response.tool_calls:
                 if response.content:
                     yield response.content
@@ -85,7 +112,6 @@ class Agent:
             if response.content:
                 yield response.content
 
-            # Execute tool calls
             for tool_call in response.tool_calls:
                 fn = tool_call.function if isinstance(tool_call.function, dict) else {}
                 tool_name = fn.get("name")
@@ -95,7 +121,7 @@ class Agent:
                     try:
                         arguments = json.loads(raw_arguments)
                     except json.JSONDecodeError:
-                        logger.error(f"Failed to decode JSON arguments: {raw_arguments}")
+                        logger.error("Failed to decode JSON arguments: %s", raw_arguments)
                         arguments = {}
 
                 if not isinstance(arguments, dict):
@@ -110,7 +136,7 @@ class Agent:
                     ))
                     continue
 
-                logger.info(f"Tool call: {tool_name}({arguments})")
+                logger.info("Tool call: %s(%s)", tool_name, arguments)
                 result: ToolResult = await self.tools.execute(tool_name, arguments)
 
                 self.messages.append(Message(
