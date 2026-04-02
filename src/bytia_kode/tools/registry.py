@@ -1,20 +1,19 @@
 """Tool registry and base tool definitions."""
 from __future__ import annotations
 
+import asyncio
 import logging
-import logging
-import subprocess
-import os
-from typing import Any, Callable, Awaitable
+import shlex
+from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 
 from bytia_kode.providers.client import ToolDef
 
-
 logger = logging.getLogger(__name__)
+_ALLOWED_BINARIES = {"ls", "pwd", "cat", "echo", "git", "grep", "find", "mkdir", "touch", "uv", "python", "wsl"}
 
-logger = logging.getLogger(__name__)
 
 class ToolResult(BaseModel):
     output: str
@@ -22,7 +21,6 @@ class ToolResult(BaseModel):
 
 
 class Tool:
-    """Base class for all tools."""
     """Base tool definition."""
 
     name: str = ""
@@ -45,6 +43,27 @@ class Tool:
         raise NotImplementedError
 
 
+def _resolve_workspace_path(path: str) -> Path:
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    resolved = candidate.resolve()
+    workspace = Path.cwd().resolve()
+    if workspace == resolved or workspace in resolved.parents:
+        return resolved
+    raise PermissionError(f"Security violation: path escapes workspace: {path}")
+
+
+def _read_file_lines(path: Path) -> list[str]:
+    with path.open("r", encoding="utf-8") as fh:
+        return fh.readlines()
+
+
+def _write_file(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 class BashTool(Tool):
     name = "bash"
     description = "Execute a shell command and return the output"
@@ -60,23 +79,38 @@ class BashTool(Tool):
 
     async def execute(self, command: str, timeout: int = 60, workdir: str = ".", **_) -> ToolResult:
         try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                cwd=os.path.expanduser(workdir),
+            argv = shlex.split(command)
+            if not argv:
+                return ToolResult(output="Security policy: empty command is not allowed", error=True)
+
+            command_base = Path(argv[0]).name
+            if command_base not in _ALLOWED_BINARIES:
+                return ToolResult(
+                    output=f"Security policy violation: command '{command_base}' is not allowed",
+                    error=True,
+                )
+
+            process = await asyncio.create_subprocess_exec(
+                *argv,
+                cwd=str(_resolve_workspace_path(workdir)),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            output = result.stdout
-            if result.stderr:
-                output += f"\nSTDERR:\n{result.stderr}"
-            return ToolResult(output=output[:50000], error=result.returncode != 0)
-        except subprocess.TimeoutExpired:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            output = stdout.decode("utf-8", errors="replace")
+            stderr_text = stderr.decode("utf-8", errors="replace")
+            if stderr_text:
+                output += f"\nSTDERR:\n{stderr_text}"
+            return ToolResult(output=output[:50000], error=process.returncode != 0)
+        except asyncio.TimeoutError:
             return ToolResult(output=f"Command timed out after {timeout}s", error=True)
-        except Exception as e:
-            logger.error(f"Error executing tool: {e}")
-            return ToolResult(output=str(e), error=True)
+        except PermissionError as exc:
+            return ToolResult(output=str(exc), error=True)
+        except ValueError as exc:
+            return ToolResult(output=f"Invalid command syntax: {exc}", error=True)
+        except Exception as exc:
+            logger.error("Error executing tool: %s", exc)
+            return ToolResult(output=str(exc), error=True)
 
 
 class FileReadTool(Tool):
@@ -94,17 +128,18 @@ class FileReadTool(Tool):
 
     async def execute(self, path: str, offset: int = 1, limit: int = 500, **_) -> ToolResult:
         try:
-            p = os.path.expanduser(path)
-            with open(p, "r") as f:
-                lines = f.readlines()
-            selected = lines[offset - 1 : offset - 1 + limit]
+            resolved = _resolve_workspace_path(path)
+            lines = await asyncio.to_thread(_read_file_lines, resolved)
+            selected = lines[offset - 1: offset - 1 + limit]
             numbered = [f"{offset + i:6d}|{line}" for i, line in enumerate(selected)]
             return ToolResult(output="".join(numbered))
         except FileNotFoundError:
             return ToolResult(output=f"File not found: {path}", error=True)
-        except Exception as e:
-            logger.error(f"Error executing tool: {e}")
-            return ToolResult(output=str(e), error=True)
+        except PermissionError as exc:
+            return ToolResult(output=str(exc), error=True)
+        except Exception as exc:
+            logger.error("Error executing tool: %s", exc)
+            return ToolResult(output=str(exc), error=True)
 
 
 class FileWriteTool(Tool):
@@ -121,23 +156,18 @@ class FileWriteTool(Tool):
 
     async def execute(self, path: str, content: str, **_) -> ToolResult:
         try:
-            p = os.path.expanduser(path)
-            parent = os.path.dirname(p)
-            if parent:
-                os.makedirs(parent, exist_ok=True)
-            with open(p, "w") as f:
-                f.write(content)
+            resolved = _resolve_workspace_path(path)
+            await asyncio.to_thread(_write_file, resolved, content)
             return ToolResult(output=f"Wrote {len(content)} chars to {path}")
-        except Exception as e:
-            logger.error(f"Error executing tool: {e}")
-            return ToolResult(output=str(e), error=True)
+        except PermissionError as exc:
+            return ToolResult(output=str(exc), error=True)
+        except Exception as exc:
+            logger.error("Error executing tool: %s", exc)
+            return ToolResult(output=str(exc), error=True)
 
 
 class ToolRegistry:
-    """
-    Registry of available tools.
-    Provides methods to register, execute, and list tools.
-    """
+    """Registry of available tools."""
 
     def __init__(self):
         self._tools: dict[str, Tool] = {}

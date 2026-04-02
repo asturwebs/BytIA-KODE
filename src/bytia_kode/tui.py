@@ -10,9 +10,10 @@ from pathlib import Path
 
 from textual import work
 from textual.app import App, ComposeResult
+from textual import events
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Horizontal, Container
-from textual.widgets import Header, Footer, Static, Input
+from textual.widgets import Header, Footer, Static, TextArea, Button
 from textual.reactive import reactive
 from textual.message import Message as TextualMessage
 from rich.markdown import Markdown
@@ -25,6 +26,7 @@ from rich import box
 from bytia_kode.config import load_config
 from bytia_kode.agent import Agent
 from bytia_kode.providers.client import Message
+from bytia_kode import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -32,23 +34,30 @@ logger = logging.getLogger(__name__)
 SPINNER_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
 
 # Banner — wrapped in a Panel for the shadow effect
-BANNER_TEXT = "[bold #7ee787]██████╗ ██╗   ██╗████████╗██╗ █████╗     ██╗  ██╗ ██████╗ ██████╗ ███████╗[/]\n[bold #7ee787]██╔══██╗╚██╗ ██╔╝╚══██╔══╝██║██╔══██╗    ██║ ██╔╝██╔═══██╗██╔══██╗██╔════╝[/]\n[bold #7ee787]██████╔╝ ╚████╔╝    ██║   ██║███████║    █████╔╝ ██║   ██║██║  ██║█████╗  [/]\n[bold #7ee787]██╔══██╗  ╚██╔╝     ██║   ██║██╔══██╗    ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]\n[bold #7ee787]██████╔╝   ██║      ██║   ██║██║  ██║    ██║  ██╗╚██████╔╝██████╔╝███████╗[/]\n[bold #7ee787]╚═════╝    ╚═╝      ╚═╝   ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]\n[dim #58a6ff]                  Agentic Coding Assistant v0.3.0[/]"
+BANNER_ART = """[bold #7ee787]██████╗ ██╗   ██╗████████╗██╗ █████╗     ██╗  ██╗ ██████╗ ██████╗ ███████╗[/]
+[bold #7ee787]██╔══██╗╚██╗ ██╔╝╚══██╔══╝██║██╔══██╗    ██║ ██╔╝██╔═══██╗██╔══██╗██╔════╝[/]
+[bold #7ee787]██████╔╝ ╚████╔╝    ██║   ██║███████║    █████╔╝ ██║   ██║██║  ██║█████╗  [/]
+[bold #7ee787]██╔══██╗  ╚██╔╝     ██║   ██║██╔══██╗    ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]
+[bold #7ee787]██████╔╝   ██║      ██║   ██║██║  ██║    ██║  ██╗╚██████╔╝██████╔╝███████╗[/]
+[bold #7ee787]╚═════╝    ╚═╝      ╚═╝   ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]"""
 
 # Theme persistence file
 _THEME_FILE = Path.home() / ".bytia-kode" / "theme.json"
 
-DEFAULT_THEME = "textual-dark"
+DEFAULT_THEME = "monokai"
 
 
 def _load_theme() -> str:
     """Load saved theme preference."""
     try:
         if _THEME_FILE.exists():
-            return json.loads(_THEME_FILE.read_text()).get("theme", DEFAULT_THEME)
+            theme = json.loads(_THEME_FILE.read_text()).get("theme", DEFAULT_THEME)
+            if theme == "textual-dark":
+                theme = DEFAULT_THEME
+            return theme
     except Exception:
         pass
     return DEFAULT_THEME
-
 
 def _save_theme(theme: str):
     """Persist theme preference."""
@@ -120,6 +129,18 @@ class ChatMessage(Static):
         elif self.role == "system":
             yield Static(Text(f"  {self.msg_content}", style="dim italic"))
 
+class PromptTextArea(TextArea):
+    class Submitted(TextualMessage):
+        def __init__(self, text: str):
+            self.text = text
+            super().__init__()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            self.post_message(self.Submitted(self.text))
+            return
 
 class StatusBar(Static):
     """Status bar showing CWD, tokens, processing state."""
@@ -198,8 +219,6 @@ class BytIAKODEApp(App):
         Binding("ctrl+s", "show_skills", "Skills", show=True),
         Binding("ctrl+e", "toggle_safe_mode", "Safe", show=True),
         Binding("ctrl+x", "copy_last_code", "Copy Code", show=True),
-        Binding("ctrl-x", "copy_last_code", "Copy Code", show=True),
-        Binding("ctrl+x", "copy_last_code", "Copy Code", show=True),
         Binding("up", "history_up", "", show=False),
         Binding("down", "history_down", "", show=False),
     ]
@@ -210,6 +229,11 @@ class BytIAKODEApp(App):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        saved_theme = _load_theme()
+        if saved_theme == 'textual-dark':
+            saved_theme = DEFAULT_THEME
+            _save_theme(saved_theme)
+        self.theme = saved_theme
         self.config = load_config()
         self.agent = Agent(self.config)
         self._history: list[str] = []
@@ -220,12 +244,13 @@ class BytIAKODEApp(App):
         yield Header(show_clock=True)
         yield VerticalScroll(id="chat-area")
         yield StatusBar()
-        with Container(id="input-area"):
-            yield Input(placeholder="Escribe tu mensaje o /help", id="input-field")
+        with Horizontal(id="input-area"):
+            yield PromptTextArea(id="input-field", show_line_numbers=False, language="markdown")
+            yield Button("➜", id="send-button")
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#input-field", Input).focus()
+        self.query_one("#input-field", TextArea).focus()
 
         # Initialize status bar
         status = self.query_one(StatusBar)
@@ -234,22 +259,28 @@ class BytIAKODEApp(App):
             provider=self._provider_name(),
         )
 
-        # Show banner with shadow (Panel)
+        # Show banner (Panel)
         chat = self.query_one("#chat-area", VerticalScroll)
         banner_panel = Panel(
-            Text.from_markup(BANNER_TEXT),
-            border_style="#30363d",
+            Text.from_markup(BANNER_ART),
+            border_style="#6aff00",
             padding=(1, 2),
             expand=False,
         )
         chat.mount(Static(banner_panel))
+        
+        info_panel = Panel(
+            Text.from_markup(f"[cyan]Model:[/] {self.config.provider.model} | [cyan]Provider:[/] {self._provider_name()} | [cyan]Theme:[/] {self.theme} | [cyan]Version:[/] {__version__}\n[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"),
+            title="[dim]Session Info[/]",
+            border_style="cyan",
+            padding=(0, 1),
+            expand=False,
+        )
+        chat.mount(Static(info_panel))
+        
         chat.mount(Static(""))  # spacer
         chat.scroll_end(animate=False)
 
-        self._add_system_message(
-            f"Model: {self.config.provider.model} | "
-            f"Provider: {self._provider_name()} | /help for commands"
-        )
         if self.safe_mode:
             safe_text = Text("Safe mode ON (dangerous cmds require confirmation)")
             safe_text.stylize("dim italic")
@@ -325,22 +356,26 @@ class BytIAKODEApp(App):
                     tokens_in += chars // 4
         return tokens_in, tokens_out
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
+    def on_prompt_text_area_submitted(self, event: PromptTextArea.Submitted) -> None:
+        self._submit_prompt(event.text)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "send-button":
+            text = self.query_one("#input-field", TextArea).text
+            self._submit_prompt(text)
+
+    def _submit_prompt(self, raw_text: str) -> None:
         if self.is_processing:
             return
-
-        text = event.value.strip()
+        text = (raw_text or "").strip()
         if not text:
             return
-
-        event.input.value = ""
+        self.query_one("#input-field", TextArea).text = ""
         self._history.append(text)
         self._history_pos = len(self._history)
-
         if text.startswith("/"):
             self._handle_command(text)
             return
-
         self._add_message("user", text)
         self.is_processing = True
         self._start_spinner()
@@ -510,15 +545,15 @@ class BytIAKODEApp(App):
     def action_history_up(self):
         if self._history and self._history_pos > 0:
             self._history_pos -= 1
-            self.query_one("#input-field", Input).value = self._history[self._history_pos]
+            self.query_one("#input-field", TextArea).text = self._history[self._history_pos]
 
     def action_history_down(self):
         if self._history_pos < len(self._history) - 1:
             self._history_pos += 1
-            self.query_one("#input-field", Input).value = self._history[self._history_pos]
+            self.query_one("#input-field", TextArea).text = self._history[self._history_pos]
         else:
             self._history_pos = len(self._history)
-            self.query_one("#input-field", Input).value = ""
+            self.query_one("#input-field", TextArea).text = ""
 
     async def on_shutdown(self) -> None:
         self._stop_spinner()
@@ -532,3 +567,11 @@ def run_tui():
 
 if __name__ == "__main__":
     run_tui()
+
+
+
+
+
+
+
+

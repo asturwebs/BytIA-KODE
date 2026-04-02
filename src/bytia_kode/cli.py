@@ -10,6 +10,7 @@ from prompt_toolkit import PromptSession
 
 from bytia_kode.config import load_config
 from bytia_kode.agent import Agent
+from bytia_kode import __version__
 
 
 console = Console()
@@ -19,7 +20,7 @@ async def repl():
     config = load_config()
     agent = Agent(config)
 
-    console.print("\n[bold #7ee787]BytIA KODE[/bold #7ee787] v0.1.0 (simple mode)")
+    console.print(f"\n[bold #7ee787]BytIA KODE[/bold #7ee787] v{__version__} (simple mode)")
     console.print(f"[dim]Model: {config.provider.model} | Provider: {config.provider.base_url}[/dim]")
     console.print("[dim]/help for commands, /quit to exit[/dim]\n")
 

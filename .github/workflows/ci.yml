@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest build twine
+      - name: Validate metadata
+        run: python scripts/validate_metadata.py
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Build wheel
+        run: python -m build --wheel
+      - name: Check distributions
+        run: python -m twine check dist/*
+      - name: Verify packaged resource
+        run: |
+          python - <<'PY'
+          import glob
+          import os
+          import subprocess
+          import sys
+          import tempfile
+          import venv
+          from importlib import resources
+          from pathlib import Path
+
+          wheel = sorted(glob.glob('dist/*.whl'))[-1]
+          env_dir = Path(tempfile.mkdtemp(prefix='bytia-wheel-'))
+          venv.create(env_dir, with_pip=True)
+          py = env_dir / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+          subprocess.check_call([str(py), '-m', 'pip', 'install', wheel])
+          code = "from importlib import resources; r = resources.files('bytia_kode.prompts').joinpath('core_identity.yaml'); print(r.is_file())"
+          output = subprocess.check_output([str(py), '-c', code], text=True).strip()
+          if output != 'True':
+              raise SystemExit('core_identity.yaml no está disponible como recurso empaquetado')
+          PY

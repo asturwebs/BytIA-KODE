@@ -1,11 +1,10 @@
 """BytMemory connector for persistent memory."""
 from __future__ import annotations
 
-import os
 import json
 import logging
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +29,18 @@ class BytMemoryConnector:
         store_file = self.data_dir / "store.json"
         if store_file.exists():
             try:
-                self._store = json.loads(store_file.read_text())
-                logger.debug(f"Loaded {len(self._store)} memory entries")
-            except Exception as e:
-                logger.warning(f"Failed to load memory: {e}")
+                self._store = json.loads(store_file.read_text(encoding="utf-8"))
+                logger.debug("Loaded %s memory entries", len(self._store))
+            except json.JSONDecodeError as exc:
+                logger.error("Memory store is corrupted: %s", exc)
+                raise RuntimeError(f"Memory store is corrupted: {store_file}") from exc
+            except Exception as exc:
+                logger.error("Failed to load memory: %s", exc)
+                raise RuntimeError(f"Failed to load memory store: {store_file}") from exc
 
     def _save(self):
         store_file = self.data_dir / "store.json"
-        store_file.write_text(json.dumps(self._store, indent=2, ensure_ascii=False))
+        store_file.write_text(json.dumps(self._store, indent=2, ensure_ascii=False), encoding="utf-8")
 
     def add(self, key: str, content: str):
         self._store[key] = content
@@ -58,12 +61,21 @@ class BytMemoryConnector:
         return results
 
     def get_context(self) -> str:
-        """Get all memory as context for system prompt."""
+        """Get a bounded slice of memory as context for system prompt."""
         if not self._store:
             return ""
+        max_entries = 20
+        max_chars = 2000
         lines = ["## Memory\n"]
-        for key, value in self._store.items():
-            lines.append(f"- **{key}**: {value}")
+        current_length = len(lines[0])
+        selected_lines: list[str] = []
+        for key, value in reversed(list(self._store.items())[-max_entries:]):
+            line = f"- **{key}**: {value}"
+            if current_length + len(line) + 1 > max_chars:
+                continue
+            selected_lines.append(line)
+            current_length += len(line) + 1
+        lines.extend(reversed(selected_lines))
         return "\n".join(lines)
 
     def remove(self, key: str):

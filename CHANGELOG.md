@@ -1,25 +1,50 @@
 # Changelog
 
-Todas las versiones notables y cambios de este proyecto se documentaran en este archivo.
+Todos los cambios relevantes del proyecto se documentan en este archivo.
 
-El formato esta basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
-y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
+El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
-## [0.1.0] - 2026-04-02
-### Anadido
-- Interfaz de usuario de terminal (TUI) basada en Textual.
-- Bot de Telegram con control de acceso por lista blanca de usuarios.
-- Arquitectura agentica base con bucle de pensamiento y accion (think -> act -> observe).
-- Sistema extensible de herramientas (Tools) base (\ash\, \ile_read\, \ile_write\).
-- Soporte para multiples proveedores de LLM compatibles con OpenAI (Z.AI, OpenRouter, MiniMax, Ollama, llama.cpp).
-- Atajo \Ctrl+X\ para copiar facilmente el ultimo bloque de codigo generado.
+## [Unreleased]
 
-### Modificado
-- Mejorado el manejo de errores en el \ToolRegistry\ agregando logging detallado para fallos de comandos y lectura de archivos.
-- Ajustada la logica del agente para lidiar robustamente con argumentos JSON malformados.
-- Expancion segura de rutas usando \os.path.expanduser\ en la presentacion de la TUI.
-- Actualizacion de la documentacion principal (\README.md\).
+- Sin cambios publicados todavía después de `0.3.0`.
 
-### Arreglado
-- Correccion de redundancia de \isinstance\ y excepciones de JSON al interpretar argumentos de las herramientas.
-- Tipado estricto en la firma de herramientas para evitar posibles vulnerabilidades.
+## [0.3.1] - 2026-04-02
+### Security & Performance Hardening
+
+- Mitigaciones de seguridad completadas para SEC-001 (command injection), SEC-002/003 (path traversal) y SEC-005 (fail-secure en Telegram).
+- Motor de I/O asíncrono validado con benchmark comparativo: `5.01x` de speedup y `80.04%` de mejora frente a la tanda secuencial.
+- Memoria endurecida con carga estricta ante corrupción y contexto acotado a `20` entradas o `2000` caracteres.
+- Refactor ligero del agente extrayendo `_handle_tool_calls()` para mejorar legibilidad sin cambiar la lógica pública.
+
+## [0.3.0] - 2026-04-02
+### v0.3.0 - Arquitectura Constitucional Modular y Empaquetado de Recursos
+
+### Added
+- Directorio `src/bytia_kode/prompts/` con la identidad constitucional `core_identity.yaml`.
+- Subpaquete `bytia_kode.prompts` para distribuir recursos internos del proyecto.
+- Script `scripts/validate_metadata.py` para validar versión, autoría, documentación y limpieza mínima.
+- Hook versionado en `.githooks/pre-commit`.
+- Workflow de GitHub Actions para validación, tests, build y verificación del wheel.
+- Código de conducta del proyecto.
+
+### Changed
+- Refactor completo de `agent.py` para cargar la identidad con `importlib.resources`.
+- Metadatos del paquete alineados en `pyproject.toml` con versión `0.3.0`.
+- README reescrito para documentar instalación oficial por wheel y formato YAML de identidad.
+- Documentación técnica actualizada para reflejar la arquitectura modular y el empaquetado de recursos.
+- `.gitignore` reforzado para evitar reintroducción de backups y scripts de parcheo temporales.
+
+### Fixed
+- Eliminación de advertencias `Duplicate name` durante la construcción del wheel.
+- Corrección de errores recientes en el manejo del prompt multilinea de la TUI.
+- Corrección de la carga del system prompt para que funcione tanto en editable como en wheel instalado.
+
+### Validation
+- `pytest` pasando en modo editable.
+- `pytest` pasando sobre el wheel instalado en entorno limpio.
+- `python -m build --wheel` completado sin warnings duplicados.
+- `python -m twine check dist/*` completado correctamente.
+
+### Cleanup
+- Eliminación de backups, scripts temporales `fix_*` y `patch_*`, y directorios efímeros de pruebas.
+- Depuración del árbol del paquete para publicación y mantenimiento futuro.
