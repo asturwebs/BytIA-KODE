@@ -1,0 +1,17 @@
+{
+  "version": "0.3.0",
+  "milestones": {
+    "security": {
+      "score": 7,
+      "max": 10
+    },
+    "quality": {
+      "score": 8,
+      "max": 10
+    },
+    "tests": {
+      "count": 17
+    }
+  },
+  "date": "2026-04-02"
+}
