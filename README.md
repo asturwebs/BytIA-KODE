@@ -29,33 +29,24 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal avanzada, 
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
 
-## Instalación rápida
+## Instalación
+
+Requiere [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```bash
 git clone https://github.com/asturwebs/BytIA-KODE.git
 cd BytIA-KODE
 uv sync
-cp .env.example .env
+cp .env.example .env   # editar con tu provider y API key
 uv run bytia-kode
 ```
 
-## Build e instalación como paquete
+## Build como paquete
 
 ```bash
 uv build
 uv pip install ./dist/*.whl
 bytia-kode
-```
-
-## Instalación para desarrollo
-
-```bash
-git clone https://github.com/asturwebs/BytIA-KODE.git
-cd BytIA-KODE
-uv sync
-cp .env.example .env
-# Editar .env con tu provider y API key
-uv run bytia-kode
 ```
 
 ## Modos de ejecución
