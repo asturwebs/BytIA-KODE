@@ -7,6 +7,7 @@ from importlib import resources
 from textwrap import dedent
 from typing import Any, AsyncIterator
 
+import httpx
 import yaml
 
 from bytia_kode.config import AppConfig
@@ -57,6 +58,25 @@ def load_system_prompt() -> str:
     ).strip()
 
 
+def _sanitize_user_message(user_message: str) -> str:
+    filtered = "".join(ch for ch in user_message if ch.isprintable() or ch in "\n\t")
+    lines = [line.rstrip() for line in filtered.splitlines()]
+    sanitized = "\n".join(lines).strip()
+    return sanitized
+
+
+def _format_chat_error(exc: Exception) -> str:
+    if isinstance(exc, (TimeoutError, httpx.TimeoutException)):
+        return f"Provider timeout: {exc}"
+    if isinstance(exc, (ConnectionError, httpx.ConnectError, httpx.NetworkError)):
+        return f"Provider connection error: {exc}"
+    if isinstance(exc, httpx.HTTPError):
+        return f"Provider HTTP error: {exc}"
+    if isinstance(exc, RuntimeError):
+        return f"Provider runtime error: {exc}"
+    return f"Unexpected provider error: {exc}"
+
+
 class Agent:
     """
     The agentic loop: think -> act -> observe -> repeat.
@@ -85,73 +105,88 @@ class Agent:
 
     async def chat(self, user_message: str, provider: str = "primary") -> AsyncIterator[str]:
         """Process a user message through the agentic loop, yielding text chunks."""
-        self.messages.append(Message(role="user", content=user_message))
+        sanitized_message = _sanitize_user_message(user_message)
+        if not sanitized_message:
+            yield "Input discarded: empty or non-printable message."
+            return
+
+        self.messages.append(Message(role="user", content=sanitized_message))
 
         provider_client = self.providers.get(provider)
         tool_defs = self.tools.get_tool_defs()
 
-        for _iteration in range(self.max_iterations):
-            all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
+        try:
+            for _iteration in range(self.max_iterations):
+                all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
 
-            response = await provider_client.chat(
-                messages=all_messages,
-                tools=tool_defs if tool_defs else None,
-            )
-
-            self.messages.append(Message(
-                role="assistant",
-                content=response.content,
-                tool_calls=[tc.model_dump() for tc in response.tool_calls] if response.tool_calls else None,
-            ))
-
-            if not response.tool_calls:
-                if response.content:
-                    yield response.content
-                break
-
-            if response.content:
-                yield response.content
-
-            for tool_call in response.tool_calls:
-                fn = tool_call.function if isinstance(tool_call.function, dict) else {}
-                tool_name = fn.get("name")
-                raw_arguments = fn.get("arguments", {})
-                arguments = raw_arguments
-                if isinstance(raw_arguments, str):
-                    try:
-                        arguments = json.loads(raw_arguments)
-                    except json.JSONDecodeError:
-                        logger.error("Failed to decode JSON arguments: %s", raw_arguments)
-                        arguments = {}
-
-                if not isinstance(arguments, dict):
-                    arguments = {}
-
-                if not tool_name:
-                    self.messages.append(Message(
-                        role="tool",
-                        content="Invalid tool call: missing function name",
-                        tool_call_id=tool_call.id,
-                        name="invalid_tool",
-                    ))
-                    continue
-
-                logger.info("Tool call: %s(%s)", tool_name, arguments)
-                result: ToolResult = await self.tools.execute(tool_name, arguments)
+                response = await provider_client.chat(
+                    messages=all_messages,
+                    tools=tool_defs if tool_defs else None,
+                )
 
                 self.messages.append(Message(
-                    role="tool",
-                    content=result.output,
-                    tool_call_id=tool_call.id,
-                    name=tool_name,
+                    role="assistant",
+                    content=response.content,
+                    tool_calls=[tc.model_dump() for tc in response.tool_calls] if response.tool_calls else None,
                 ))
 
-        else:
-            yield "\n[Max iterations reached]"
+                if not response.tool_calls:
+                    if response.content:
+                        yield response.content
+                    break
+
+                if response.content:
+                    yield response.content
+
+                for tool_call in response.tool_calls:
+                    fn = tool_call.function if isinstance(tool_call.function, dict) else {}
+                    tool_name = fn.get("name")
+                    raw_arguments = fn.get("arguments", {})
+                    arguments = raw_arguments
+                    if isinstance(raw_arguments, str):
+                        try:
+                            arguments = json.loads(raw_arguments)
+                        except json.JSONDecodeError:
+                            logger.error("Failed to decode JSON arguments: %s", raw_arguments)
+                            arguments = {}
+
+                    if not isinstance(arguments, dict):
+                        arguments = {}
+
+                    if not tool_name:
+                        self.messages.append(Message(
+                            role="tool",
+                            content="Invalid tool call: missing function name",
+                            tool_call_id=tool_call.id,
+                            name="invalid_tool",
+                        ))
+                        continue
+
+                    logger.info("Tool call: %s(%s)", tool_name, arguments)
+                    result: ToolResult = await self.tools.execute(tool_name, arguments)
+
+                    self.messages.append(Message(
+                        role="tool",
+                        content=result.output,
+                        tool_call_id=tool_call.id,
+                        name=tool_name,
+                    ))
+            else:
+                yield "\n[Max iterations reached]"
+        except (TimeoutError, ConnectionError, RuntimeError, httpx.HTTPError) as exc:
+            error_message = _format_chat_error(exc)
+            logger.error("Agent chat failure: %s", error_message)
+            self.messages.append(Message(role="assistant", content=error_message))
+            yield error_message
 
     async def chat_stream(self, user_message: str, provider: str = "primary") -> AsyncIterator[str]:
         """Stream response for non-tool-use conversations."""
-        self.messages.append(Message(role="user", content=user_message))
+        sanitized_message = _sanitize_user_message(user_message)
+        if not sanitized_message:
+            yield "Input discarded: empty or non-printable message."
+            return
+
+        self.messages.append(Message(role="user", content=sanitized_message))
         all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
 
         provider_client = self.providers.get(provider)

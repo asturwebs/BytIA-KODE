@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 python scripts/validate_metadata.py
+python scripts/check_secrets.py
 python -m pytest -q
