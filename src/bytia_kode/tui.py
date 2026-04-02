@@ -219,6 +219,7 @@ class BytIAKODEApp(App):
         Binding("ctrl+s", "show_skills", "Skills", show=True),
         Binding("ctrl+e", "toggle_safe_mode", "Safe", show=True),
         Binding("ctrl+x", "copy_last_code", "Copy Code", show=True),
+        Binding("ctrl+shift+t", "change_theme", "Theme", show=True),
         Binding("up", "history_up", "", show=False),
         Binding("down", "history_down", "", show=False),
     ]
@@ -291,13 +292,14 @@ class BytIAKODEApp(App):
         if saved and saved != "textual-dark":
             self.theme = saved
 
-    def _on_theme_change(self, event) -> None:
+    def _watch_theme(self, theme_name: str) -> None:
         """Persist theme and update info panel when user switches it."""
-        _save_theme(self.theme)
+        super()._watch_theme(theme_name)
+        _save_theme(theme_name)
         try:
             info_widget = self.query_one("#info-panel", Static)
             info_panel = Panel(
-                Text.from_markup(f"[cyan]Model:[/] {self.config.provider.model} | [cyan]Provider:[/] {self._provider_name()} | [cyan]Theme:[/] {self.theme} | [cyan]Version:[/] {__version__}\n[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"),
+                Text.from_markup(f"[cyan]Model:[/] {self.config.provider.model} | [cyan]Provider:[/] {self._provider_name()} | [cyan]Theme:[/] {theme_name} | [cyan]Version:[/] {__version__}\n[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"),
                 title="[dim]Session Info[/]",
                 border_style="cyan",
                 padding=(0, 1),
