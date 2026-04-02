@@ -192,6 +192,18 @@ Motor I/O asíncrono validado con benchmark: **5.01x speedup** (80% mejora) fren
 - La TUI no muestra todavía streaming token a token real del proveedor.
 - La memoria persistente es local con contexto acotado (20 entries / 2000 chars). Sin búsqueda semántica todavía.
 
+## Contribuir
+
+Contribuciones, issues y sugerencias son bienvenidas.
+
+1. Fork del repositorio
+2. Rama para tu feature (`git checkout -b feature/mi-mejora`)
+3. Commit con cambios (`git commit -m 'feat: descripción'`)
+4. Push a la rama (`git push origin feature/mi-mejora`)
+5. Abre un Pull Request
+
+Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para los criterios de validación.
+
 ## Autores
 
 - **Pedro Luis Cuevas Villarrubia** (AsturWebs) `<pedro@asturwebs.es>`
