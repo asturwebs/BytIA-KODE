@@ -8,6 +8,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 - Sin cambios publicados todavía después de `0.3.0`.
 
+## [0.3.1] - 2026-04-02
+### Security & Performance Hardening
+
+- Mitigaciones de seguridad completadas para SEC-001 (command injection), SEC-002/003 (path traversal) y SEC-005 (fail-secure en Telegram).
+- Motor de I/O asíncrono validado con benchmark comparativo: `5.01x` de speedup y `80.04%` de mejora frente a la tanda secuencial.
+- Memoria endurecida con carga estricta ante corrupción y contexto acotado a `20` entradas o `2000` caracteres.
+- Refactor ligero del agente extrayendo `_handle_tool_calls()` para mejorar legibilidad sin cambiar la lógica pública.
+
 ## [0.3.0] - 2026-04-02
 ### v0.3.0 - Arquitectura Constitucional Modular y Empaquetado de Recursos
 

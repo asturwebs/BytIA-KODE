@@ -25,7 +25,15 @@ def is_suspicious_line(line: str) -> bool:
     if SK_PATTERN.search(line):
         return True
     matches = HIGH_ENTROPY_PATTERN.findall(line)
-    return any(not token.startswith('http') for token in matches)
+    for token in matches:
+        if token.startswith('http'):
+            continue
+        if '/' in token or ':' in token:
+            continue
+        if all(char in '0123456789abcdef' for char in token.lower()):
+            continue
+        return True
+    return False
 
 
 def main() -> None:
