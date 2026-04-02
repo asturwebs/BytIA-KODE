@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from bytia_kode.providers.client import ToolDef
 
 logger = logging.getLogger(__name__)
-_ALLOWED_BINARIES = {"ls", "pwd", "cat", "echo", "git", "grep", "find", "mkdir", "touch", "uv", "python", "wsl"}
+_ALLOWED_BINARIES = {"ls", "pwd", "cat", "echo", "git", "grep", "find", "mkdir", "touch", "uv", "python", "python3", "wsl"}
 
 
 class ToolResult(BaseModel):
