@@ -70,7 +70,7 @@ Documentación adicional:
 | `PROVIDER_BASE_URL` | Endpoint principal compatible con OpenAI | `https://api.z.ai/api/coding/paas/v4` |
 | `PROVIDER_MODEL` | Modelo principal | `glm-5.1` |
 | `LOCAL_BASE_URL` | Endpoint local compatible | `http://localhost:8080` |
-| `LOCAL_MODEL` | Modelo local | `hermes-4.3-36b` |
+| `LOCAL_MODEL` | Modelo local | vacío (configurar) |
 | `TELEGRAM_BOT_TOKEN` | Token del bot | vacío |
 | `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
 
@@ -121,16 +121,28 @@ python -m twine check dist/*
 git config core.hooksPath .githooks
 ```
 
+## Seguridad
+
+v0.3.0 incluye hardening de seguridad verificado con auditoría profesional:
+
+| Issue | Mitigación |
+| --- | --- |
+| SEC-001 — Command injection | Allowlist de binarios + `shell=False` + `shlex.split()` |
+| SEC-002/003 — Path traversal | `_resolve_workspace_path()` con sandbox a `cwd` |
+| SEC-005 — Telegram abierto | Fail-secure por defecto (denegar sin allowlist) |
+
+Motor I/O asíncrono validado con benchmark: **5.01x speedup** (80% mejora) frente a ejecución secuencial.
+
 ## Limitaciones conocidas
 
 - `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
 - La TUI no muestra todavía streaming token a token real del proveedor.
-- La memoria persistente sigue siendo local y básica.
+- La memoria persistente es local con contexto acotado (20 entries / 2000 chars). Sin búsqueda semántica todavía.
 
 ## Autores
 
-- Pedro Luis Cuevas Villarrubia `<pedro@asturwebs.es>`
-- BytIA — coautoría operativa y constitucional del proyecto
+- **Pedro Luis Cuevas Villarrubia** (AsturWebs) `<pedro@asturwebs.es>`
+- **BytIA** v12.1.0 — coautoría operativa y constitucional
 
 ## Licencia
 

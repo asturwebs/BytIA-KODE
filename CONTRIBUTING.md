@@ -3,10 +3,10 @@
 ## Validación obligatoria
 
 ```bash
-python scripts/validate_metadata.py
-python -m pytest -q
-python -m build --wheel
-python -m twine check dist/*
+uv run python scripts/validate_metadata.py
+uv run pytest -q
+uv run python -m build --wheel
+uv run python -m twine check dist/*
 ```
 
 ## Hook local versionado
