@@ -1,11 +1,25 @@
 [project]
 name = "bytia-kode"
 version = "0.3.0"
-description = "BytIA KODE - Agentic coding CLI & Telegram bot"
-authors = [{ name = "Asturwebs", email = "dev@asturwebs.com" }]
+description = "BytIA KODE - TUI agéntica con identidad constitucional modular y recursos empaquetados"
+authors = [{ name = "Pedro Luis Cuevas Villarrubia", email = "pedro@asturwebs.es" }]
+maintainers = [{ name = "BytIA" }]
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+keywords = ["tui", "agent", "llm", "yaml", "textual", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: User Interfaces",
+]
 dependencies = [
     "httpx>=0.28",
     "python-dotenv>=1.1",
@@ -19,19 +33,14 @@ dependencies = [
     "beautifulsoup4>=4.14.3",
 ]
 
-
 [project.urls]
 Repository = "https://github.com/asturwebs/BytIA-KODE"
 Issues = "https://github.com/asturwebs/BytIA-KODE/issues"
+Changelog = "https://github.com/asturwebs/BytIA-KODE/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-local = [
-    "llama-cpp-python>=0.3",
-]
-memory = [
-    "sentence-transformers>=4.0",
-    "faiss-cpu>=1.11",
-]
+local = ["llama-cpp-python>=0.3"]
+memory = ["sentence-transformers>=4.0", "faiss-cpu>=1.11"]
 
 [project.scripts]
 bytia-kode = "bytia_kode.tui:run_tui"
@@ -41,10 +50,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "textual-dev>=1.8.0",
-]
+dev = ["pytest>=9.0.2", "textual-dev>=1.8.0", "build>=1.4.2", "twine>=6.2.0"]
 
 [tool.hatch.build]
 exclude = [

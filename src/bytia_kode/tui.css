@@ -22,8 +22,8 @@ Footer .footer--key {
 /* Chat area */
 #chat-area {
     scrollbar-size: 1 1;
-    scrollbar-color: $panel;
-    scrollbar-background: $background;
+    scrollbar-color: $surface;
+    scrollbar-background: $boost;
     padding: 0 2;
 }
 
@@ -43,7 +43,7 @@ Footer .footer--key {
     height: 1;
     width: 100%;
     background: $surface;
-    color: $text-muted;
+    color: rgba(255, 255, 255, 0.5);
     padding: 0 2;
     margin: 0;
 }
@@ -54,15 +54,15 @@ Footer .footer--key {
     height: auto;
     max-height: 8;
     background: $surface;
-    border-top: solid $panel;
+    border-top: solid $surface;
     padding: 1 2;
     margin-bottom: 0;
 }
 
 #input-field {
-    background: $background;
+    background: $boost;
     color: $text;
-    border: tall $panel;
+    border: tall $surface;
     padding: 0 1;
 }
 
@@ -79,6 +79,20 @@ Footer .footer--key {
     border: tall $warning;
 }
 
+
+#send-button {
+    width: 5;
+    min-width: 5;
+    margin-left: 1;
+    background: $accent;
+    color: $text;
+    border: tall $accent;
+    text-style: bold;
+}
+
+#send-button:hover {
+    background: #58a6ff;
+}
 /* Panels — compact */
 Panel {
     padding: 0 1;

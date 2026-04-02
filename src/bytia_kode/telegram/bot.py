@@ -10,6 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 from bytia_kode.config import load_config, AppConfig
 from bytia_kode.agent import Agent
+from bytia_kode import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class TelegramBot:
             await update.message.reply_text("Not authorized.")
             return
         await update.message.reply_text(
-            "BytIA KODE v0.1.0\n"
+            f"BytIA KODE v{__version__}\n"
             f"Model: {self.config.provider.model}\n"
             "Send me a message to start coding!"
         )
