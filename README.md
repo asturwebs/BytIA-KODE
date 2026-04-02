@@ -27,13 +27,23 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal avanzada, 
 >
 > Formato de identidad del sistema: `YAML`
 >
-> Método oficial de instalación: wheel local con `pip install ./dist/*.whl`
+> Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
 
-## Instalación oficial
+## Instalación rápida
 
 ```bash
-python -m build --wheel
-pip install ./dist/*.whl
+git clone https://github.com/asturwebs/BytIA-KODE.git
+cd BytIA-KODE
+uv sync
+cp .env.example .env
+uv run bytia-kode
+```
+
+## Build e instalación como paquete
+
+```bash
+uv build
+uv pip install ./dist/*.whl
 bytia-kode
 ```
 
@@ -44,6 +54,8 @@ git clone https://github.com/asturwebs/BytIA-KODE.git
 cd BytIA-KODE
 uv sync
 cp .env.example .env
+# Editar .env con tu provider y API key
+uv run bytia-kode
 ```
 
 ## Modos de ejecución
@@ -126,10 +138,10 @@ Documentación adicional:
 ## Validación y release
 
 ```bash
-python scripts/validate_metadata.py
-python -m pytest -q
-python -m build --wheel
-python -m twine check dist/*
+uv run python scripts/validate_metadata.py
+uv run pytest -q
+uv build
+uv run python -m twine check dist/*
 ```
 
 ### Hook local versionado
