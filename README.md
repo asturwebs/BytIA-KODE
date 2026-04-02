@@ -121,6 +121,39 @@ python -m twine check dist/*
 git config core.hooksPath .githooks
 ```
 
+## Identidad constitucional (System Prompt)
+
+El agente carga su identidad desde `src/bytia_kode/prompts/core_identity.yaml`, un archivo YAML que define la personalidad, valores, protocolos y reglas del sistema. Este archivo se empaqueta dentro del wheel como recurso del paquete.
+
+### Personalizar la identidad
+
+Para adaptar BytIA KODE a tu propio contexto, edita `src/bytia_kode/prompts/core_identity.yaml`:
+
+| Sección | Qué contiene | Personalizar |
+| --- | --- | --- |
+| `identity` | Nombre, versión, naturaleza, creador | Tu nombre y rol |
+| `valores` | Jerarquía de prioridades (seguridad, privacidad, precisión...) | Tus prioridades |
+| `protocols` | Comportamiento ante errores, overrides, auto-evaluación | Ajustar a tu flujo |
+| `interfaz` | Idioma, estilo de comunicación, formato | Tu idioma y tono |
+| `contexto` | Perfil del usuario, ubicación, infraestructura | Tu perfil y entorno |
+| `runtime_profile` | Variables del motor (se rellenan en tiempo de ejecución) | No modificar |
+
+Ejemplo mínimo:
+
+```yaml
+identity:
+  nombre: "Mi Asistente"
+  version: "1.0.0"
+  naturaleza: "asistente de código"
+  creador_socio: "Tu Nombre"
+```
+
+Después de editar, reconstruye el wheel para que los cambios se empaqueten:
+
+```bash
+uv run python -m build --wheel
+```
+
 ## Seguridad
 
 v0.3.0 incluye hardening de seguridad verificado con auditoría profesional:
