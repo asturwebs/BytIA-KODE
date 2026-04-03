@@ -1,18 +1,16 @@
-"""BytIA KODE TUI - Disruptive CLI interface with Textual. v3"""
+"""BytIA KODE TUI - Theme-aware CLI interface with Textual. v4"""
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
-from datetime import datetime
 from pathlib import Path
 
 from textual import work
 from textual.app import App, ComposeResult
 from textual import events
 from textual.binding import Binding
-from textual.containers import VerticalScroll, Horizontal, Container
+from textual.containers import VerticalScroll, Horizontal
 from textual.widgets import Header, Footer, Static, TextArea, Button
 from textual.reactive import reactive
 from textual.message import Message as TextualMessage
@@ -30,37 +28,31 @@ from bytia_kode import __version__
 
 logger = logging.getLogger(__name__)
 
-# Spinner frames
 SPINNER_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
 
-# Banner — wrapped in a Panel for the shadow effect
-BANNER_ART = """[bold #7ee787]██████╗ ██╗   ██╗████████╗██╗ █████╗     ██╗  ██╗ ██████╗ ██████╗ ███████╗[/]
-[bold #7ee787]██╔══██╗╚██╗ ██╔╝╚══██╔══╝██║██╔══██╗    ██║ ██╔╝██╔═══██╗██╔══██╗██╔════╝[/]
-[bold #7ee787]██████╔╝ ╚████╔╝    ██║   ██║███████║    █████╔╝ ██║   ██║██║  ██║█████╗  [/]
-[bold #7ee787]██╔══██╗  ╚██╔╝     ██║   ██║██╔══██╗    ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]
-[bold #7ee787]██████╔╝   ██║      ██║   ██║██║  ██║    ██║  ██╗╚██████╔╝██████╔╝███████╗[/]
-[bold #7ee787]╚═════╝    ╚═╝      ╚═╝   ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]"""
+BANNER_ART = """[bold green]██████╗ ██╗   ██╗████████╗██╗ █████╗     ██╗  ██╗ ██████╗ ██████╗ ███████╗[/]
+[bold green]██╔══██╗╚██╗ ██╔╝╚══██╔══╝██║██╔══██╗    ██║ ██╔╝██╔═══██╗██╔══██╗██╔════╝[/]
+[bold green]██████╔╝ ╚████╔╝    ██║   ██║███████║    █████╔╝ ██║   ██║██║  ██║█████╗  [/]
+[bold green]██╔══██╗  ╚██╔╝     ██║   ██║██╔══██╗    ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]
+[bold green]██████╔╝   ██║      ██║   ██║██║  ██║    ██║  ██╗╚██████╔╝██████╔╝███████╗[/]
+[bold green]╚═════╝    ╚═╝      ╚═╝   ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]"""
 
-# Theme persistence file
 _THEME_FILE = Path.home() / ".bytia-kode" / "theme.json"
-
-DEFAULT_THEME = "monokai"
+DARK_THEMES = ["gruvbox", "monokai", "nord", "dracula", "catppuccin-mocha", "tokyo-night"]
+DEFAULT_THEME = "gruvbox"
 
 
 def _load_theme() -> str:
-    """Load saved theme preference."""
     try:
         if _THEME_FILE.exists():
-            theme = json.loads(_THEME_FILE.read_text()).get("theme", DEFAULT_THEME)
-            if theme == "textual-dark":
-                theme = DEFAULT_THEME
-            return theme
+            t = json.loads(_THEME_FILE.read_text()).get("theme", DEFAULT_THEME)
+            return t if t in DARK_THEMES else DEFAULT_THEME
     except Exception:
         pass
     return DEFAULT_THEME
 
+
 def _save_theme(theme: str):
-    """Persist theme preference."""
     try:
         _THEME_FILE.parent.mkdir(parents=True, exist_ok=True)
         _THEME_FILE.write_text(json.dumps({"theme": theme}))
@@ -69,8 +61,6 @@ def _save_theme(theme: str):
 
 
 class ChatMessage(Static):
-    """A single chat message widget — compact, no wasted vertical space."""
-
     def __init__(self, role: str, content: str, **kwargs):
         self.role = role
         self.msg_content = content
@@ -92,7 +82,7 @@ class ChatMessage(Static):
             yield Static(
                 Panel(
                     Markdown(self.msg_content),
-                    title="[bold #7ee787]KODE[/]",
+                    title="[bold green]KODE[/]",
                     title_align="left",
                     border_style="green",
                     padding=(0, 1),
@@ -129,6 +119,7 @@ class ChatMessage(Static):
         elif self.role == "system":
             yield Static(Text(f"  {self.msg_content}", style="dim italic"))
 
+
 class PromptTextArea(TextArea):
     class Submitted(TextualMessage):
         def __init__(self, text: str):
@@ -142,9 +133,8 @@ class PromptTextArea(TextArea):
             self.post_message(self.Submitted(self.text))
             return
 
-class StatusBar(Static):
-    """Status bar showing CWD, tokens, processing state."""
 
+class StatusBar(Static):
     def __init__(self, **kwargs):
         self._st_cwd = os.getcwd()
         self._st_model = ""
@@ -153,7 +143,7 @@ class StatusBar(Static):
         self._st_spinner_idx = 0
         self._st_tokens_in = 0
         self._st_tokens_out = 0
-        super().__init__("[bold #7ee787]Ready[/]", id="status-bar", **kwargs)
+        super().__init__("[bold green]Ready[/]", id="status-bar", **kwargs)
 
     def update_status(self, model: str = "", provider: str = "",
                       processing: bool = False, tokens_in: int = 0, tokens_out: int = 0):
@@ -175,37 +165,30 @@ class StatusBar(Static):
 
     def _refresh_display(self):
         parts = []
-
-        # Processing indicator
         if self._st_processing:
             spinner = SPINNER_FRAMES[self._st_spinner_idx]
-            parts.append(f"[bold #f0883e]{spinner} Thinking...[/]")
+            parts.append(f"[bold yellow]{spinner} Thinking...[/]")
         else:
-            parts.append("[bold #7ee787]Ready[/]")
+            parts.append("[bold green]Ready[/]")
 
-        # Model info
-        parts.append(f"[#58a6ff]{self._st_model}[/]")
-        parts.append(f"[#8b949e]{self._st_provider}[/]")
+        parts.append(f"[cyan]{self._st_model}[/]")
+        parts.append(f"[dim]{self._st_provider}[/]")
 
-        # Token counts
         if self._st_tokens_in or self._st_tokens_out:
-            parts.append(f"[#8b949e]in:{self._st_tokens_in} out:{self._st_tokens_out}[/]")
+            parts.append(f"[dim]in:{self._st_tokens_in} out:{self._st_tokens_out}[/]")
 
-        # CWD
         cwd = os.path.expanduser(self._st_cwd)
         home = os.path.expanduser("~")
         if cwd.startswith(home):
             cwd = "~" + cwd[len(home):]
         if len(cwd) > 40:
             cwd = "..." + cwd[-37:]
-        parts.append(f"[#6e7681]{cwd}[/]")
+        parts.append(f"[dim]{cwd}[/]")
 
         self.update("  |  ".join(parts))
 
 
 class BytIAKODEApp(App):
-    """The BytIA KODE TUI application."""
-
     TITLE = "BytIA KODE"
     SUB_TITLE = "Agentic Coding Assistant"
     CSS_PATH = "tui.css"
@@ -219,7 +202,7 @@ class BytIAKODEApp(App):
         Binding("ctrl+s", "show_skills", "Skills", show=True),
         Binding("ctrl+e", "toggle_safe_mode", "Safe", show=True),
         Binding("ctrl+x", "copy_last_code", "Copy Code", show=True),
-        Binding("ctrl+shift+t", "change_theme", "Theme", show=True),
+        Binding("f2", "change_theme", "Theme", show=True, priority=True),
         Binding("up", "history_up", "", show=False),
         Binding("down", "history_down", "", show=False),
     ]
@@ -230,11 +213,7 @@ class BytIAKODEApp(App):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        saved_theme = _load_theme()
-        if saved_theme == 'textual-dark':
-            saved_theme = DEFAULT_THEME
-            _save_theme(saved_theme)
-        self.theme = saved_theme
+        self.theme = _load_theme()
         self.config = load_config()
         self.agent = Agent(self.config)
         self._history: list[str] = []
@@ -253,61 +232,71 @@ class BytIAKODEApp(App):
     def on_mount(self) -> None:
         self.query_one("#input-field", TextArea).focus()
 
-        # Initialize status bar
         status = self.query_one(StatusBar)
         status.update_status(
             model=self.config.provider.model,
             provider=self._provider_name(),
         )
 
-        # Show banner (Panel)
         chat = self.query_one("#chat-area", VerticalScroll)
-        banner_panel = Panel(
+        chat.mount(Static(Panel(
             Text.from_markup(BANNER_ART),
-            border_style="#6aff00",
+            border_style="green",
             padding=(1, 2),
             expand=False,
-        )
-        chat.mount(Static(banner_panel))
-        
-        info_panel = Panel(
-            Text.from_markup(f"[cyan]Model:[/] {self.config.provider.model} | [cyan]Provider:[/] {self._provider_name()} | [cyan]Theme:[/] {self.theme} | [cyan]Version:[/] {__version__}\n[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"),
+        )))
+
+        chat.mount(Static(Panel(
+            Text.from_markup(
+                f"[cyan]Model:[/] {self.config.provider.model} | "
+                f"[cyan]Provider:[/] {self._provider_name()} | "
+                f"[cyan]Theme:[/] {self.theme} | "
+                f"[cyan]Version:[/] {__version__}\n"
+                "[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"
+            ),
             title="[dim]Session Info[/]",
             border_style="cyan",
             padding=(0, 1),
             expand=False,
-        )
-        chat.mount(Static(info_panel, id="info-panel"))
-        
-        chat.mount(Static(""))  # spacer
+        ), id="info-panel"))
+
+        chat.mount(Static(""))
         chat.scroll_end(animate=False)
 
         if self.safe_mode:
-            safe_text = Text("Safe mode ON (dangerous cmds require confirmation)")
-            safe_text.stylize("dim italic")
-            self._add_rich_message(safe_text)
+            t = Text("Safe mode ON (dangerous cmds require confirmation)")
+            t.stylize("dim italic")
+            chat.mount(Static(t))
 
-        # Restore saved theme last (after all UI is set up)
-        saved = _load_theme()
-        if saved and saved != "textual-dark":
-            self.theme = saved
-
-    def _watch_theme(self, theme_name: str) -> None:
-        """Persist theme and update info panel when user switches it."""
-        super()._watch_theme(theme_name)
+    def watch_theme(self, theme_name: str) -> None:
         _save_theme(theme_name)
         try:
-            info_widget = self.query_one("#info-panel", Static)
-            info_panel = Panel(
-                Text.from_markup(f"[cyan]Model:[/] {self.config.provider.model} | [cyan]Provider:[/] {self._provider_name()} | [cyan]Theme:[/] {theme_name} | [cyan]Version:[/] {__version__}\n[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"),
+            info = self.query_one("#info-panel", Static)
+            info.update(Panel(
+                Text.from_markup(
+                    f"[cyan]Model:[/] {self.config.provider.model} | "
+                    f"[cyan]Provider:[/] {self._provider_name()} | "
+                    f"[cyan]Theme:[/] {theme_name} | "
+                    f"[cyan]Version:[/] {__version__}\n"
+                    "[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"
+                ),
                 title="[dim]Session Info[/]",
                 border_style="cyan",
                 padding=(0, 1),
                 expand=False,
-            )
-            info_widget.update(info_panel)
+            ))
         except Exception:
             pass
+
+    def action_change_theme(self) -> None:
+        current = self.theme
+        try:
+            idx = DARK_THEMES.index(current)
+            next_idx = (idx + 1) % len(DARK_THEMES)
+        except ValueError:
+            next_idx = 0
+        self.theme = DARK_THEMES[next_idx]
+        self._add_system_message(f"Theme: {self.theme}")
 
     def _provider_name(self) -> str:
         url = self.config.provider.base_url
@@ -327,7 +316,6 @@ class BytIAKODEApp(App):
         chat.scroll_end(animate=False)
 
     def _add_rich_message(self, rich_content):
-        """Add a message with pre-rendered Rich content (avoids double-render of markup)."""
         chat = self.query_one("#chat-area", VerticalScroll)
         chat.mount(Static(rich_content))
         chat.scroll_end(animate=False)
@@ -352,11 +340,9 @@ class BytIAKODEApp(App):
         status.update_status(processing=False)
 
     def _tick_spinner(self):
-        status = self.query_one(StatusBar)
-        status.tick_spinner()
+        self.query_one(StatusBar).tick_spinner()
 
     def _count_tokens(self) -> tuple[int, int]:
-        """Count tokens from agent messages. Messages are Pydantic objects, not dicts."""
         tokens_in = 0
         tokens_out = 0
         for m in self.agent.messages:
@@ -375,8 +361,7 @@ class BytIAKODEApp(App):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "send-button":
-            text = self.query_one("#input-field", TextArea).text
-            self._submit_prompt(text)
+            self._submit_prompt(self.query_one("#input-field", TextArea).text)
 
     def _submit_prompt(self, raw_text: str) -> None:
         if self.is_processing:
@@ -431,9 +416,9 @@ class BytIAKODEApp(App):
     def _show_help(self):
         table = Table(title="BytIA KODE Commands", box=box.SIMPLE_HEAVY,
                       show_lines=False, padding=(0, 1), collapse_padding=True)
-        table.add_column("Command", style="bold #58a6ff", min_width=12)
-        table.add_column("Description", style="#c9d1d9")
-        table.add_column("Key", style="dim #8b949e", min_width=8)
+        table.add_column("Command", style="bold cyan", min_width=12)
+        table.add_column("Description", min_width=20)
+        table.add_column("Key", style="dim", min_width=8)
         for cmd, desc, key in [
             ("/help", "Show this help", ""),
             ("/quit", "Exit", "Ctrl+Q"),
@@ -455,8 +440,8 @@ class BytIAKODEApp(App):
         table = Table(title="Providers", box=box.SIMPLE_HEAVY,
                       padding=(0, 1), collapse_padding=True)
         table.add_column("Type", style="bold", min_width=10)
-        table.add_column("URL", style="#58a6ff", min_width=30)
-        table.add_column("Model", style="#7ee787")
+        table.add_column("URL", style="cyan", min_width=30)
+        table.add_column("Model", style="green")
         table.add_row("Primary", self.config.provider.base_url, self.config.provider.model)
         if self.config.provider.fallback_url:
             table.add_row("Fallback", self.config.provider.fallback_url, self.config.provider.fallback_model)
@@ -486,13 +471,11 @@ class BytIAKODEApp(App):
             async for chunk in self.agent.chat(text):
                 response_text += chunk
 
-            # Token count from agent messages (Pydantic objects with .content)
             tokens_in, tokens_out = self._count_tokens()
 
             if response_text:
                 self._add_message("assistant", response_text)
 
-            # Update status with token info
             status = self.query_one(StatusBar)
             status.update_status(
                 model=self.config.provider.model,
@@ -529,13 +512,11 @@ class BytIAKODEApp(App):
     def action_toggle_safe_mode(self):
         self.safe_mode = not self.safe_mode
         if self.safe_mode:
-            label = Text("Safe mode: ON", style="bold #7ee787")
+            self._add_rich_message(Text("Safe mode: ON", style="bold green"))
         else:
-            label = Text("Safe mode: OFF", style="bold #f0883e")
-        self._add_rich_message(label)
+            self._add_rich_message(Text("Safe mode: OFF", style="bold yellow"))
 
     def action_copy_last_code(self):
-        """Copy the last assistant code block or message to clipboard."""
         if not self.agent.messages:
             return
         last_msg = None
@@ -544,16 +525,15 @@ class BytIAKODEApp(App):
                 last_msg = msg
                 break
         if last_msg and last_msg.content:
-            text = last_msg.content
             import re
             code_blocks = re.findall(r"`[a-zA-Z0-9]*\
 (.*?)\
-`", text, re.DOTALL)
+`", last_msg.content, re.DOTALL)
             if code_blocks:
                 self.copy_to_clipboard(code_blocks[-1].strip())
                 self.notify("Code copied to clipboard!")
             else:
-                self.copy_to_clipboard(text.strip())
+                self.copy_to_clipboard(last_msg.content.strip())
                 self.notify("Message copied to clipboard!")
 
     def action_history_up(self):
@@ -581,11 +561,3 @@ def run_tui():
 
 if __name__ == "__main__":
     run_tui()
-
-
-
-
-
-
-
-

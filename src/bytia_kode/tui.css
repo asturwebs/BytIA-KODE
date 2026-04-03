@@ -6,7 +6,7 @@ Header {
 }
 
 Header .header--icon {
-    color: #7ee787;
+    color: $accent;
 }
 
 /* Footer: only override key colors */
@@ -15,7 +15,7 @@ Footer {
 }
 
 Footer .footer--key {
-    color: #58a6ff;
+    color: $accent;
     text-style: bold;
 }
 
@@ -43,7 +43,7 @@ Footer .footer--key {
     height: 1;
     width: 100%;
     background: $surface;
-    color: rgba(255, 255, 255, 0.5);
+    color: $text-disabled;
     padding: 0 2;
     margin: 0;
 }
@@ -91,7 +91,7 @@ Footer .footer--key {
 }
 
 #send-button:hover {
-    background: #58a6ff;
+    background: $primary;
 }
 /* Panels — compact */
 Panel {
