@@ -23,6 +23,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - Persistencia del tema seleccionado en `~/.bytia-kode/theme.json`.
 - Bordes de mensajes de chat (user, assistant, tool, error) reaccionan en tiempo real al cambiar tema.
 
+### Added
+
+- `F3` para cambiar entre providers configurados (primary → fallback → local → primary).
+- Comando `/models` para listar modelos disponibles del provider activo (Ollama/llama.cpp).
+- Comando `/use <model>` para seleccionar un modelo del provider activo.
+- `ProviderClient.list_models()` — consulta Ollama `/api/tags` y fallback a `/v1/models`.
+- `ProviderManager.list_available()` y `set_model()` para switching en runtime.
+- TUI usa `active_provider` para routing de chat (antes hardcodeado a "primary").
+
 ## [0.3.0] - 2026-04-02
 
 ### Added

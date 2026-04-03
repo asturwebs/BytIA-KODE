@@ -110,6 +110,8 @@ Documentación adicional:
 | `/history` | Historial reciente |
 | `/cwd` | Directorio actual |
 | `/safe` | Estado visual de safe mode |
+| `/models` | Listar modelos del provider activo |
+| `/use <model>` | Seleccionar modelo del provider activo |
 
 ### Atajos
 
@@ -124,6 +126,7 @@ Documentación adicional:
 | `Ctrl+E` | Alternar safe mode |
 | `Ctrl+X` | Copiar último bloque de código |
 | `F2` | Cambiar tema cíclicamente |
+| `F3` | Cambiar provider (primary/fallback/local) |
 | `↑` / `↓` | Historial de entrada |
 | `Enter` | Enviar prompt |
 

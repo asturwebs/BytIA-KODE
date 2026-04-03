@@ -58,3 +58,17 @@ class ProviderManager:
             await self._fallback.close()
         if self._local:
             await self._local.close()
+
+    def list_available(self) -> list[str]:
+        """Return list of configured provider names."""
+        available = ["primary"]
+        if self._fallback:
+            available.append("fallback")
+        if self._local:
+            available.append("local")
+        return available
+
+    def set_model(self, provider: str, model: str):
+        """Update model for a provider at runtime."""
+        client = self.get(provider)
+        client.model = model

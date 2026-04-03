@@ -204,6 +204,7 @@ class BytIAKODEApp(App):
         Binding("ctrl+e", "toggle_safe_mode", "Safe", show=True),
         Binding("ctrl+x", "copy_last_code", "Copy Code", show=True),
         Binding("f2", "change_theme", "Theme", show=True, priority=True),
+        Binding("f3", "switch_provider", "Provider", show=True, priority=True),
         Binding("up", "history_up", "", show=False),
         Binding("down", "history_down", "", show=False),
     ]
@@ -211,6 +212,7 @@ class BytIAKODEApp(App):
     is_processing: reactive[bool] = reactive(False)
     msg_count: reactive[int] = reactive(0)
     safe_mode: reactive[bool] = reactive(True)
+    active_provider: reactive[str] = reactive("primary")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -437,6 +439,11 @@ class BytIAKODEApp(App):
             self.action_toggle_safe_mode()
         elif cmd == "/cwd":
             self._add_system_message(f"CWD: {os.getcwd()}")
+        elif cmd == "/models":
+            self._show_models()
+        elif cmd.lower().startswith("/use "):
+            model_name = cmd_raw[5:].strip()
+            self._use_model(model_name)
         else:
             self._add_system_message(f"Unknown command: {cmd_raw}  |  /help for list")
 
@@ -455,6 +462,8 @@ class BytIAKODEApp(App):
             ("/tools", "List tools", "Ctrl+T"),
             ("/skills", "List skills", "Ctrl+S"),
             ("/safe", "Toggle safe mode", "Ctrl+E"),
+            ("/models", "List local models", ""),
+            ("/use <model>", "Select local model", ""),
             ("/history", "Show history", ""),
             ("/cwd", "Show current directory", ""),
         ]:
@@ -490,12 +499,67 @@ class BytIAKODEApp(App):
         else:
             self._add_system_message("No skills loaded.")
 
+    def _provider_display_name(self, provider: str) -> str:
+        names = {"primary": "Primary", "fallback": "Fallback", "local": "Local"}
+        return names.get(provider, provider)
+
+    def action_switch_provider(self) -> None:
+        available = self.agent.providers.list_available()
+        try:
+            idx = available.index(self.active_provider)
+            next_idx = (idx + 1) % len(available)
+        except ValueError:
+            next_idx = 0
+        self.active_provider = available[next_idx]
+        provider_client = self.agent.providers.get(self.active_provider)
+        name = self._provider_display_name(self.active_provider)
+        self._add_system_message(f"Switched to: {name} ({provider_client.model})")
+        status = self.query_one(StatusBar)
+        status.update_status(
+            model=provider_client.model,
+            provider=f"{name} [{self._provider_name()}]",
+        )
+
+    def _use_model(self, model_name: str):
+        if not model_name:
+            return
+        self.agent.providers.set_model(self.active_provider, model_name)
+        self._add_system_message(f"Model set to: {model_name}")
+        status = self.query_one(StatusBar)
+        status.update_status(
+            model=model_name,
+            provider=self._provider_display_name(self.active_provider),
+        )
+
+    @work(exclusive=True)
+    async def _show_models(self):
+        self._add_system_message("Fetching models...")
+        try:
+            client = self.agent.providers.get(self.active_provider)
+            models = await client.list_models()
+        except Exception as e:
+            self._add_system_message(f"Error: {e}")
+            return
+        if not models:
+            self._add_system_message("No models found. Is Ollama/llama running?")
+            return
+        table = Table(title=f"Models ({self._provider_display_name(self.active_provider)})",
+                      box=box.SIMPLE_HEAVY, padding=(0, 1), collapse_padding=True)
+        table.add_column("#", style="dim", min_width=3)
+        table.add_column("Model", style="cyan")
+        for i, m in enumerate(models, 1):
+            table.add_row(str(i), m)
+        chat = self.query_one("#chat-area", VerticalScroll)
+        chat.mount(Static(table))
+        chat.scroll_end(animate=False)
+        self._add_system_message("Use /use <model_name> to select.")
+
     @work(exclusive=True)
     async def _process_message(self, text: str):
         try:
             response_text = ""
 
-            async for chunk in self.agent.chat(text):
+            async for chunk in self.agent.chat(text, provider=self.active_provider):
                 response_text += chunk
 
             tokens_in, tokens_out = self._count_tokens()

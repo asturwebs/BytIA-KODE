@@ -156,3 +156,22 @@ class ProviderClient:
     async def close(self):
         if self._client and not self._client.is_closed:
             await self._client.aclose()
+
+    async def list_models(self) -> list[str]:
+        """List available models from Ollama or OpenAI-compatible endpoint."""
+        client = await self._get_client()
+        try:
+            resp = await client.get("/api/tags", timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                return [m["name"] for m in data.get("models", [])]
+        except Exception:
+            pass
+        try:
+            resp = await client.get("/v1/models", timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                return [m["id"] for m in data.get("data", [])]
+        except Exception:
+            pass
+        return []
