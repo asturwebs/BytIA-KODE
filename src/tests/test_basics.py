@@ -167,28 +167,6 @@ def test_agent_preserves_history_on_provider_runtime_error():
     assert agent.messages[0].content == "hola"
 
 
-def test_memory_store_raises_on_corrupted_json(tmp_path):
-    from bytia_kode.memory.store import BytMemoryConnector
-
-    memory_dir = tmp_path / 'memory'
-    memory_dir.mkdir(parents=True, exist_ok=True)
-    (memory_dir / 'store.json').write_text('{invalid', encoding='utf-8')
-
-    with pytest.raises(RuntimeError, match='Memory store is corrupted'):
-        BytMemoryConnector(tmp_path)
-
-
-def test_memory_context_is_bounded(tmp_path):
-    from bytia_kode.memory.store import BytMemoryConnector
-
-    connector = BytMemoryConnector(tmp_path)
-    for idx in range(30):
-        connector.add(f'k{idx}', 'x' * 150)
-
-    context = connector.get_context()
-    assert len(context) <= 2000
-    assert 'k0' not in context
-    assert 'k29' in context
 
 
 def test_telegram_bot_chat_hides_internal_errors():

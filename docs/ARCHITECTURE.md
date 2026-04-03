@@ -4,12 +4,11 @@ Documento actualizado para la release 0.4.0 (unreleased).
 
 ## Entrada principal
 
-- `src/bytia_kode/__main__.py`: selecciona TUI, CLI simple o bot Telegram.
+- `src/bytia_kode/__main__.py`: TUI por defecto, `--bot` para Telegram.
 
 ## Interfaces
 
 - `src/bytia_kode/tui.py` — interfaz Textual TUI (9 temas, streaming, reasoning)
-- `src/bytia_kode/cli.py` — REPL simple
 - `src/bytia_kode/telegram/bot.py` — bot con fail-secure por defecto
 
 ## Núcleo del agente
@@ -135,13 +134,6 @@ Skills son procedimientos reutilizables almacenados como archivos SKILL.md con f
 - `verify_skill()`: marca como verificada tras validación del usuario
 - `skill_summary()`: genera resumen para inyección en system prompt
 
-## Memoria
-
-- `memory/store.py` — almacenamiento JSON persistente
-
-- Carga estricta: `store.json` corrupto genera `RuntimeError`.
-- Contexto acotado: `get_context()` limita a las 20 entradas más recientes y máximo 2000 caracteres.
-
 ---
 
 ## Stack Técnico (dependencias externas)
@@ -169,7 +161,6 @@ Librerías y frameworks que usamos, no creamos. Versión mínima según `pyproje
 | --- | --- | --- |
 | [Textual](https://textual.textualize.io/) | >=8.2.1 | Framework TUI. App, Screens, Widgets, CSS, reactive, bindings. |
 | [Rich](https://rich.readthedocs.io/) | >=14.0 | Renderizado: Markdown, Panel, Table, Syntax, Text, Box. Usado por Textual internamente. |
-| [prompt-toolkit](https://python-prompt-toolkit.readthedocs.io/) | >=3.0 | REPL simple (`cli.py`). Historia, autocompletado. |
 
 ### Data / Config
 
@@ -184,13 +175,6 @@ Librerías y frameworks que usamos, no creamos. Versión mínima según `pyproje
 | Paquete | Versión | Uso |
 | --- | --- | --- |
 | [python-telegram-bot](https://docs.python-telegram-bot.org/) | >=22.0 | Bot de Telegram. API async v20+. |
-
-### Utilidades
-
-| Paquete | Versión | Uso |
-| --- | --- | --- |
-| [python-docx](https://python-docx.readthedocs.io/) | >=1.2.0 | Lectura de documentos Word (tool futura). |
-| [BeautifulSoup4](https://www.crummy.com/software/BeautifulSoup/) | >=4.14.3 | Parseo HTML (tool futura). |
 
 ### Dev dependencies
 

@@ -190,3 +190,33 @@ src/bytia_kode/
 - 17 tests pasando.
 - Tool reinstalada: `bytia-kode==0.3.0`.
 - Documentación actualizada: ARCHITECTURE.md, TUI.md, CHANGELOG.md, DEVLOG.md.
+
+---
+
+## 2026-04-03 - Sesión 9: Limpieza de peso muerto
+
+### Depuración de dependencias
+
+Auditoría completa del codebase para identificar código/peso muerto:
+
+| Item | Estado | Acción |
+| --- | --- | --- |
+| `python-docx` | Declarado, nunca importado | Eliminado (~2MB) |
+| `beautifulsoup4` | Declarado, nunca importado | Eliminado (~500KB) |
+| `prompt-toolkit` | Solo usado por `cli.py` (REPL inalcanzable) | Eliminado (~1MB) |
+| `cli.py` | REPL simple, nunca accesible desde entry point | Eliminado |
+| `memory/store.py` | `add()` nunca se llama → `get_context()` siempre vacío | Eliminado |
+| 2 tests de memoria | Testean módulo eliminado | Eliminados |
+| `__main__.py` | `--simple` flag ya no tiene destino | Simplificado |
+
+### Resultado
+
+- Dependencias: 9 → 6 (eliminadas 3)
+- Tests: 17 → 15
+- Archivos fuente: -2 (cli.py, memory/store.py)
+- Install size reducido ~3.5MB
+
+### Verificación
+
+- 15 tests pasando.
+- Tool reinstalada: `bytia-kode==0.4.0`.
