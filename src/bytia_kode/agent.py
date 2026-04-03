@@ -92,6 +92,7 @@ class Agent:
         self._max_context_tokens = MAX_CONTEXT_TOKENS
         self._system_prompt = load_system_prompt()
         self._bkode_path, self._bkode_content = self._load_bkode()
+        self._initialized = False
 
     def _load_bkode(self) -> tuple[Path | None, str]:
         """Walk up from CWD looking for B-KODE.md (like CLAUDE.md, HERMES.md)."""
@@ -184,6 +185,13 @@ class Agent:
           str               — text content chunk
           ("reasoning", str) — reasoning/thinking chunk
         """
+        if not self._initialized:
+            detected = await self.providers.auto_detect_model()
+            self._initialized = True
+            if not detected:
+                yield "No hay ningún modelo cargado en el router. Carga uno primero (routeron + UI en :8080/slots)."
+                return
+
         sanitized_message = _sanitize_user_message(user_message)
         if not sanitized_message:
             yield "Input discarded: empty or non-printable message."
