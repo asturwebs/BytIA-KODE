@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 > B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.
 
+### Added
+
+- **Auto-detect modelo del router** — `ProviderClient.detect_loaded_model()` consulta `/v1/models` y filtra `status: loaded`. `ProviderManager.auto_detect_model()` se ejecuta al arrancar y al cambiar provider. Si `PROVIDER_MODEL=auto`, detecta dinámicamente qué modelo hay en VRAM.
+- **llama.cpp Router support** — Single port (8080) multi-modelo. B-KODE se conecta al router y usa el modelo que esté cargado, sin hardcodear nombres.
+
+> B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.
+
 ### Removed (cleanup)
 
 - `python-docx` — dependencia declarada pero nunca importada. ~2MB eliminados del install.
@@ -35,7 +42,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - **Error handling en agentic loop** — Los errores de provider ya NO se persisten en `self.messages`. Antes causaban cascada de 400 Bad Request en turnos siguientes.
 - **Info-panel eliminado del chat area** — Reemplazado por una línea simple (`#info-line`) con B-KODE status y versión.
 - **Footer simplificado** — Solo muestra `Menu (Ctrl+P)`. El resto de bindings tienen `show=False`.
-- **Config defaults actualizados** — `PROVIDER_BASE_URL` → `http://localhost:8081/v1`, `PROVIDER_MODEL` → `glm-4.7-flash`, `FALLBACK_MODEL` → `glm-5-turbo`, `LOCAL_MODEL` → `gemma4:26b`.
+- **Config defaults actualizados** — `PROVIDER_BASE_URL` → `http://localhost:8080/v1` (router), `PROVIDER_MODEL` → `auto` (detección dinámica), `FALLBACK_MODEL` → `glm-5-turbo`, `LOCAL_MODEL` → `gemma4:26b`.
 
 ### Fixed
 

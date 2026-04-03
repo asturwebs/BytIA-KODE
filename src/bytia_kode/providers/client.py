@@ -216,3 +216,20 @@ class ProviderClient:
         except Exception:
             pass
         return []
+
+    async def detect_loaded_model(self) -> str | None:
+        """Query router API to find which model is currently loaded."""
+        try:
+            models = await self.list_models()
+            base = self.base_url.removesuffix("/v1")
+            client = await self._get_client()
+            resp = await client.get(f"{base}/v1/models", timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                for m in data.get("data", []):
+                    status = m.get("status", {}).get("value", "")
+                    if status == "loaded":
+                        return m["id"]
+        except Exception:
+            pass
+        return None

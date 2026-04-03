@@ -25,7 +25,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal avanzada, 
   <em>Comandos integrados · Benchmark: 4.90x speedup async</em>
 </p>
 
-> Release actual: `0.3.0`
+> Release actual: `0.4.0`
 >
 > Formato de identidad del sistema: `YAML`
 >

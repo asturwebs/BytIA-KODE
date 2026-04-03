@@ -355,6 +355,10 @@ class BytIAKODEApp(App):
         self.query_one("#input-field", TextArea).focus()
         self.watch(self, "active_provider", self._on_provider_changed)
 
+        self._auto_detect_model_worker = self.run_worker(
+            self._auto_detect_model, exclusive=True, group="model_detect"
+        )
+
         activity = self.query_one(ActivityIndicator)
         activity.set_status("ready")
 
@@ -386,6 +390,15 @@ class BytIAKODEApp(App):
     def _on_provider_changed(self, old_provider: str, new_provider: str) -> None:
         self._add_system_message(f"Switched to: {self._provider_display_name(new_provider)}")
         self.query_one(ActivityIndicator)._refresh()
+        self.run_worker(self._auto_detect_model, exclusive=True)
+
+    async def _auto_detect_model(self) -> None:
+        """Auto-detect loaded model from router on startup/provider switch."""
+        try:
+            await self.agent.providers.auto_detect_model()
+            self.query_one(ActivityIndicator)._refresh()
+        except Exception as exc:
+            logger.debug("Auto-detect model failed: %s", exc)
 
     def watch_theme(self, theme_name: str) -> None:
         _save_theme(theme_name)
