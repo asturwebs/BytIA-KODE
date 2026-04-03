@@ -17,6 +17,7 @@ SKIP_PATTERNS = [
     re.compile(r'import '),
     re.compile(r'from '),
     re.compile(r'\w+:$'),
+    re.compile(r'test_\w+'),
 ]
 
 

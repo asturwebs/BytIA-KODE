@@ -12,7 +12,6 @@ import httpx
 import yaml
 
 from bytia_kode.config import AppConfig
-from bytia_kode.memory.store import BytMemoryConnector
 from bytia_kode.providers.client import Message
 from bytia_kode.providers.manager import ProviderManager
 from bytia_kode.skills.loader import SkillLoader
@@ -88,7 +87,6 @@ class Agent:
         self.tools = ToolRegistry()
         self.skills = SkillLoader(skill_dirs=[config.skills_dir])
         self.skills.load_all()
-        self.memory = BytMemoryConnector(config.data_dir)
         self.messages: list[Message] = []
         self.max_iterations = 50
         self._max_context_tokens = MAX_CONTEXT_TOKENS
@@ -119,9 +117,6 @@ class Agent:
         skill_summary = self.skills.skill_summary()
         if skill_summary:
             parts.append(skill_summary)
-        mem_context = self.memory.get_context()
-        if mem_context:
-            parts.append(mem_context)
         return "\n\n".join(parts)
 
     def _estimate_tokens(self) -> int:

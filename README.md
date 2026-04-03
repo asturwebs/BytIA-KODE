@@ -54,10 +54,8 @@ bytia-kode
 ## Modos de ejecución
 
 ```bash
-uv run bytia-kode
-uv run python -m bytia_kode
-uv run python -m bytia_kode --simple
-uv run python -m bytia_kode --bot
+uv run bytia-kode          # TUI (por defecto)
+uv run python -m bytia_kode --bot  # Telegram bot
 ```
 
 ## Arquitectura resumida
@@ -65,7 +63,6 @@ uv run python -m bytia_kode --bot
 ```text
 __main__.py
   ├─ tui.py
-  ├─ cli.py
   └─ telegram/bot.py
 
 agent.py
@@ -73,8 +70,7 @@ agent.py
   ├─ providers/manager.py
   ├─ providers/client.py
   ├─ tools/registry.py
-  ├─ skills/loader.py
-  └─ memory/store.py
+  └─ skills/loader.py
 ```
 
 Documentación adicional:
@@ -269,7 +265,6 @@ BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCH
 | [PyYAML](https://pyyaml.org/) | Parseo de identidad y skills |
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | Variables de entorno |
 | [python-telegram-bot](https://docs.python-telegram-bot.org/) | Bot de Telegram |
-| [prompt-toolkit](https://python-prompt-toolkit.readthedocs.io/) | REPL simple |
 
 ## Seguridad
 
@@ -286,7 +281,6 @@ Motor I/O asíncrono validado con benchmark: **4.90x speedup** (80% mejora) fren
 ## Limitaciones conocidas
 
 - `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
-- La memoria persistente es local con contexto acotado (20 entries / 2000 chars). Sin búsqueda semántica todavía.
 - Las skills no registran tools dinámicas todavía (fase 2 prevista).
 - El estimador de tokens es una heurística (chars/3), no un tokenizer real.
 - No hay auto-fallback de providers (circuit breaker pendiente).
