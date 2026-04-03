@@ -258,3 +258,28 @@ Auditoría completa del codebase para identificar código/peso muerto:
 - 15 tests pasando.
 - TUI funcional: auto-detect Gemma 4, reasoning OK, tildes OK.
 - 133 t/s generación Gemma 4 (MoE: 26B total, 4B activos).
+
+---
+
+## 2026-04-03 - Sesión 10b: Bot Telegram → Router + Guard sin modelo
+
+### Bot migra de Ollama a router
+
+- `bot.py`: `provider="local"` (Ollama, CPU, ~15 t/s) → `provider="primary"` (router, GPU, ~133 t/s)
+- Motivo: Ollama en CPU puro = 9x más lento que llama.cpp en GPU
+- Lazy init: `auto_detect_model()` se ejecuta en el primer mensaje (no en `__init__`)
+- `_initialized` flag en Agent para ejecutar auto-detect una sola vez
+
+### Guard: sin modelo cargado
+
+- `auto_detect_model()` devuelve `bool` (True si detectó, False si no)
+- Si no hay modelo en VRAM, el agente yield mensaje claro: *"No hay ningún modelo cargado en el router"* en vez de fallar con 400
+
+### Bug fix
+
+- `@work(exclusive=True)` + `run_worker(exclusive=True)` = doble decoración → WorkerError. Fix: async def sin `@work`, solo `run_worker(exclusive=True)`
+
+### Verificación
+
+- 15 tests pasando.
+- Bot Telegram respondiendo vía router GPU (~133 t/s).

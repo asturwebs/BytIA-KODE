@@ -28,16 +28,20 @@ class ProviderManager:
                 config.local_model,
             )
 
-    async def auto_detect_model(self) -> None:
-        """If primary model is 'auto', detect loaded model from router."""
+    async def auto_detect_model(self) -> bool:
+        """If primary model is 'auto', detect loaded model from router.
+
+        Returns True if a model was detected, False otherwise.
+        """
         if self._primary.model != "auto":
-            return
+            return True
         loaded = await self._primary.detect_loaded_model()
         if loaded:
             self._primary.model = loaded
             logger.info("Auto-detected loaded model: %s", loaded)
-        else:
-            logger.warning("No model loaded on router, using 'auto' (may fail)")
+            return True
+        logger.warning("No model loaded on router")
+        return False
 
     @property
     def primary(self) -> ProviderClient:
