@@ -11,7 +11,8 @@ from textual.app import App, ComposeResult
 from textual import events
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Horizontal
-from textual.widgets import Header, Footer, Static, TextArea, Button
+from textual.widgets import Header, Footer, Static, TextArea, Button, ListView, ListItem, Label
+from textual.screen import ModalScreen
 from textual.reactive import reactive
 from textual.message import Message as TextualMessage
 from rich.markdown import Markdown
@@ -28,14 +29,13 @@ from bytia_kode import __version__
 
 logger = logging.getLogger(__name__)
 
-SPINNER_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
-
 BANNER_TEMPLATE = """[bold {accent}]██████╗      ██╗  ██╗ ██████╗ ██████╗ ███████╗    [dim italic]by AsturWebs & BytIA[/]
 [bold {accent}]██╔══██╗      ██║ ██╔╝██╔═══██╗██╔══██╗██╔════╝[/]
 [bold {accent}]██████╔╝      █████╔╝ ██║   ██║██║  ██║█████╗  [/]
 [bold {accent}]██╔══██╗      ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]
 [bold {accent}]██████╔╝      ██║  ██╗╚██████╔╝██████╔╝███████╗[/]
-[bold {accent}]╚═════╝       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]"""
+[bold {accent}]╚═════╝       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]
+[dim italic]Agente + Skills + Terminal = Enterprise Automation[/]"""
 
 _THEME_FILE = Path.home() / ".bytia-kode" / "theme.json"
 DARK_THEMES = ["gruvbox", "monokai", "nord", "dracula", "catppuccin-mocha", "tokyo-night",
@@ -135,78 +135,182 @@ class PromptTextArea(TextArea):
             return
 
 
-class StatusBar(Static):
+class ActivityIndicator(Static):
+    """Dynamic status bar showing agent state and context usage."""
+
     def __init__(self, **kwargs):
-        self._st_cwd = os.getcwd()
-        self._st_model = ""
-        self._st_provider = ""
-        self._st_processing = False
-        self._st_spinner_idx = 0
-        self._st_tokens_in = 0
-        self._st_tokens_out = 0
-        super().__init__("[bold green]Ready[/]", id="status-bar", **kwargs)
+        self._status = "ready"
+        self._detail = ""
+        super().__init__("", id="activity-indicator", **kwargs)
 
-    def update_status(self, model: str = "", provider: str = "",
-                      processing: bool = False, tokens_in: int = 0, tokens_out: int = 0):
-        if model:
-            self._st_model = model
-        if provider:
-            self._st_provider = provider
-        self._st_processing = processing
-        if tokens_in:
-            self._st_tokens_in = tokens_in
-        if tokens_out:
-            self._st_tokens_out = tokens_out
-        self._st_cwd = os.getcwd()
-        self._refresh_display()
+    def on_mount(self) -> None:
+        self._refresh()
+        self.watch(self.app, "theme", lambda *_: self._refresh())
 
-    def tick_spinner(self):
-        self._st_spinner_idx = (self._st_spinner_idx + 1) % len(SPINNER_FRAMES)
-        self._refresh_display()
+    def set_status(self, status: str, detail: str = ""):
+        self._status = status
+        self._detail = detail
+        self._refresh()
 
-    def _refresh_display(self):
-        parts = []
-        if self._st_processing:
-            spinner = SPINNER_FRAMES[self._st_spinner_idx]
-            parts.append(f"[bold yellow]{spinner} Thinking...[/]")
+    def _refresh(self):
+        try:
+            c = self.app._get_theme_colors()
+        except Exception:
+            c = {"accent": "#7ee787", "warning": "#f0883e", "error": "#ff5555"}
+        a, w, e = c.get("accent", "#7ee787"), c.get("warning", "#f0883e"), c.get("error", "#ff5555")
+        ctx_info = ""
+        model_info = ""
+        try:
+            agent = self.app.agent
+            used = agent._estimate_tokens()
+            total = agent._max_context_tokens
+            ctx_info = f" | ctx {used // 1000}k/{total // 1000}k"
+            try:
+                client = agent.providers.get(self.app.active_provider)
+                provider = self.app._provider_name()
+                model_info = f" | {provider} | {client.model}"
+            except Exception:
+                pass
+        except Exception:
+            pass
+        if self._status == "ready":
+            self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}[/]")
+        elif self._status == "thinking":
+            self.update(f"  [bold {w}]\u25d0 Thinking...{model_info}{ctx_info}[/]")
+        elif self._status == "tool":
+            self.update(f"  [bold {a}]\u25cf Running: {self._detail}{model_info}{ctx_info}[/]")
+        elif self._status == "error":
+            self.update(f"  [bold {e}]\u2717 Error[/]")
+        elif self._status == "skill":
+            self.update(f"  [bold {w}]\u270e {self._detail}{model_info}{ctx_info}[/]")
         else:
-            parts.append("[bold green]Ready[/]")
+            self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}[/]")
 
-        parts.append(f"[cyan]{self._st_model}[/]")
-        parts.append(f"[dim]{self._st_provider}[/]")
 
-        if self._st_tokens_in or self._st_tokens_out:
-            parts.append(f"[dim]in:{self._st_tokens_in} out:{self._st_tokens_out}[/]")
+class ThinkingBlock(Static):
+    """Collapsible reasoning/thinking block. Click or Ctrl+D to toggle."""
 
-        cwd = os.path.expanduser(self._st_cwd)
-        home = os.path.expanduser("~")
-        if cwd.startswith(home):
-            cwd = "~" + cwd[len(home):]
-        if len(cwd) > 40:
-            cwd = "..." + cwd[-37:]
-        parts.append(f"[dim]{cwd}[/]")
+    can_focus = True
 
-        self.update("  |  ".join(parts))
+    BINDINGS = [
+        Binding("enter", "toggle", "Toggle", show=False),
+    ]
+
+    _expanded: reactive[bool] = reactive(False)
+
+    def __init__(self, content: str, **kwargs):
+        self.thinking_content = content
+        super().__init__("", **kwargs)
+
+    def on_mount(self) -> None:
+        self._update_display()
+        self.watch(self, "_expanded", lambda *_: self._update_display())
+
+    def on_click(self) -> None:
+        self.toggle()
+
+    def action_toggle(self) -> None:
+        self.toggle()
+
+    def toggle(self):
+        self._expanded = not self._expanded
+
+    def append(self, delta: str):
+        self.thinking_content += delta
+        self._update_display()
+
+    def _update_display(self):
+        try:
+            c = self.app._get_theme_colors()
+        except Exception:
+            c = {"warning": "#f0883e", "accent": "#7ee787"}
+        w = c.get("warning", "#f0883e")
+        lines = self.thinking_content.strip().split("\n")
+        n_lines = len(lines)
+        if self._expanded:
+            preview = self.thinking_content[:3000]
+            if len(self.thinking_content) > 3000:
+                preview += f"\n... ({n_lines} lines total)"
+            self.update(Panel(
+                Text(preview, style=f"italic {w}"),
+                title=f"[bold {w}]\U0001f4ad Reasoning ({n_lines} lines)[/] [dim]click/Ctrl+D collapse[/]",
+                title_align="left",
+                border_style=w,
+                padding=(0, 1),
+                expand=False,
+            ))
+        else:
+            self.update(Panel(
+                Text(f"  {n_lines} lines of reasoning", style=f"dim italic {w}"),
+                title=f"[bold {w}]\U0001f4ad Reasoning[/] [dim]click/Ctrl+D expand[/]",
+                title_align="left",
+                border_style=w,
+                padding=(0, 1),
+                expand=False,
+            ))
+
+
+class CommandMenuScreen(ModalScreen):
+    """Ctrl+P popup with available commands."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss", "Close", show=False),
+        Binding("up", "cursor_up", "", show=False),
+        Binding("down", "cursor_down", "", show=False),
+        Binding("enter", "select", "", show=False),
+    ]
+
+    COMMANDS = [
+        ("\u2630  Quit", "quit"),
+        ("\u21ba  Reset conversation", "reset_conversation"),
+        ("\u2715  Clear screen", "clear_screen"),
+        ("\U0001f527  List tools", "show_tools"),
+        ("\U0001f4da  List skills", "show_skills"),
+        ("\u26a1  Toggle safe mode", "toggle_safe_mode"),
+        ("\U0001f3a8  Change theme", "change_theme"),
+        ("\u21c4  Switch provider", "switch_provider"),
+        ("\U0001f4cb  Copy last code block", "copy_last_code"),
+        ("\u2139  Show model info", "show_model"),
+        ("\U0001f4c2  List available models", "show_models"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield ListView(
+            *[ListItem(Label(cmd), id=f"cmd-{i}") for i, (cmd, _) in enumerate(self.COMMANDS)],
+            id="command-list",
+            initial_index=0,
+        )
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        try:
+            idx = self.query_one("#command-list", ListView).index
+            _, action = self.COMMANDS[idx]
+            self.dismiss(action)
+        except Exception:
+            self.dismiss(None)
 
 
 class BytIAKODEApp(App):
     TITLE = "BytIA KODE"
     SUB_TITLE = "Agentic Coding Assistant"
     CSS_PATH = "tui.css"
+    COMMAND_PALETTE_BINDING = ""
 
     BINDINGS = [
-        Binding("ctrl+q", "quit", "Quit", show=True),
-        Binding("ctrl+r", "reset_conversation", "Reset", show=True),
-        Binding("ctrl+l", "clear_screen", "Clear", show=True),
-        Binding("ctrl+m", "show_model", "Model", show=True),
-        Binding("ctrl+t", "show_tools", "Tools", show=True),
-        Binding("ctrl+s", "show_skills", "Skills", show=True),
-        Binding("ctrl+e", "toggle_safe_mode", "Safe", show=True),
-        Binding("ctrl+x", "copy_last_code", "Copy Code", show=True),
-        Binding("f2", "change_theme", "Theme", show=True, priority=True),
-        Binding("f3", "switch_provider", "Provider", show=True, priority=True),
-        Binding("up", "history_up", "", show=False),
-        Binding("down", "history_down", "", show=False),
+        Binding("ctrl+p", "show_command_menu", "Menu", show=True),
+        Binding("ctrl+q", "quit", "Quit", show=False),
+        Binding("ctrl+r", "reset_conversation", "Reset", show=False),
+        Binding("ctrl+l", "clear_screen", "Clear", show=False),
+        Binding("ctrl+m", "show_model", "Model info", show=False),
+        Binding("ctrl+t", "show_tools", "List tools", show=False),
+        Binding("ctrl+s", "show_skills", "List skills", show=False),
+        Binding("ctrl+d", "toggle_reasoning", "Reasoning", show=False),
+        Binding("ctrl+e", "toggle_safe_mode", "Safe mode", show=False),
+        Binding("ctrl+x", "copy_last_code", "Copy code", show=False),
+        Binding("f2", "change_theme", "Theme", show=False, priority=True),
+        Binding("f3", "switch_provider", "Provider", show=False, priority=True),
+        Binding("up", "history_up", "History prev", show=False),
+        Binding("down", "history_down", "History next", show=False),
     ]
 
     is_processing: reactive[bool] = reactive(False)
@@ -241,20 +345,18 @@ class BytIAKODEApp(App):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield VerticalScroll(id="chat-area")
-        yield StatusBar()
+        yield ActivityIndicator()
         with Horizontal(id="input-area"):
             yield PromptTextArea(id="input-field", show_line_numbers=False, language="markdown")
-            yield Button("➜", id="send-button")
+            yield Button("\u276f", id="send-button")
         yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#input-field", TextArea).focus()
+        self.watch(self, "active_provider", self._on_provider_changed)
 
-        status = self.query_one(StatusBar)
-        status.update_status(
-            model=self.config.provider.model,
-            provider=self._provider_name(),
-        )
+        activity = self.query_one(ActivityIndicator)
+        activity.set_status("ready")
 
         chat = self.query_one("#chat-area", VerticalScroll)
         c = self._get_theme_colors()
@@ -265,19 +367,13 @@ class BytIAKODEApp(App):
             expand=False,
         ), id="banner-panel"))
 
-        chat.mount(Static(Panel(
+        bk_status = f"[green]B-KODE.md[/]" if self.agent._bkode_path else "[dim]no B-KODE.md[/]"
+        chat.mount(Static(
             Text.from_markup(
-                f"[cyan]Model:[/] {self.config.provider.model} | "
-                f"[cyan]Provider:[/] {self._provider_name()} | "
-                f"[cyan]Theme:[/] {self.theme} | "
-                f"[cyan]Version:[/] {__version__}\n"
-                "[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"
+                f"  {bk_status} | v{__version__} | Ctrl+P menu | Shift+Drag select"
             ),
-            title="[dim]Session Info[/]",
-            border_style="cyan",
-            padding=(0, 1),
-            expand=False,
-        ), id="info-panel"))
+            id="info-line",
+        ))
 
         chat.mount(Static(""))
         chat.scroll_end(animate=False)
@@ -287,31 +383,22 @@ class BytIAKODEApp(App):
             t.stylize("dim italic")
             chat.mount(Static(t))
 
+    def _on_provider_changed(self, old_provider: str, new_provider: str) -> None:
+        self._add_system_message(f"Switched to: {self._provider_display_name(new_provider)}")
+        self.query_one(ActivityIndicator)._refresh()
+
     def watch_theme(self, theme_name: str) -> None:
         _save_theme(theme_name)
-        c = self._get_theme_colors()
         try:
+            self.query_one(ActivityIndicator)._refresh()
+        except Exception:
+            pass
+        try:
+            c = self._get_theme_colors()
             self.query_one("#banner-panel", Static).update(Panel(
                 Text.from_markup(self._render_banner()),
                 border_style=c["accent"],
                 padding=(1, 2),
-                expand=False,
-            ))
-        except Exception:
-            pass
-        try:
-            info = self.query_one("#info-panel", Static)
-            info.update(Panel(
-                Text.from_markup(
-                    f"[{c['secondary']}]Model:[/] {self.config.provider.model} | "
-                    f"[{c['secondary']}]Provider:[/] {self._provider_name()} | "
-                    f"[{c['secondary']}]Theme:[/] {theme_name} | "
-                    f"[{c['secondary']}]Version:[/] {__version__}\n"
-                    "[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"
-                ),
-                title="[dim]Session Info[/]",
-                border_style=c["secondary"],
-                padding=(0, 1),
                 expand=False,
             ))
         except Exception:
@@ -328,7 +415,11 @@ class BytIAKODEApp(App):
         self._add_system_message(f"Theme: {self.theme}")
 
     def _provider_name(self) -> str:
-        url = self.config.provider.base_url
+        try:
+            client = self.agent.providers.get(self.active_provider)
+            url = client.base_url
+        except Exception:
+            url = self.config.provider.base_url
         if "z.ai" in url:
             return "Z.AI"
         if "localhost" in url or "127.0.0.1" in url:
@@ -357,19 +448,17 @@ class BytIAKODEApp(App):
             self.msg_count += 1
 
     def _start_spinner(self):
-        status = self.query_one(StatusBar)
-        status.update_status(processing=True)
+        self.query_one(ActivityIndicator).set_status("thinking")
         self._spinner_timer = self.set_interval(0.1, self._tick_spinner)
 
     def _stop_spinner(self):
         if self._spinner_timer:
             self._spinner_timer.stop()
             self._spinner_timer = None
-        status = self.query_one(StatusBar)
-        status.update_status(processing=False)
+        self.query_one(ActivityIndicator).set_status("ready")
 
     def _tick_spinner(self):
-        self.query_one(StatusBar).tick_spinner()
+        pass  # ActivityIndicator handles its own refresh
 
     def _count_tokens(self) -> tuple[int, int]:
         tokens_in = 0
@@ -396,9 +485,17 @@ class BytIAKODEApp(App):
         if self.is_processing:
             return
         text = (raw_text or "").strip()
+        self.query_one("#input-field", TextArea).text = ""
+        # Skill capture mode: accumulate lines until empty line
+        if getattr(self, "_skill_capturing", False):
+            if not text:
+                # Empty line → finalize skill
+                self._finalize_skill_capture()
+            else:
+                self._skill_save_lines.append(text)
+            return
         if not text:
             return
-        self.query_one("#input-field", TextArea).text = ""
         self._history.append(text)
         self._history_pos = len(self._history)
         if text.startswith("/"):
@@ -429,6 +526,34 @@ class BytIAKODEApp(App):
             self._show_tools()
         elif cmd == "/skills":
             self._show_skills()
+        elif cmd.startswith("/skills save "):
+            parts = cmd_raw[13:].strip().split(maxsplit=1)
+            if not parts or not parts[0]:
+                self._add_system_message("Usage: /skills save <name> [description]")
+                return
+            name = parts[0]
+            description = parts[1] if len(parts) > 1 else ""
+            self._skill_save_name = name
+            self._skill_save_desc = description
+            self._skill_save_lines: list[str] = []
+            self._skill_capturing = True
+            self._add_system_message(f"Writing skill '{name}' — type content (empty line to finish):")
+        elif cmd.startswith("/skills show "):
+            name = cmd_raw[13:].strip()
+            skill = self.agent.skills.get(name)
+            if skill:
+                from rich.panel import Panel
+                chat = self.query_one("#chat-area", VerticalScroll)
+                chat.mount(Static(Panel(skill.instructions, title=f"Skill: {name}", border_style="cyan")))
+                chat.scroll_end(animate=False)
+            else:
+                self._add_system_message(f"Skill not found: {name}")
+        elif cmd.startswith("/skills verify "):
+            name = cmd_raw[15:].strip()
+            if self.agent.skills.verify_skill(name):
+                self._add_system_message(f"Skill verified: {name}")
+            else:
+                self._add_system_message(f"Skill not found: {name}")
         elif cmd == "/history":
             lines = self._history[-20:]
             self._add_system_message(
@@ -460,8 +585,12 @@ class BytIAKODEApp(App):
             ("/clear", "Clear screen", "Ctrl+L"),
             ("/model", "Show model info", "Ctrl+M"),
             ("/tools", "List tools", "Ctrl+T"),
-            ("/skills", "List skills", "Ctrl+S"),
+            ("/skills", "List skills", ""),
+            ("/skills save <name>", "Create skill", ""),
+            ("/skills show <name>", "Show skill content", ""),
+            ("/skills verify <name>", "Mark skill verified", ""),
             ("/safe", "Toggle safe mode", "Ctrl+E"),
+            ("", "Toggle reasoning view", "Ctrl+D"),
             ("/models", "List local models", ""),
             ("/use <model>", "Select local model", ""),
             ("/history", "Show history", ""),
@@ -492,12 +621,29 @@ class BytIAKODEApp(App):
         self._add_system_message(f"Tools: {', '.join(tools)}")
 
     def _show_skills(self):
-        skills = self.agent.skills.load_all()
-        if skills:
-            for name, skill in skills.items():
-                self._add_system_message(f"  {name}: {skill.description or '(no desc)'}")
+        names = self.agent.skills.list_skill_names()
+        if names:
+            for name in names:
+                skill = self.agent.skills.get(name)
+                verified = " [verified]" if skill and skill.verified else ""
+                desc = f": {skill.description}" if skill and skill.description else ""
+                self._add_system_message(f"  {name}{verified}{desc}")
         else:
-            self._add_system_message("No skills loaded.")
+            self._add_system_message("No skills saved. Use /skills save <name> to create one.")
+
+    def _finalize_skill_capture(self):
+        content = "\n".join(self._skill_save_lines)
+        name = self._skill_save_name or ""
+        description = self._skill_save_desc or ""
+        self._skill_capturing = False
+        try:
+            path = self.agent.skills.save_skill(name, content, description)
+            self._add_system_message(f"Skill saved: {path}")
+        except Exception as e:
+            self._add_system_message(f"Error saving skill: {e}")
+        self._skill_save_name = None
+        self._skill_save_desc = None
+        self._skill_save_lines = []
 
     def _provider_display_name(self, provider: str) -> str:
         names = {"primary": "Primary", "fallback": "Fallback", "local": "Local"}
@@ -514,22 +660,12 @@ class BytIAKODEApp(App):
         provider_client = self.agent.providers.get(self.active_provider)
         name = self._provider_display_name(self.active_provider)
         self._add_system_message(f"Switched to: {name} ({provider_client.model})")
-        status = self.query_one(StatusBar)
-        status.update_status(
-            model=provider_client.model,
-            provider=f"{name} [{self._provider_name()}]",
-        )
 
     def _use_model(self, model_name: str):
         if not model_name:
             return
         self.agent.providers.set_model(self.active_provider, model_name)
         self._add_system_message(f"Model set to: {model_name}")
-        status = self.query_one(StatusBar)
-        status.update_status(
-            model=model_name,
-            provider=self._provider_display_name(self.active_provider),
-        )
 
     @work(exclusive=True)
     async def _show_models(self):
@@ -559,22 +695,32 @@ class BytIAKODEApp(App):
     async def _process_message(self, text: str):
         try:
             response_text = ""
-
+            reasoning_text = ""
+            thinking_block: ThinkingBlock | None = None
+            stream_widget: Static | None = None
+            chat = self.query_one("#chat-area", VerticalScroll)
             async for chunk in self.agent.chat(text, provider=self.active_provider):
-                response_text += chunk
+                if isinstance(chunk, tuple) and chunk[0] == "reasoning":
+                    reasoning_text += chunk[1]
+                    if thinking_block is None:
+                        thinking_block = ThinkingBlock("")
+                        await chat.mount(thinking_block)
+                    thinking_block.append(chunk[1])
+                    chat.scroll_end(animate=False)
+                elif isinstance(chunk, str):
+                    response_text += chunk
+                    if stream_widget is None:
+                        stream_widget = Static("", id="streaming-output")
+                        await chat.mount(stream_widget)
+                    stream_widget.update(Markdown(response_text))
+                    chat.scroll_end(animate=False)
 
-            tokens_in, tokens_out = self._count_tokens()
-
+            # Finalize: remove streaming widget, add formatted message
+            if stream_widget and stream_widget.is_mounted:
+                stream_widget.remove()
             if response_text:
                 self._add_message("assistant", response_text)
-
-            status = self.query_one(StatusBar)
-            status.update_status(
-                model=self.config.provider.model,
-                provider=self._provider_name(),
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-            )
+            chat.scroll_end(animate=False)
 
         except Exception as e:
             logger.error(f"Chat error: {e}")
@@ -582,6 +728,14 @@ class BytIAKODEApp(App):
         finally:
             self._stop_spinner()
             self.is_processing = False
+
+    def action_show_command_menu(self) -> None:
+        def on_dismiss(action: str | None):
+            if action:
+                handler = getattr(self, f"action_{action}", None)
+                if handler:
+                    handler()
+        self.push_screen(CommandMenuScreen(), on_dismiss)
 
     def action_reset_conversation(self):
         self.agent.reset()
@@ -607,6 +761,11 @@ class BytIAKODEApp(App):
             self._add_rich_message(Text("Safe mode: ON", style="bold green"))
         else:
             self._add_rich_message(Text("Safe mode: OFF", style="bold yellow"))
+
+    def action_toggle_reasoning(self):
+        blocks = self.query(ThinkingBlock)
+        if blocks:
+            blocks.last().toggle()
 
     def action_copy_last_code(self):
         if not self.agent.messages:

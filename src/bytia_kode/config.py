@@ -21,18 +21,18 @@ def _env(key: str, default: str = "") -> str:
 @dataclass
 class ProviderConfig:
     """OpenAI-compatible provider configuration."""
-    base_url: str = field(default_factory=lambda: _env("PROVIDER_BASE_URL", "https://api.z.ai/api/coding/paas/v4"))
+    base_url: str = field(default_factory=lambda: _env("PROVIDER_BASE_URL", "http://localhost:8081/v1"))
     api_key: str = field(default_factory=lambda: _env("PROVIDER_API_KEY"))
-    model: str = field(default_factory=lambda: _env("PROVIDER_MODEL", "glm-5.1"))
+    model: str = field(default_factory=lambda: _env("PROVIDER_MODEL", "glm-4.7-flash"))
 
     # Fallback
-    fallback_url: str = field(default_factory=lambda: _env("FALLBACK_BASE_URL"))
+    fallback_url: str = field(default_factory=lambda: _env("FALLBACK_BASE_URL", "https://api.z.ai/api/coding/paas/v4"))
     fallback_key: str = field(default_factory=lambda: _env("FALLBACK_API_KEY"))
-    fallback_model: str = field(default_factory=lambda: _env("FALLBACK_MODEL"))
+    fallback_model: str = field(default_factory=lambda: _env("FALLBACK_MODEL", "glm-5-turbo"))
 
     # Local
-    local_url: str = field(default_factory=lambda: _env("LOCAL_BASE_URL", "http://localhost:8080"))
-    local_model: str = field(default_factory=lambda: _env("LOCAL_MODEL"))
+    local_url: str = field(default_factory=lambda: _env("LOCAL_BASE_URL", "http://localhost:11434/v1"))
+    local_model: str = field(default_factory=lambda: _env("LOCAL_MODEL", "gemma4:26b"))
 
 
 @dataclass
@@ -50,8 +50,12 @@ class AppConfig:
     log_level: str = field(default_factory=lambda: _env("LOG_LEVEL", "INFO"))
     data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", "~/.bytia-kode")).expanduser())
 
+    skills_dir: Path = field(init=False)
+
     def __post_init__(self):
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.skills_dir = self.data_dir / "skills"
+        self.skills_dir.mkdir(parents=True, exist_ok=True)
 
 
 def load_config() -> AppConfig:

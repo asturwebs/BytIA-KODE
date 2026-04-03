@@ -123,8 +123,14 @@ class ProviderClient:
         tools: list[ToolDef] | None = None,
         temperature: float = 0.3,
         max_tokens: int = 8192,
-    ) -> AsyncIterator[str]:
-        """Stream a chat completion, yielding text deltas."""
+    ) -> AsyncIterator[tuple[str, str | list[ToolCall]]]:
+        """Stream a chat completion with tool call and reasoning support.
+
+        Yields tuples of (type, data):
+          ("text", delta_str)         — text chunk
+          ("reasoning", delta_str)    — reasoning/thinking chunk
+          ("tool_calls", [ToolCall])  — accumulated tool calls (once, at end)
+        """
         client = await self._get_client()
 
         payload: dict = {
@@ -137,6 +143,8 @@ class ProviderClient:
         if tools:
             payload["tools"] = [t.model_dump() for t in tools]
 
+        tool_calls_acc: dict[int, dict] = {}
+
         async with client.stream("POST", "/chat/completions", json=payload) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
@@ -147,11 +155,43 @@ class ProviderClient:
                     break
                 try:
                     chunk = json.loads(data_str)
-                    delta = chunk["choices"][0].get("delta", {})
+                    choices = chunk.get("choices", [])
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {})
+
                     if delta.get("content"):
-                        yield delta["content"]
+                        yield ("text", delta["content"])
+
+                    reasoning = delta.get("reasoning_content") or delta.get("reasoning")
+                    if reasoning:
+                        yield ("reasoning", reasoning)
+
+                    if delta.get("tool_calls"):
+                        for tc_delta in delta["tool_calls"]:
+                            idx = tc_delta.get("index", 0)
+                            if idx not in tool_calls_acc:
+                                tool_calls_acc[idx] = {"id": "", "function": {"name": "", "arguments": ""}}
+                            if tc_delta.get("id"):
+                                tool_calls_acc[idx]["id"] = tc_delta["id"]
+                            func = tc_delta.get("function", {})
+                            if func.get("name"):
+                                tool_calls_acc[idx]["function"]["name"] += func["name"]
+                            if func.get("arguments"):
+                                tool_calls_acc[idx]["function"]["arguments"] += func["arguments"]
                 except (json.JSONDecodeError, KeyError, IndexError):
                     continue
+
+        if tool_calls_acc:
+            final_tool_calls = []
+            for idx in sorted(tool_calls_acc):
+                tc = tool_calls_acc[idx]
+                final_tool_calls.append(ToolCall(
+                    id=tc["id"],
+                    type="function",
+                    function=tc["function"],
+                ))
+            yield ("tool_calls", final_tool_calls)
 
     async def close(self):
         if self._client and not self._client.is_closed:

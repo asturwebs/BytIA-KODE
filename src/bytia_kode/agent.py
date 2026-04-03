@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from importlib import resources
+from pathlib import Path
 from textwrap import dedent
 from typing import Any, AsyncIterator
 
@@ -20,6 +21,7 @@ from bytia_kode.tools.registry import ToolRegistry, ToolResult
 logger = logging.getLogger(__name__)
 CORE_IDENTITY_PACKAGE = "bytia_kode.prompts"
 CORE_IDENTITY_RESOURCE = "core_identity.yaml"
+MAX_CONTEXT_TOKENS = 16384  # ~16k tokens default
 
 
 def load_identity() -> dict[str, Any]:
@@ -84,14 +86,36 @@ class Agent:
         self.config = config
         self.providers = ProviderManager(config.provider)
         self.tools = ToolRegistry()
-        self.skills = SkillLoader()
+        self.skills = SkillLoader(skill_dirs=[config.skills_dir])
+        self.skills.load_all()
         self.memory = BytMemoryConnector(config.data_dir)
         self.messages: list[Message] = []
         self.max_iterations = 50
+        self._max_context_tokens = MAX_CONTEXT_TOKENS
         self._system_prompt = load_system_prompt()
+        self._bkode_path, self._bkode_content = self._load_bkode()
+
+    def _load_bkode(self) -> tuple[Path | None, str]:
+        """Walk up from CWD looking for B-KODE.md (like CLAUDE.md, HERMES.md)."""
+        cwd = Path.cwd().resolve()
+        for candidate in (cwd, *cwd.parents):
+            bk = candidate / "B-KODE.md"
+            if bk.is_file():
+                try:
+                    content = bk.read_text(encoding="utf-8").strip()
+                    if content:
+                        logger.info("B-KODE.md loaded from %s", bk)
+                        return bk, content
+                except OSError as exc:
+                    logger.warning("Failed to read B-KODE.md at %s: %s", bk, exc)
+            if candidate == candidate.parent:
+                break
+        return None, ""
 
     def _build_system_prompt(self) -> str:
         parts = [self._system_prompt]
+        if self._bkode_content:
+            parts.append(f"# Project Instructions (B-KODE.md)\n\n{self._bkode_content}")
         skill_summary = self.skills.skill_summary()
         if skill_summary:
             parts.append(skill_summary)
@@ -99,6 +123,30 @@ class Agent:
         if mem_context:
             parts.append(mem_context)
         return "\n\n".join(parts)
+
+    def _estimate_tokens(self) -> int:
+        """Rough token estimate: chars / 3.5 for mixed content."""
+        total = len(self._build_system_prompt())
+        for m in self.messages:
+            if m.content:
+                total += len(m.content)
+            if m.tool_calls:
+                total += sum(len(str(tc)) for tc in m.tool_calls)
+        return total // 3
+
+    def _manage_context(self) -> None:
+        """Compress old messages when context exceeds 75% of max."""
+        threshold = int(MAX_CONTEXT_TOKENS * 0.75)
+        while self._estimate_tokens() > threshold and len(self.messages) > 4:
+            old = self.messages[:2]
+            summary_text = " | ".join(
+                f"{m.role[:3].upper()}: {m.content[:80]}..." for m in old
+            )
+            summary_msg = Message(
+                role="system",
+                content=f"[Previous conversation summarized] {summary_text}",
+            )
+            self.messages = [summary_msg] + self.messages[len(old):]
 
     async def _handle_tool_calls(self, tool_calls) -> None:
         for tool_call in tool_calls:
@@ -134,8 +182,13 @@ class Agent:
                 name=tool_name,
             ))
 
-    async def chat(self, user_message: str, provider: str = "primary") -> AsyncIterator[str]:
-        """Process a user message through the agentic loop, yielding text chunks."""
+    async def chat(self, user_message: str, provider: str = "primary") -> AsyncIterator[str | tuple[str, str]]:
+        """Process a user message through the agentic loop, streaming text and reasoning chunks.
+
+        Yields:
+          str               — text content chunk
+          ("reasoning", str) — reasoning/thinking chunk
+        """
         sanitized_message = _sanitize_user_message(user_message)
         if not sanitized_message:
             yield "Input discarded: empty or non-printable message."
@@ -144,56 +197,42 @@ class Agent:
         self.messages.append(Message(role="user", content=sanitized_message))
         provider_client = self.providers.get(provider)
         tool_defs = self.tools.get_tool_defs()
+        self._manage_context()
 
         try:
             for _iteration in range(self.max_iterations):
                 all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
-                response = await provider_client.chat(
+                response_text = ""
+                tool_calls_accum: list = []
+
+                async for chunk_type, data in provider_client.chat_stream(
                     messages=all_messages,
                     tools=tool_defs if tool_defs else None,
-                )
+                ):
+                    if chunk_type == "text" and isinstance(data, str):
+                        response_text += data
+                        yield data
+                    elif chunk_type == "reasoning" and isinstance(data, str):
+                        yield ("reasoning", data)
+                    elif chunk_type == "tool_calls" and isinstance(data, list):
+                        tool_calls_accum = data
 
                 self.messages.append(Message(
                     role="assistant",
-                    content=response.content,
-                    tool_calls=[tc.model_dump() for tc in response.tool_calls] if response.tool_calls else None,
+                    content=response_text or None,
+                    tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
                 ))
 
-                if not response.tool_calls:
-                    if response.content:
-                        yield response.content
+                if not tool_calls_accum:
                     break
 
-                if response.content:
-                    yield response.content
-
-                await self._handle_tool_calls(response.tool_calls)
+                await self._handle_tool_calls(tool_calls_accum)
             else:
                 yield "\n[Max iterations reached]"
         except (TimeoutError, ConnectionError, RuntimeError, httpx.HTTPError) as exc:
             error_message = _format_chat_error(exc)
             logger.error("Agent chat failure: %s", error_message)
-            self.messages.append(Message(role="assistant", content=error_message))
             yield error_message
-
-    async def chat_stream(self, user_message: str, provider: str = "primary") -> AsyncIterator[str]:
-        """Stream response for non-tool-use conversations."""
-        sanitized_message = _sanitize_user_message(user_message)
-        if not sanitized_message:
-            yield "Input discarded: empty or non-printable message."
-            return
-
-        self.messages.append(Message(role="user", content=sanitized_message))
-        all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
-        provider_client = self.providers.get(provider)
-
-        full_response = ""
-        async for chunk in provider_client.chat_stream(messages=all_messages):
-            full_response += chunk
-            yield chunk
-
-        if full_response:
-            self.messages.append(Message(role="assistant", content=full_response))
 
     def reset(self):
         """Clear conversation history."""

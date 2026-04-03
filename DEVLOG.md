@@ -90,3 +90,103 @@ src/bytia_kode/
 - `uv run pytest -v` → 17 passed in 0.30s
 - Pre-commit hook: metadata OK + secret scan OK + pytest OK
 - Repo publicado en GitHub: https://github.com/asturwebs/BytIA-KODE
+
+---
+
+## 2026-04-03 - Sesión 7: UX Avanzada + Skills System
+
+### Temas y provider switching
+
+- Banner ASCII actualizado a "B KODE" con colores dinámicos por tema.
+- 3 temas claros añadidos (catppuccin-latte, solarized-light, rose-pine-dawn). Total: 9 temas.
+- `F2` cambia tema cíclicamente con persistencia en `~/.bytia-kode/theme.json`.
+- Bordes de mensajes de chat reactivos al cambio de tema (on_mount + watch pattern).
+- `F3` para switching entre providers (primary → fallback → local).
+- `/models` lista modelos del provider activo (Ollama `/api/tags` + `/v1/models` fallback).
+- `/use <model>` selecciona modelo en runtime.
+
+### Paper analysis
+
+- Análisis de "Terminal Agents Suffice for Enterprise Automation" (arXiv:2604.00073).
+- Hallazgos clave: skills persistentes +5.8pp success rate, -43.7% coste.
+- Exploración del sistema de skills de Hermes Agent CLI instalado en WSL2.
+
+### Skills System (v0.3.1)
+
+- `AppConfig.skills_dir` → `~/.bytia-kode/skills/` (auto-creado).
+- `SkillLoader`: `save_skill()`, `list_skill_names()`, `get_skill()`, `verify_skill()`.
+- `get_relevant()` con scoring (trigger +3, description +2, content +1).
+- Campo `verified` parseado del frontmatter YAML.
+- Comandos TUI: `/skills save` (multiline capture), `/skills show`, `/skills verify`.
+- Skill `skill-creator` creada como meta-skill de bootstrap.
+- Formato SKILL.md compatible agentskills.io.
+
+### Verificación
+
+- 17 tests pasando.
+- Tool instalado y verificado.
+
+---
+
+## 2026-04-03 - Sesión 8: Streaming, Reasoning, Context Management, TUI v4
+
+### Streaming real
+
+- `ProviderClient.chat_stream()` reescrito para consumir SSE y yield tuples:
+  - `("text", delta)` — texto visible
+  - `("reasoning", delta)` — razonamiento (DeepSeek `reasoning_content`, Gemma 4 `reasoning`)
+  - `("tool_calls", [ToolCall])` — tool calls acumuladas por índice SSE
+- Tool calls se acumulan incrementalmente (deltas con `index` en SSE).
+- La TUI renderiza con streaming: plain `Static` durante streaming, `ChatMessage` formateado al finalizar.
+
+### Reasoning / Thinking
+
+- `ThinkingBlock(Static)` — widget colapsable con `can_focus = True`.
+- Click o Enter para toggle expandir/colapsar.
+- Se monta al recibir el primer chunk de reasoning y se actualiza con `append()` en cada delta.
+- Soporta múltiples ThinkingBlock en la conversación, cada uno toggleable independientemente.
+- Formato: preview de 3000 chars expandido, "N lines of reasoning" colapsado.
+
+### B-KODE.md
+
+- Fichero de instrucciones a nivel proyecto (como CLAUDE.md/HERMES.md).
+- Búsqueda walk-up desde CWD hasta filesystem root (`candidate == candidate.parent`).
+- Inyectado en system prompt: identidad → B-KODE.md → skills → memoria.
+- Status mostrado en info line del chat.
+
+### Context window management
+
+- `MAX_CONTEXT_TOKENS = 16384`.
+- `_estimate_tokens()`: heurística chars/3 (incluye system prompt).
+- `_manage_context()`: comprime los 2 mensajes más antiguos en resumen cuando se supera 75% del límite.
+- `ActivityIndicator` muestra `ctx Xk/Yk` en tiempo real.
+
+### TUI v4 refactor
+
+- **ActivityIndicator** — Nueva barra de estado encima del input. Muestra: estado, provider, modelo, contexto.
+- **CommandMenuScreen** — Popup con Ctrl+P. `ListView` con 11 comandos seleccionables.
+- **`COMMAND_PALETTE_BINDING = ""`** — Deshabilita paleta built-in de Textual.
+- **Session Info movida** — De panel en chat area a ActivityIndicator. Info line simplificada (solo B-KODE status + versión).
+- **Footer simplificado** — Solo `Menu (Ctrl+P)` visible. Resto de bindings con `show=False`.
+
+### Config actualizada
+
+- Primary: `glm-4.7-flash` en `localhost:8081/v1` (llama.cpp)
+- Fallback: `glm-5-turbo` en `api.z.ai` (Z.AI cloud API)
+- Local: `gemma4:26b` en `localhost:11434/v1` (Ollama)
+
+### Bugs fixed
+
+1. `COMMAND_PALETTE_BINDING = None` → `NoneType.rpartition()` crash → Fix: `""`
+2. CommandMenuScreen vacía (ListView en VerticalScroll colapsaba) → Fix: ListView directo
+3. ActivityIndicator no visible (`dock: bottom` conflicto) → Fix: remover dock
+4. ThinkingBlock._render() conflicto con Textual → Fix: renombrar a `_update_display()`
+5. Errores de provider persistidos en historial → cascada de 400 Bad Request → Fix: no persistir
+6. `watch_theme` con variable `c` no definida → Fix: eliminar código duplicado
+7. `agent._max_context_tokens` no existía → Fix: atributo en `__init__`
+
+### Verificación
+
+- 17 tests pasando.
+- Tool reinstalada: `bytia-kode==0.3.0`.
+- Documentación actualizada: ARCHITECTURE.md, TUI.md, CHANGELOG.md, DEVLOG.md.

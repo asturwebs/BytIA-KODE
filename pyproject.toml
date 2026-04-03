@@ -1,7 +1,7 @@
 [project]
 name = "bytia-kode"
-version = "0.3.0"
-description = "BytIA KODE - TUI agéntica con identidad constitucional modular y recursos empaquetados"
+version = "0.4.0"
+description = "B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI."
 authors = [{ name = "Pedro Luis Cuevas Villarrubia", email = "pedro@asturwebs.es" }]
 maintainers = [{ name = "BytIA" }]
 readme = "README.md"
