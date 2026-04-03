@@ -8,6 +8,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 > B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.
 
+### Removed (cleanup)
+
+- `python-docx` — dependencia declarada pero nunca importada. ~2MB eliminados del install.
+- `beautifulsoup4` — dependencia declarada pero nunca importada. ~500KB eliminados del install.
+- `prompt-toolkit` — solo usada por `cli.py` (REPL simple inalcanzable desde el entry point). ~1MB eliminado.
+- `cli.py` — REPL simple eliminada. Entry point `bytia-kode` siempre lanza TUI. `--simple` flag eliminado.
+- `memory/store.py` — sistema de memoria persistente eliminado. `add()` nunca se llamaba, `get_context()` siempre devolvía `""`. Agente simplificado.
+- 2 tests de memoria eliminados (test_memory_store_raises_on_corrupted_json, test_memory_context_is_bounded).
+
 ### Added
 
 - **Streaming real token a token** — `chat_stream()` en `ProviderClient` consume SSE y yield chunks (`("text", str)`, `("reasoning", str)`, `("tool_calls", list)`) en tiempo real.
