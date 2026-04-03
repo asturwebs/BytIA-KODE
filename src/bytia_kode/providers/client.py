@@ -159,16 +159,17 @@ class ProviderClient:
 
     async def list_models(self) -> list[str]:
         """List available models from Ollama or OpenAI-compatible endpoint."""
+        base = self.base_url.removesuffix("/v1")
         client = await self._get_client()
         try:
-            resp = await client.get("/api/tags", timeout=5.0)
+            resp = await client.get(f"{base}/api/tags", timeout=5.0)
             if resp.status_code == 200:
                 data = resp.json()
                 return [m["name"] for m in data.get("models", [])]
         except Exception:
             pass
         try:
-            resp = await client.get("/v1/models", timeout=5.0)
+            resp = await client.get(f"{base}/v1/models", timeout=5.0)
             if resp.status_code == 200:
                 data = resp.json()
                 return [m["id"] for m in data.get("data", [])]
