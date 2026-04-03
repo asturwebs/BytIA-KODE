@@ -1,8 +1,12 @@
 """Provider management - switch between providers at runtime."""
 from __future__ import annotations
 
+import logging
+
 from bytia_kode.config import ProviderConfig
 from bytia_kode.providers.client import ProviderClient
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderManager:
@@ -20,9 +24,20 @@ class ProviderManager:
         if config.local_url:
             self._local = ProviderClient(
                 config.local_url,
-                "not-needed",  # local models usually don't need keys
+                "not-needed",
                 config.local_model,
             )
+
+    async def auto_detect_model(self) -> None:
+        """If primary model is 'auto', detect loaded model from router."""
+        if self._primary.model != "auto":
+            return
+        loaded = await self._primary.detect_loaded_model()
+        if loaded:
+            self._primary.model = loaded
+            logger.info("Auto-detected loaded model: %s", loaded)
+        else:
+            logger.warning("No model loaded on router, using 'auto' (may fail)")
 
     @property
     def primary(self) -> ProviderClient:

@@ -95,7 +95,9 @@ class TelegramBot:
 
         try:
             response_text = ""
-            async for chunk in self.agent.chat(user_text):
+            async for chunk in self.agent.chat(user_text, provider="local"):
+                if isinstance(chunk, tuple):
+                    continue  # skip reasoning chunks in TG
                 response_text += chunk
 
             if len(response_text) > 4000:

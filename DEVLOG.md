@@ -220,3 +220,41 @@ Auditoría completa del codebase para identificar código/peso muerto:
 
 - 15 tests pasando.
 - Tool reinstalada: `bytia-kode==0.4.0`.
+
+---
+
+## 2026-04-03 - Sesión 10: Consolidación Router + Gemma 4 + Cleanup
+
+### Consolidación llama.cpp a router single-port
+
+6 servicios individuales (puertos 8080-8085) consolidados en un solo router:
+- `bytia-router.service` (systemd) — `llama-server --models-dir ... --models-max 1 --models-autoload`
+- Un solo puerto `:8080`, un modelo en VRAM a la vez, carga/descarga via API
+- 7 modelos disponibles (141GB total): GLM-4.7 Flash, GLM-4.7 Distill, Gemma 4 26B, Hermes 4.3 36B, Nemotron Cascade 30B (Q5+Q8), Qwen 3.5 27B
+
+### llama.cpp rebuild v417
+
+- Build anterior (v330) no soportaba arquitectura Gemma 4 (`unknown model architecture: 'gemma4'`)
+- Rebuild desde source: `cmake -B build -DLLAMA_CUDA=ON -DCMAKE_BUILD_TYPE=Release` → ggml v0.9.11, versión 417
+- Gemma 4 26B-A4B-it (Q4_K_M, 15.6GB) cargado OK: 23.6GB/24.5GB VRAM
+
+### B-KODE adaptado al paradigma router
+
+- `PROVIDER_BASE_URL` → `http://localhost:8080/v1` (router, antes :8081 individual)
+- `PROVIDER_MODEL` → `auto` (detección dinámica del modelo cargado)
+- `ProviderClient.detect_loaded_model()` — consulta `/v1/models`, filtra `status: loaded`
+- `ProviderManager.auto_detect_model()` — se ejecuta al montar TUI y al cambiar provider
+- `_auto_detect_model()` worker en TUI — async, exclusive, con fallback silencioso
+- Bug fix: `@work(exclusive=True)` + `run_worker(exclusive=True)` = doble decoración → crash. Fix: solo `run_worker` con `async def` sin decorador
+
+### Infra cleanup
+
+- `.zshrc`: eliminadas 5 funciones `claude-*` (qwopus, hermes, nemotron, etc.), 6 aliases `llama-*` individuales, 12 aliases de servicios systemd, sección AgentZero Docker. Añadidos `routeron/off/status/logs/ui/slots`
+- `~/.bytia-banner`: simplificado a Router:8080 con modelo activo detectado via API (solo si `status: loaded`). Sin `sudo` (no pide password)
+- `~/.bytia-kode/.env`: puerto actualizado, modelo auto
+
+### Verificación
+
+- 15 tests pasando.
+- TUI funcional: auto-detect Gemma 4, reasoning OK, tildes OK.
+- 133 t/s generación Gemma 4 (MoE: 26B total, 4B activos).
