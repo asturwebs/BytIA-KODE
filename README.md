@@ -123,8 +123,27 @@ Documentación adicional:
 | `Ctrl+S` | Mostrar skills |
 | `Ctrl+E` | Alternar safe mode |
 | `Ctrl+X` | Copiar último bloque de código |
+| `F2` | Cambiar tema cíclicamente |
 | `↑` / `↓` | Historial de entrada |
 | `Enter` | Enviar prompt |
+
+### Temas
+
+Pulsa `F2` para cambiar entre los 9 temas disponibles. El tema seleccionado se guarda automáticamente en `~/.bytia-kode/theme.json`.
+
+| Tema | Tipo |
+| --- | --- |
+| `gruvbox` (por defecto) | Oscuro |
+| `monokai` | Oscuro |
+| `nord` | Oscuro |
+| `dracula` | Oscuro |
+| `catppuccin-mocha` | Oscuro |
+| `tokyo-night` | Oscuro |
+| `catppuccin-latte` | Claro |
+| `solarized-light` | Claro |
+| `rose-pine-dawn` | Claro |
+
+El banner, session info panel y todos los colores CSS se adaptan al tema activo.
 
 ## Validación y release
 

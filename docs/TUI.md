@@ -35,7 +35,10 @@ Documento actualizado para la versión 0.3.0.
 
 ## Estado actual
 
-- Tema por defecto documentado: `monokai`.
+- Tema por defecto: `gruvbox`.
+- 9 temas disponibles (6 oscuros + 3 claros). `F2` para cambiar.
+- Banner, session info panel y CSS adaptados al tema activo.
+- Tema persistido en `~/.bytia-kode/theme.json`.
 - Identidad del sistema cargada desde YAML empaquetado.
 - Entrada multilinea activa.
 - Botón visual de envío activo.
@@ -45,3 +48,19 @@ Documento actualizado para la versión 0.3.0.
 - `safe_mode` sigue siendo visual.
 - No hay render de streaming en tiempo real.
 - La salida detallada de tools no actúa todavía como consola integrada.
+
+## Temas
+
+Pulsa `F2` para cambiar entre temas. La selección se guarda en `~/.bytia-kode/theme.json`.
+
+| Tema | Tipo |
+| --- | --- |
+| `gruvbox` | Oscuro (por defecto) |
+| `monokai` | Oscuro |
+| `nord` | Oscuro |
+| `dracula` | Oscuro |
+| `catppuccin-mocha` | Oscuro |
+| `tokyo-night` | Oscuro |
+| `catppuccin-latte` | Claro |
+| `solarized-light` | Claro |
+| `rose-pine-dawn` | Claro |
