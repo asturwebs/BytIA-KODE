@@ -67,14 +67,18 @@ class ChatMessage(Static):
         self.msg_content = content
         super().__init__(**kwargs)
 
+    def _colors(self) -> dict[str, str]:
+        return self.app._get_theme_colors()
+
     def compose(self) -> ComposeResult:
+        c = self._colors()
         if self.role == "user":
             yield Static(
                 Panel(
-                    Text(self.msg_content, style="bold cyan"),
-                    title="[bold cyan]You[/]",
+                    Text(self.msg_content, style=f"bold {c['secondary']}"),
+                    title=f"[bold {c['secondary']}]You[/]",
                     title_align="left",
-                    border_style="cyan",
+                    border_style=c["secondary"],
                     padding=(0, 1),
                     expand=False,
                 )
@@ -83,9 +87,9 @@ class ChatMessage(Static):
             yield Static(
                 Panel(
                     Markdown(self.msg_content),
-                    title="[bold green]KODE[/]",
+                    title=f"[bold {c['accent']}]KODE[/]",
                     title_align="left",
-                    border_style="green",
+                    border_style=c["accent"],
                     padding=(0, 1),
                     expand=False,
                 )
@@ -95,13 +99,13 @@ class ChatMessage(Static):
             if len(content) > 50:
                 body = Syntax(content, "bash", theme="monokai", line_numbers=False)
             else:
-                body = Text(content, style="yellow")
+                body = Text(content, style=c["warning"])
             yield Static(
                 Panel(
                     body,
-                    title="[bold yellow]Tool[/]",
+                    title=f"[bold {c['warning']}]Tool[/]",
                     title_align="left",
-                    border_style="yellow",
+                    border_style=c["warning"],
                     padding=(0, 1),
                     expand=False,
                 )
@@ -109,10 +113,10 @@ class ChatMessage(Static):
         elif self.role == "error":
             yield Static(
                 Panel(
-                    Text(self.msg_content, style="bold red"),
-                    title="[bold red]Error[/]",
+                    Text(self.msg_content, style=f"bold {c['error']}"),
+                    title=f"[bold {c['error']}]Error[/]",
                     title_align="left",
-                    border_style="red",
+                    border_style=c["error"],
                     padding=(0, 1),
                     expand=False,
                 )
