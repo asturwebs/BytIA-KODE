@@ -533,7 +533,8 @@ class BytIAKODEApp(App):
 
     @work(exclusive=True)
     async def _show_models(self):
-        self._add_system_message("Fetching models...")
+        provider = self._provider_display_name(self.active_provider)
+        self._add_system_message(f"Fetching models from {provider}...")
         try:
             client = self.agent.providers.get(self.active_provider)
             models = await client.list_models()
@@ -541,9 +542,9 @@ class BytIAKODEApp(App):
             self._add_system_message(f"Error: {e}")
             return
         if not models:
-            self._add_system_message("No models found. Is Ollama/llama running?")
+            self._add_system_message(f"No models found on {provider}. Try F3 to switch to Local (Ollama).")
             return
-        table = Table(title=f"Models ({self._provider_display_name(self.active_provider)})",
+        table = Table(title=f"Models ({provider})",
                       box=box.SIMPLE_HEAVY, padding=(0, 1), collapse_padding=True)
         table.add_column("#", style="dim", min_width=3)
         table.add_column("Model", style="cyan")
