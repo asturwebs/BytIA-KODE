@@ -12,6 +12,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 - **Auto-detect modelo del router** — `ProviderClient.detect_loaded_model()` consulta `/v1/models` y filtra `status: loaded`. `ProviderManager.auto_detect_model()` se ejecuta al arrancar y al cambiar provider. Si `PROVIDER_MODEL=auto`, detecta dinámicamente qué modelo hay en VRAM.
 - **llama.cpp Router support** — Single port (8080) multi-modelo. B-KODE se conecta al router y usa el modelo que esté cargado, sin hardcodear nombres.
+- **Bot Telegram usa router (GPU)** — Cambiado de Ollama (CPU, ~15 t/s) a router (:8080, GPU, ~133 t/s). Lazy init con auto-detect en el primer mensaje.
+- **Guard si no hay modelo cargado** — Si el router no tiene ningún modelo, el bot responde con mensaje claro en vez de fallar con 400.
 
 > B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.
 
