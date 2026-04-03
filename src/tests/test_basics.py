@@ -150,6 +150,10 @@ def test_agent_preserves_history_on_provider_runtime_error():
         async def chat(self, **kwargs):
             raise RuntimeError("provider exploded")
 
+        async def chat_stream(self, **kwargs):
+            raise RuntimeError("provider exploded")
+            yield  # make it an async generator
+
     agent = Agent(load_config())
     agent.providers.get = lambda provider: FailingProvider()
 
@@ -158,11 +162,9 @@ def test_agent_preserves_history_on_provider_runtime_error():
 
     result = asyncio.run(run_chat())
     assert result == ["Provider runtime error: provider exploded"]
-    assert len(agent.messages) == 2
+    assert len(agent.messages) == 1
     assert agent.messages[0].role == "user"
     assert agent.messages[0].content == "hola"
-    assert agent.messages[1].role == "assistant"
-    assert "provider exploded" in (agent.messages[1].content or "")
 
 
 def test_memory_store_raises_on_corrupted_json(tmp_path):

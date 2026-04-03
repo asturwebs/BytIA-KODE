@@ -1,11 +1,9 @@
 """Skill loading system - SKILL.md pattern."""
 from __future__ import annotations
 
-import os
-import re
 import logging
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +15,7 @@ class Skill:
     trigger: str = ""
     instructions: str = ""
     path: Path | None = None
+    verified: bool = False
 
 
 class SkillLoader:
@@ -57,6 +56,7 @@ class SkillLoader:
         description = ""
         instructions = content
         trigger = ""
+        verified = False
 
         # Extract frontmatter-like metadata
         lines = content.split("\n")
@@ -77,6 +77,8 @@ class SkillLoader:
                     description = line.split(":", 1)[1].strip()
                 elif line.startswith("trigger:"):
                     trigger = line.split(":", 1)[1].strip()
+                elif line.startswith("verified:"):
+                    verified = line.split(":", 1)[1].strip().lower() == "true"
 
         instructions = "\n".join(lines[body_start:]).strip()
 
@@ -86,21 +88,63 @@ class SkillLoader:
             trigger=trigger,
             instructions=instructions,
             path=path,
+            verified=verified,
         )
 
     def get(self, name: str) -> Skill | None:
         return self._skills.get(name)
 
+    def save_skill(self, name: str, content: str, description: str = "", trigger: str = "") -> Path:
+        """Save a new skill to the first skill directory."""
+        if not self.skill_dirs:
+            raise ValueError("No skill directories configured")
+        skill_dir = self.skill_dirs[0]
+        skill_path = skill_dir / name / self.SKILL_FILE
+        skill_path.parent.mkdir(parents=True, exist_ok=True)
+        fm = f"---\nname: {name}\ndescription: {description}\n"
+        if trigger:
+            fm += f"trigger: {trigger}\n"
+        fm += "verified: false\n---\n\n"
+        skill_path.write_text(fm + content, encoding="utf-8")
+        parsed = self._parse_skill(skill_path)
+        if parsed:
+            self._skills[name] = parsed
+        logger.info(f"Skill saved: {skill_path}")
+        return skill_path
+
+    def list_skill_names(self) -> list[str]:
+        """List all skill names."""
+        return list(self._skills.keys())
+
+    def verify_skill(self, name: str) -> bool:
+        """Mark a skill as verified."""
+        skill = self._skills.get(name)
+        if not skill or not skill.path:
+            return False
+        content = skill.path.read_text()
+        content = content.replace("verified: false", "verified: true", 1)
+        skill.path.write_text(content, encoding="utf-8")
+        skill.verified = True
+        return True
+
     def get_relevant(self, query: str) -> list[Skill]:
-        """Get skills whose trigger or description matches the query."""
+        """Get skills whose trigger, description, or content matches the query."""
         relevant = []
         q = query.lower()
         for skill in self._skills.values():
-            if skill.trigger and skill.trigger.lower() in q:
-                relevant.append(skill)
-            elif skill.description and skill.description.lower() in q:
-                relevant.append(skill)
-        return relevant
+            score = 0
+            if skill.trigger:
+                for kw in skill.trigger.lower().split(","):
+                    if kw.strip() in q:
+                        score += 3
+            if skill.description and skill.description.lower() in q:
+                score += 2
+            if skill.instructions and q in skill.instructions.lower():
+                score += 1
+            if score > 0:
+                relevant.append((score, skill))
+        relevant.sort(key=lambda x: -x[0])
+        return [s for _, s in relevant[:5]]
 
     def skill_summary(self) -> str:
         """Generate a summary of loaded skills for system prompt."""

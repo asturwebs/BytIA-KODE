@@ -2,9 +2,11 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.3.0-success.svg)
+![Release](https://img.shields.io/badge/release-0.4.0-success.svg)
 
-BytIA KODE es una TUI agéntica para desarrollo asistido con terminal avanzada, CLI simple y bot de Telegram. La versión 0.3.0 consolida una arquitectura constitucional modular basada en YAML, carga de identidad mediante recursos empaquetados y validación reproducible de build.
+BytIA KODE es una TUI agéntica para desarrollo asistido con terminal avanzada, CLI simple y bot de Telegram. La versión 0.4.0 incorpora streaming real, soporte de razonamiento, gestión de contexto y B-KODE.md.
+
+> **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
 <p align="center">
   <img src="docs/img/bytia-kode-1-TUI-inicio.png" width="700"><br>
@@ -87,10 +89,14 @@ Documentación adicional:
 
 | Variable | Descripción | Valor por defecto |
 | --- | --- | --- |
-| `PROVIDER_BASE_URL` | Endpoint principal compatible con OpenAI | `https://api.z.ai/api/coding/paas/v4` |
-| `PROVIDER_MODEL` | Modelo principal | `glm-5.1` |
-| `LOCAL_BASE_URL` | Endpoint local compatible | `http://localhost:8080` |
-| `LOCAL_MODEL` | Modelo local | vacío (configurar) |
+| `PROVIDER_BASE_URL` | Endpoint principal (OpenAI-compatible) | `http://localhost:8081/v1` |
+| `PROVIDER_API_KEY` | API key del provider principal | vacío |
+| `PROVIDER_MODEL` | Modelo principal | `glm-4.7-flash` |
+| `FALLBACK_BASE_URL` | Endpoint fallback (nube) | `https://api.z.ai/api/coding/paas/v4` |
+| `FALLBACK_API_KEY` | API key del fallback | vacío |
+| `FALLBACK_MODEL` | Modelo fallback | `glm-5-turbo` |
+| `LOCAL_BASE_URL` | Endpoint local (Ollama) | `http://localhost:11434/v1` |
+| `LOCAL_MODEL` | Modelo local | `gemma4:26b` |
 | `TELEGRAM_BOT_TOKEN` | Token del bot | vacío |
 | `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
 
@@ -106,7 +112,12 @@ Documentación adicional:
 | `/clear` | Limpia chat |
 | `/model`, `/provider` | Proveedor y modelo activos |
 | `/tools` | Tools registradas |
-| `/skills` | Skills detectadas |
+| `/skills` | Listar skills guardadas |
+| `/skills save <name>` | Crear skill nueva (contenido multiline) |
+| `/skills show <name>` | Mostrar contenido de skill |
+| `/skills verify <name>` | Marcar skill como verificada |
+| `/models` | Listar modelos del provider activo |
+| `/use <model>` | Seleccionar modelo del provider activo |
 | `/history` | Historial reciente |
 | `/cwd` | Directorio actual |
 | `/safe` | Estado visual de safe mode |
@@ -117,12 +128,14 @@ Documentación adicional:
 
 | Atajo | Acción |
 | --- | --- |
+| `Ctrl+P` | Menú de comandos |
 | `Ctrl+Q` | Salir |
 | `Ctrl+R` | Reset conversación |
 | `Ctrl+L` | Limpiar chat |
 | `Ctrl+M` | Mostrar modelo |
 | `Ctrl+T` | Mostrar tools |
 | `Ctrl+S` | Mostrar skills |
+| `Ctrl+D` | Toggle reasoning |
 | `Ctrl+E` | Alternar safe mode |
 | `Ctrl+X` | Copiar último bloque de código |
 | `F2` | Cambiar tema cíclicamente |
@@ -146,7 +159,54 @@ Pulsa `F2` para cambiar entre los 9 temas disponibles. El tema seleccionado se g
 | `solarized-light` | Claro |
 | `rose-pine-dawn` | Claro |
 
-El banner, session info panel y todos los colores CSS se adaptan al tema activo.
+El banner, ActivityIndicator, ThinkingBlock y todos los colores CSS se adaptan al tema activo.
+
+## Skills System
+
+BytIA KODE incluye un sistema de skills persistentes inspirado en [Hermes Agent](https://github.com/hermes-agent/hermes) y el paper [_Terminal Agents Suffice for Enterprise Automation_](https://arxiv.org/abs/2604.00073). Las skills son procedimientos reutilizables que el agente carga en su system prompt.
+
+### Estructura
+
+```
+~/.bytia-kode/skills/
+├── skill-creator/
+│   └── SKILL.md          # Instrucciones principales (requerido)
+├── my-procedure/
+│   ├── SKILL.md
+│   ├── references/       # Docs adicionales (opcional)
+│   └── scripts/          # Scripts ejecutables (opcional)
+└── ...
+```
+
+### Formato SKILL.md
+
+```yaml
+---
+name: my-skill               # Requerido, kebab-case
+description: Brief desc      # Requerido
+trigger: keywords, for, search  # Opcional, búsqueda por relevance
+verified: false              # Opcional, marca de validación
+---
+
+## Procedure
+[Instrucciones paso a paso]
+
+## Pitfalls
+[Errores comunes y soluciones]
+```
+
+### Comandos
+
+| Comando | Descripción |
+| --- | --- |
+| `/skills` | Listar skills con estado |
+| `/skills save <name>` | Crear skill (escribir contenido, línea vacía para terminar) |
+| `/skills show <name>` | Mostrar contenido completo |
+| `/skills verify <name>` | Marcar como verificada |
+
+### Skill incluida
+
+- **skill-creator** — Guía para crear nuevas skills (meta-skill de bootstrap)
 
 ## Validación y release
 
@@ -196,6 +256,21 @@ Después de editar, reconstruye el wheel para que los cambios se empaqueten:
 uv build
 ```
 
+## Stack técnico
+
+BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCHITECTURE.md](docs/ARCHITECTURE.md) para el detalle completo con versiones y uso específico.
+
+| Librería | Rol |
+| --- | --- |
+| [Textual](https://textual.textualize.io/) | Framework TUI |
+| [Rich](https://rich.readthedocs.io/) | Renderizado (Markdown, Panel, Table) |
+| [httpx](https://www.python-httpx.org/) | Cliente HTTP async / streaming SSE |
+| [Pydantic](https://docs.pydantic.dev/) | Modelos de datos y validación |
+| [PyYAML](https://pyyaml.org/) | Parseo de identidad y skills |
+| [python-dotenv](https://github.com/theskumar/python-dotenv) | Variables de entorno |
+| [python-telegram-bot](https://docs.python-telegram-bot.org/) | Bot de Telegram |
+| [prompt-toolkit](https://python-prompt-toolkit.readthedocs.io/) | REPL simple |
+
 ## Seguridad
 
 v0.3.0 incluye hardening de seguridad verificado con auditoría profesional:
@@ -211,8 +286,10 @@ Motor I/O asíncrono validado con benchmark: **4.90x speedup** (80% mejora) fren
 ## Limitaciones conocidas
 
 - `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
-- La TUI no muestra todavía streaming token a token real del proveedor.
 - La memoria persistente es local con contexto acotado (20 entries / 2000 chars). Sin búsqueda semántica todavía.
+- Las skills no registran tools dinámicas todavía (fase 2 prevista).
+- El estimador de tokens es una heurística (chars/3), no un tokenizer real.
+- No hay auto-fallback de providers (circuit breaker pendiente).
 
 ## Contribuir
 

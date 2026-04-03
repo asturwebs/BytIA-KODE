@@ -1,4 +1,4 @@
-/* BytIA KODE TUI Theme v3 — Theme-friendly (uses $design tokens) */
+/* BytIA KODE TUI Theme v4 — Clean layout */
 
 /* Header: only override icon color */
 Header {
@@ -9,7 +9,7 @@ Header .header--icon {
     color: $accent;
 }
 
-/* Footer: only override key colors */
+/* Footer: minimal — only shows Menu binding */
 Footer {
     height: 1;
 }
@@ -37,18 +37,16 @@ Footer .footer--key {
     padding-bottom: 0;
 }
 
-/* Status bar — thin, docked above input */
-#status-bar {
-    dock: bottom;
+/* Activity indicator — thin bar above input (no dock, flows naturally) */
+#activity-indicator {
     height: 1;
     width: 100%;
     background: $surface;
-    color: $text-disabled;
-    padding: 0 2;
-    margin: 0;
+    padding: 0 1;
+    content-align: left middle;
 }
 
-/* Input area — zero-gap with footer */
+/* Input area */
 #input-area {
     dock: bottom;
     height: auto;
@@ -79,7 +77,6 @@ Footer .footer--key {
     border: tall $warning;
 }
 
-
 #send-button {
     width: 5;
     min-width: 5;
@@ -93,6 +90,31 @@ Footer .footer--key {
 #send-button:hover {
     background: $primary;
 }
+
+/* Command menu popup */
+CommandMenuScreen {
+    align: center middle;
+}
+
+#command-list {
+    width: 40;
+    height: 11;
+    background: $surface;
+    border: tall $accent;
+}
+
+#command-list > ListItem {
+    padding: 0 2;
+}
+
+#command-list > ListItem:hover {
+    background: $boost;
+}
+
+#command-list > ListItem.-highlight {
+    background: $boost;
+}
+
 /* Panels — compact */
 Panel {
     padding: 0 1;

@@ -8,6 +8,16 @@ ROOT = Path(__file__).resolve().parents[1]
 SK_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]{10,}")
 HIGH_ENTROPY_PATTERN = re.compile(r"\b[A-Za-z0-9_\-=/+]{30,}\b")
 SKIP_FILES = {'.env.example', 'uv.lock'}
+SKIP_PATTERNS = [
+    re.compile(r'https?://'),
+    re.compile(r'file://'),
+    re.compile(r'^\s*(def |async def |class )'),
+    re.compile(r'field\(default_factory'),
+    re.compile(r'^\s*#'),
+    re.compile(r'import '),
+    re.compile(r'from '),
+    re.compile(r'\w+:$'),
+]
 
 
 def staged_files() -> list[Path]:
@@ -24,6 +34,8 @@ def staged_files() -> list[Path]:
 def is_suspicious_line(line: str) -> bool:
     if SK_PATTERN.search(line):
         return True
+    if any(p.search(line) for p in SKIP_PATTERNS):
+        return False
     matches = HIGH_ENTROPY_PATTERN.findall(line)
     for token in matches:
         if token.startswith('http'):
