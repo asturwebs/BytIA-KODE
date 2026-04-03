@@ -67,62 +67,58 @@ class ChatMessage(Static):
         self.msg_content = content
         super().__init__(**kwargs)
 
-    def _colors(self) -> dict[str, str]:
-        return self.app._get_theme_colors()
+    def on_mount(self) -> None:
+        self._update_content()
+        self.watch(self.app, "theme", self._on_theme_changed)
 
-    def compose(self) -> ComposeResult:
-        c = self._colors()
+    def _on_theme_changed(self, old_theme: str, new_theme: str) -> None:
+        self._update_content()
+
+    def _update_content(self):
+        c = self.app._get_theme_colors()
         if self.role == "user":
-            yield Static(
-                Panel(
-                    Text(self.msg_content, style=f"bold {c['secondary']}"),
-                    title=f"[bold {c['secondary']}]You[/]",
-                    title_align="left",
-                    border_style=c["secondary"],
-                    padding=(0, 1),
-                    expand=False,
-                )
-            )
+            self.update(Panel(
+                Text(self.msg_content, style=f"bold {c['secondary']}"),
+                title=f"[bold {c['secondary']}]You[/]",
+                title_align="left",
+                border_style=c["secondary"],
+                padding=(0, 1),
+                expand=False,
+            ))
         elif self.role == "assistant":
-            yield Static(
-                Panel(
-                    Markdown(self.msg_content),
-                    title=f"[bold {c['accent']}]KODE[/]",
-                    title_align="left",
-                    border_style=c["accent"],
-                    padding=(0, 1),
-                    expand=False,
-                )
-            )
+            self.update(Panel(
+                Markdown(self.msg_content),
+                title=f"[bold {c['accent']}]KODE[/]",
+                title_align="left",
+                border_style=c["accent"],
+                padding=(0, 1),
+                expand=False,
+            ))
         elif self.role == "tool":
             content = self.msg_content[:2000]
             if len(content) > 50:
                 body = Syntax(content, "bash", theme="monokai", line_numbers=False)
             else:
                 body = Text(content, style=c["warning"])
-            yield Static(
-                Panel(
-                    body,
-                    title=f"[bold {c['warning']}]Tool[/]",
-                    title_align="left",
-                    border_style=c["warning"],
-                    padding=(0, 1),
-                    expand=False,
-                )
-            )
+            self.update(Panel(
+                body,
+                title=f"[bold {c['warning']}]Tool[/]",
+                title_align="left",
+                border_style=c["warning"],
+                padding=(0, 1),
+                expand=False,
+            ))
         elif self.role == "error":
-            yield Static(
-                Panel(
-                    Text(self.msg_content, style=f"bold {c['error']}"),
-                    title=f"[bold {c['error']}]Error[/]",
-                    title_align="left",
-                    border_style=c["error"],
-                    padding=(0, 1),
-                    expand=False,
-                )
-            )
+            self.update(Panel(
+                Text(self.msg_content, style=f"bold {c['error']}"),
+                title=f"[bold {c['error']}]Error[/]",
+                title_align="left",
+                border_style=c["error"],
+                padding=(0, 1),
+                expand=False,
+            ))
         elif self.role == "system":
-            yield Static(Text(f"  {self.msg_content}", style="dim italic"))
+            self.update(Text(f"  {self.msg_content}", style="dim italic"))
 
 
 class PromptTextArea(TextArea):
