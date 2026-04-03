@@ -30,15 +30,16 @@ logger = logging.getLogger(__name__)
 
 SPINNER_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
 
-BANNER_ART = """[bold green]██████╗ ██╗   ██╗████████╗██╗ █████╗     ██╗  ██╗ ██████╗ ██████╗ ███████╗[/]
-[bold green]██╔══██╗╚██╗ ██╔╝╚══██╔══╝██║██╔══██╗    ██║ ██╔╝██╔═══██╗██╔══██╗██╔════╝[/]
-[bold green]██████╔╝ ╚████╔╝    ██║   ██║███████║    █████╔╝ ██║   ██║██║  ██║█████╗  [/]
-[bold green]██╔══██╗  ╚██╔╝     ██║   ██║██╔══██╗    ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]
-[bold green]██████╔╝   ██║      ██║   ██║██║  ██║    ██║  ██╗╚██████╔╝██████╔╝███████╗[/]
-[bold green]╚═════╝    ╚═╝      ╚═╝   ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]"""
+BANNER_TEMPLATE = """[bold {accent}]██████╗      ██╗  ██╗ ██████╗ ██████╗ ███████╗    [dim italic]by AsturWebs & BytIA[/]
+[bold {accent}]██╔══██╗      ██║ ██╔╝██╔═══██╗██╔══██╗██╔════╝[/]
+[bold {accent}]██████╔╝      █████╔╝ ██║   ██║██║  ██║█████╗  [/]
+[bold {accent}]██╔══██╗      ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]
+[bold {accent}]██████╔╝      ██║  ██╗╚██████╔╝██████╔╝███████╗[/]
+[bold {accent}]╚═════╝       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]"""
 
 _THEME_FILE = Path.home() / ".bytia-kode" / "theme.json"
-DARK_THEMES = ["gruvbox", "monokai", "nord", "dracula", "catppuccin-mocha", "tokyo-night"]
+DARK_THEMES = ["gruvbox", "monokai", "nord", "dracula", "catppuccin-mocha", "tokyo-night",
+                   "catppuccin-latte", "solarized-light", "rose-pine-dawn"]
 DEFAULT_THEME = "gruvbox"
 
 
@@ -220,6 +221,21 @@ class BytIAKODEApp(App):
         self._history_pos = -1
         self._spinner_timer = None
 
+    def _get_theme_colors(self) -> dict[str, str]:
+        t = self.current_theme
+        return {
+            "accent": t.accent or t.primary or "#7ee787",
+            "secondary": t.secondary or "#58a6ff",
+            "warning": t.warning or "#f0883e",
+            "error": t.error or "#ff5555",
+            "success": t.success or "#7ee787",
+            "text": t.foreground or "#c9d1d9",
+        }
+
+    def _render_banner(self) -> str:
+        c = self._get_theme_colors()
+        return BANNER_TEMPLATE.replace("{accent}", c["accent"])
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield VerticalScroll(id="chat-area")
@@ -239,12 +255,13 @@ class BytIAKODEApp(App):
         )
 
         chat = self.query_one("#chat-area", VerticalScroll)
+        c = self._get_theme_colors()
         chat.mount(Static(Panel(
-            Text.from_markup(BANNER_ART),
-            border_style="green",
+            Text.from_markup(self._render_banner()),
+            border_style=c["accent"],
             padding=(1, 2),
             expand=False,
-        )))
+        ), id="banner-panel"))
 
         chat.mount(Static(Panel(
             Text.from_markup(
@@ -270,18 +287,28 @@ class BytIAKODEApp(App):
 
     def watch_theme(self, theme_name: str) -> None:
         _save_theme(theme_name)
+        c = self._get_theme_colors()
+        try:
+            self.query_one("#banner-panel", Static).update(Panel(
+                Text.from_markup(self._render_banner()),
+                border_style=c["accent"],
+                padding=(1, 2),
+                expand=False,
+            ))
+        except Exception:
+            pass
         try:
             info = self.query_one("#info-panel", Static)
             info.update(Panel(
                 Text.from_markup(
-                    f"[cyan]Model:[/] {self.config.provider.model} | "
-                    f"[cyan]Provider:[/] {self._provider_name()} | "
-                    f"[cyan]Theme:[/] {theme_name} | "
-                    f"[cyan]Version:[/] {__version__}\n"
+                    f"[{c['secondary']}]Model:[/] {self.config.provider.model} | "
+                    f"[{c['secondary']}]Provider:[/] {self._provider_name()} | "
+                    f"[{c['secondary']}]Theme:[/] {theme_name} | "
+                    f"[{c['secondary']}]Version:[/] {__version__}\n"
                     "[dim italic]Tip: Hold Shift + Drag Mouse to select text. Ctrl+X copies last code.[/]"
                 ),
                 title="[dim]Session Info[/]",
-                border_style="cyan",
+                border_style=c["secondary"],
                 padding=(0, 1),
                 expand=False,
             ))

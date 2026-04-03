@@ -6,6 +6,22 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 ## [Unreleased]
 
+### Changed
+
+- Banner ASCII actualizado a "B KODE" con crédito "by AsturWebs & BytIA".
+- Colores del banner y session info panel ahora son dinámicos, adaptándose al tema activo.
+- Borde del banner dinámico (cambia con el tema).
+- Añadidos 3 temas claros: `catppuccin-latte`, `solarized-light`, `rose-pine-dawn` (total: 9 temas).
+- Tema por defecto cambiado de `monokai` a `gruvbox`.
+
+### Added
+
+- Atajo `F2` para cambiar de tema cíclicamente (con `priority=True` para WSL).
+- Método `_get_theme_colors()` para extraer colores del tema activo.
+- Método `_render_banner()` para inyección dinámica de color en el banner.
+- `watch_theme()` actualiza banner e info panel en tiempo real al cambiar tema.
+- Persistencia del tema seleccionado en `~/.bytia-kode/theme.json`.
+
 ## [0.3.0] - 2026-04-02
 
 ### Added
