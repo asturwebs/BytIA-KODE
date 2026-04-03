@@ -21,6 +21,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - Método `_render_banner()` para inyección dinámica de color en el banner.
 - `watch_theme()` actualiza banner e info panel en tiempo real al cambiar tema.
 - Persistencia del tema seleccionado en `~/.bytia-kode/theme.json`.
+- Bordes de mensajes de chat (user, assistant, tool, error) reaccionan en tiempo real al cambiar tema.
 
 ## [0.3.0] - 2026-04-02
 
