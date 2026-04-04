@@ -15,6 +15,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - **Agent callbacks** — `on_tool_call` y `on_tool_done` en `Agent.__init__` para que la TUI reaccione a tool calls en tiempo real.
 - **core_identity.yaml runtime section** — Auto-conocimiento del agente: comandos disponibles, capacidades, ubicación del proyecto y motor de inferencia.
 - **`get_router_info()` en ProviderClient** — Consulta `/v1/models` (modelo + ctx-size desde args) y `/metrics` (prompt/predicted tokens).
+- **WebFetchTool** — Tool nativa para fetch de URLs. HTTP GET via httpx, HTML tag stripping, validación de content-type, truncation a 30k chars, timeout configurable.
+- **web-fetch skill** — Skill en `~/.bytia-kode/skills/web-fetch/` con guía de uso de la tool.
 
 ### Changed
 

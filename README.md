@@ -77,6 +77,7 @@ Documentación adicional:
 
 - [Manual de la TUI](docs/TUI.md)
 - [Arquitectura técnica](docs/ARCHITECTURE.md)
+- [Guía de desarrollo](docs/DEVELOPMENT.md)
 - [Guía de contribución](CONTRIBUTING.md)
 - [Código de conducta](CODE_OF_CONDUCT.md)
 - [Historial de cambios](CHANGELOG.md)
@@ -154,6 +155,17 @@ Pulsa `F2` para cambiar entre los 9 temas disponibles. El tema seleccionado se g
 | `rose-pine-dawn` | Claro |
 
 El banner, ActivityIndicator, ThinkingBlock, ToolBlock y todos los colores CSS se adaptan al tema activo.
+
+## Tools
+
+| Tool | Propósito | Seguridad |
+| --- | --- | --- |
+| `bash` | Ejecutar comandos shell | Allowlist de binarios, sandbox CWD |
+| `file_read` | Leer archivos | Path traversal bloqueado |
+| `file_write` | Escribir archivos | Path traversal bloqueado |
+| `web_fetch` | Fetch URLs (HTTP GET) | Solo http/https, content type validation |
+
+Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.
 
 ## Skills System
 
@@ -267,7 +279,7 @@ BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCH
 | --- | --- |
 | [Textual](https://textual.textualize.io/) | Framework TUI |
 | [Rich](https://rich.readthedocs.io/) | Renderizado (Markdown, Panel, Table) |
-| [httpx](https://www.python-httpx.org/) | Cliente HTTP async / streaming SSE |
+| [httpx](https://www.python-httpx.org/) | Cliente HTTP async / streaming SSE / web_fetch |
 | [Pydantic](https://docs.pydantic.dev/) | Modelos de datos y validación |
 | [PyYAML](https://pyyaml.org/) | Parseo de identidad y skills |
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | Variables de entorno |

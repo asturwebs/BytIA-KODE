@@ -64,7 +64,7 @@
 - [ ] Auto-fallback de providers con circuit breaker
 - [ ] Cobertura de tests >= 60%
 - [ ] Rate limiting en Telegram
-- [ ] Web search/fetch tool
+- [x] Web search/fetch tool
 
 ## v0.5.0 — Skills avanzadas y memoria
 
