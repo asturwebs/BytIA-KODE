@@ -43,8 +43,8 @@ uv run python scripts/check_secrets.py
 # 4. Build
 uv build
 
-# 5. Reinstalar localmente
-uv pip install ./dist/*.whl --force-reinstall
+# 5. Reinstalar (comando ÚNICO — bkode usa uv tool, NO uv pip)
+uv tool install --force --reinstall .
 
 # 6. Probar
 bytia-kode
