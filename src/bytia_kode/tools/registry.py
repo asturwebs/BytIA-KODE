@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import shlex
 from pathlib import Path
 from typing import Any
 
+import httpx
 from pydantic import BaseModel
 
 from bytia_kode.providers.client import ToolDef
@@ -166,6 +168,60 @@ class FileWriteTool(Tool):
             return ToolResult(output=str(exc), error=True)
 
 
+_STRIP_TAGS_RE = re.compile(r"<(script|style)[^>]*>.*?</\1>", re.DOTALL | re.IGNORECASE)
+_STRIP_TAG_RE = re.compile(r"<[^>]+>")
+_MAX_CONTENT_LENGTH = 30000
+
+
+class WebFetchTool(Tool):
+    name = "web_fetch"
+    description = "Fetch content from a URL and return it as text. Use for reading web pages, documentation, and APIs."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "The URL to fetch"},
+            "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 15},
+            "max_length": {"type": "integer", "description": "Max content length in chars", "default": 30000},
+        },
+        "required": ["url"],
+    }
+
+    async def execute(self, url: str, timeout: int = 15, max_length: int = _MAX_CONTENT_LENGTH, **_) -> ToolResult:
+        if not url.startswith(("http://", "https://")):
+            return ToolResult(output="Invalid URL: must start with http:// or https://", error=True)
+        try:
+            async with httpx.AsyncClient(
+                follow_redirects=True,
+                headers={"User-Agent": "BytIA-KODE/0.4 (agentic TUI)"},
+                timeout=httpx.Timeout(timeout),
+            ) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                content_type = resp.headers.get("content-type", "")
+                if "text/html" in content_type:
+                    text = resp.text
+                    text = _STRIP_TAGS_RE.sub("", text)
+                    text = _STRIP_TAG_RE.sub("", text)
+                    text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+                elif any(t in content_type for t in ("json", "text/plain", "text/markdown", "text/yaml", "text/xml")):
+                    text = resp.text
+                else:
+                    return ToolResult(
+                        output=f"Unsupported content type: {content_type}",
+                        error=True,
+                    )
+                if len(text) > max_length:
+                    text = text[:max_length] + f"\n... [truncated at {max_length} chars]"
+                return ToolResult(output=text)
+        except httpx.HTTPStatusError as exc:
+            return ToolResult(output=f"HTTP error {exc.response.status_code}: {exc}", error=True)
+        except httpx.TimeoutException:
+            return ToolResult(output=f"Request timed out after {timeout}s", error=True)
+        except Exception as exc:
+            logger.error("web_fetch error: %s", exc)
+            return ToolResult(output=f"Fetch failed: {exc}", error=True)
+
+
 class ToolRegistry:
     """Registry of available tools."""
 
@@ -174,7 +230,7 @@ class ToolRegistry:
         self._register_defaults()
 
     def _register_defaults(self):
-        for tool_cls in [BashTool, FileReadTool, FileWriteTool]:
+        for tool_cls in [BashTool, FileReadTool, FileWriteTool, WebFetchTool]:
             self.register(tool_cls())
 
     def register(self, tool: Tool):
