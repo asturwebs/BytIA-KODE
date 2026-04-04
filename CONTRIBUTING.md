@@ -1,15 +1,17 @@
 # Contribuir a BytIA KODE
 
-## Validación obligatoria
+Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para la guía completa: estructura del proyecto, cómo crear tools y skills, testing, build y release.
+
+## Resumen rápido
 
 ```bash
-uv run python scripts/validate_metadata.py
-uv run pytest -q
-uv run python -m build --wheel
-uv run python -m twine check dist/*
+uv run pytest -q                          # Tests
+uv run python scripts/validate_metadata.py # Metadata check
+uv build                                   # Build wheel
+uv pip install ./dist/*.whl --force-reinstall  # Instalar
 ```
 
-## Hook local versionado
+Hook de pre-commit:
 
 ```bash
 git config core.hooksPath .githooks
