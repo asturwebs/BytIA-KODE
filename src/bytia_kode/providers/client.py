@@ -233,3 +233,47 @@ class ProviderClient:
         except Exception:
             pass
         return None
+
+    async def get_router_info(self) -> dict:
+        """Get loaded model info from router: name, ctx-size, prompt tokens."""
+        info: dict = {}
+        try:
+            base = self.base_url.removesuffix("/v1")
+            client = await self._get_client()
+            resp = await client.get(f"{base}/v1/models", timeout=5.0)
+            if resp.status_code != 200:
+                return info
+            data = resp.json()
+            for m in data.get("data", []):
+                status = m.get("status", {}).get("value", "")
+                if status != "loaded":
+                    continue
+                info["model"] = m.get("id", "")
+                args = m.get("status", {}).get("args", [])
+                for i, arg in enumerate(args):
+                    if arg == "--ctx-size" and i + 1 < len(args):
+                        try:
+                            info["ctx_size"] = int(args[i + 1])
+                        except ValueError:
+                            pass
+                        break
+                break
+            if info.get("model"):
+                metrics_resp = await client.get(
+                    f"{base}/metrics?model={info['model']}", timeout=5.0
+                )
+                if metrics_resp.status_code == 200:
+                    for line in metrics_resp.text.splitlines():
+                        if line.startswith("llamacpp:prompt_tokens_total "):
+                            try:
+                                info["prompt_tokens"] = int(line.split()[-1])
+                            except ValueError:
+                                pass
+                        elif line.startswith("llamacpp:tokens_predicted_total "):
+                            try:
+                                info["predicted_tokens"] = int(line.split()[-1])
+                            except ValueError:
+                                pass
+        except Exception:
+            pass
+        return info

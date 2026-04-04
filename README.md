@@ -85,14 +85,14 @@ Documentación adicional:
 
 | Variable | Descripción | Valor por defecto |
 | --- | --- | --- |
-| `PROVIDER_BASE_URL` | Endpoint principal (OpenAI-compatible) | `http://localhost:8081/v1` |
+| `PROVIDER_BASE_URL` | Endpoint principal (router llama.cpp) | `http://localhost:8080/v1` |
 | `PROVIDER_API_KEY` | API key del provider principal | vacío |
-| `PROVIDER_MODEL` | Modelo principal | `glm-4.7-flash` |
+| `PROVIDER_MODEL` | Modelo principal (`auto` = auto-detect del router) | `auto` |
 | `FALLBACK_BASE_URL` | Endpoint fallback (nube) | `https://api.z.ai/api/coding/paas/v4` |
 | `FALLBACK_API_KEY` | API key del fallback | vacío |
 | `FALLBACK_MODEL` | Modelo fallback | `glm-5-turbo` |
 | `LOCAL_BASE_URL` | Endpoint local (Ollama) | `http://localhost:11434/v1` |
-| `LOCAL_MODEL` | Modelo local | `gemma4:26b` |
+| `LOCAL_MODEL` | Modelo local | `auto` |
 | `TELEGRAM_BOT_TOKEN` | Token del bot | vacío |
 | `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
 
@@ -117,8 +117,6 @@ Documentación adicional:
 | `/history` | Historial reciente |
 | `/cwd` | Directorio actual |
 | `/safe` | Estado visual de safe mode |
-| `/models` | Listar modelos del provider activo |
-| `/use <model>` | Seleccionar modelo del provider activo |
 
 ### Atajos
 

@@ -22,27 +22,33 @@ Documento actualizado para la versión 0.4.0 (unreleased).
 4. El ActivityIndicator cambia a `◐ Thinking...`.
 5. Si el modelo razona, aparece un bloque `ThinkingBlock` colapsable.
 6. La respuesta se muestra con streaming token a token.
-7. Si hay tool calls, el indicador muestra `● Running: bash`.
-8. Al terminar, vuelve a `● Ready | provider | model | ctx Xk/Yk`.
+7. Si hay tool calls, el indicador cambia a `⚙ tool:bash`. Al terminar, aparece un `ToolBlock` colapsable con el output.
+8. Al terminar, vuelve a `● Ready | provider | model | ctx ~Xk/Yk`.
 
 ## Barra de estado (ActivityIndicator)
 
 Muestra información contextual en tiempo real:
 
 ```
-  ● Ready | Local | glm-4.7-flash | ctx 2k/16k
+  ● Ready | Local | gemma-4-26b | ctx ~2k/262k
 ```
 
-Estados:
+La capacidad de contexto (`262k`) se obtiene dinámicamente del router (`--ctx-size` en los args del modelo). El uso (`~2k`) es una estimación heurística (chars/3) de la sesión actual.
+
+### Polling del router
+
+Cada 5 segundos, la StatusBar consulta `/v1/models` del router. Si el modelo activo cambia en la WebUI (slot swap), el nombre y ctx-size se actualizan automáticamente — no hay que hacer nada.
+
+### Estados
 
 | Estado | Aspecto | Cuándo |
 | --- | --- | --- |
 | Ready | `● Ready | ...` | Idle |
-| Thinking | `◐ Thinking... | ...` | Procesando |
-| Running | `● Running: bash | ...` | Tool call activa |
+| Thinking | `◐ Thinking... | ...` | Procesando respuesta |
+| Tool | `⚙ tool:bash | ...` | Tool call en ejecución |
 | Error | `✗ Error` | Fallo del provider |
 
-La info de modelo y provider se actualiza al cambiar con F3.
+La info de modelo y provider se actualiza al cambiar con F3 y por polling automático.
 
 ## B-KODE.md
 
@@ -59,6 +65,15 @@ Interacción:
 - **Click** en cualquier ThinkingBlock para toggle
 - **Enter** cuando el ThinkingBlock tiene foco
 - **Ctrl+D** togglea el último ThinkingBlock
+
+## Tool Execution (ToolBlock)
+
+Cuando el agente ejecuta una tool (bash, file_read, file_write), se muestra un bloque colapsable con el resultado:
+
+- **Colapsado**: `🔧 bash — N chars` (click para expandir)
+- **Expandido**: Output completo de la tool (click para colapsar)
+
+El ActivityIndicator cambia a `⚙ tool:bash` durante la ejecución y vuelve a `◐ Thinking...` 500ms después. El ToolBlock aparece en el chat cuando la tool termina.
 
 ## Command Menu (Ctrl+P)
 

@@ -141,6 +141,8 @@ class ActivityIndicator(Static):
     def __init__(self, **kwargs):
         self._status = "ready"
         self._detail = ""
+        self._router_ctx_size = 0
+        self._router_prompt_tokens = 0
         super().__init__("", id="activity-indicator", **kwargs)
 
     def on_mount(self) -> None:
@@ -152,33 +154,43 @@ class ActivityIndicator(Static):
         self._detail = detail
         self._refresh()
 
+    def set_router_info(self, ctx_size: int, prompt_tokens: int):
+        self._router_ctx_size = ctx_size
+        self._router_prompt_tokens = prompt_tokens
+
     def _refresh(self):
         try:
             c = self.app._get_theme_colors()
         except Exception:
             c = {"accent": "#7ee787", "warning": "#f0883e", "error": "#ff5555"}
         a, w, e = c.get("accent", "#7ee787"), c.get("warning", "#f0883e"), c.get("error", "#ff5555")
+
         ctx_info = ""
         model_info = ""
         try:
             agent = self.app.agent
-            used = agent._estimate_tokens()
-            total = agent._max_context_tokens
-            ctx_info = f" | ctx {used // 1000}k/{total // 1000}k"
-            try:
-                client = agent.providers.get(self.app.active_provider)
-                provider = self.app._provider_name()
-                model_info = f" | {provider} | {client.model}"
-            except Exception:
-                pass
+            client = agent.providers.get(self.app.active_provider)
+            provider = self.app._provider_name()
+
+            if self._router_ctx_size > 0:
+                used = agent._estimate_tokens()
+                total = self._router_ctx_size
+                ctx_info = f" | ctx ~{used // 1000}k/{total // 1000}k"
+            else:
+                used = agent._estimate_tokens()
+                total = agent._max_context_tokens
+                ctx_info = f" | ctx ~{used // 1000}k/{total // 1000}k"
+
+            model_info = f" | {provider} | {client.model}"
         except Exception:
             pass
+
         if self._status == "ready":
             self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}[/]")
         elif self._status == "thinking":
             self.update(f"  [bold {w}]\u25d0 Thinking...{model_info}{ctx_info}[/]")
         elif self._status == "tool":
-            self.update(f"  [bold {a}]\u25cf Running: {self._detail}{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {a}]\u2699 {self._detail}{model_info}{ctx_info}[/]")
         elif self._status == "error":
             self.update(f"  [bold {e}]\u2717 Error[/]")
         elif self._status == "skill":
@@ -248,6 +260,61 @@ class ThinkingBlock(Static):
                 padding=(0, 1),
                 expand=False,
             ))
+
+
+class ToolBlock(Static):
+    """Collapsible tool execution block. Click to toggle."""
+
+    can_focus = True
+
+    BINDINGS = [
+        Binding("enter", "toggle", "Toggle", show=False),
+    ]
+
+    _expanded: reactive[bool] = reactive(False)
+
+    def __init__(self, tool_name: str, output: str, **kwargs):
+        self.tool_name = tool_name
+        self.tool_output = output
+        super().__init__("", **kwargs)
+
+    def on_mount(self) -> None:
+        self._update_display()
+        self.watch(self, "_expanded", lambda *_: self._update_display())
+
+    def on_click(self) -> None:
+        self.toggle()
+
+    def action_toggle(self) -> None:
+        self.toggle()
+
+    def toggle(self):
+        self._expanded = not self._expanded
+
+    def _update_display(self):
+        try:
+            c = self.app._get_theme_colors()
+        except Exception:
+            c = {"warning": "#f0883e", "accent": "#7ee787"}
+        a = c.get("accent", "#7ee787")
+        lines = self.tool_output.strip().split("\n")
+        n_lines = len(lines)
+        if self._expanded:
+            preview = self.tool_output[:5000]
+            if n_lines > 20:
+                preview = "\n".join(lines[:20])
+                preview += f"\n... ({n_lines} lines total)"
+            body = Syntax(preview, "bash", theme="monokai", line_numbers=False)
+        else:
+            body = Text(f"  {n_lines} lines of output", style=f"dim italic {a}")
+        self.update(Panel(
+            body,
+            title=f"[bold {a}]\U0001f527 {self.tool_name}[/] [dim]click expand[/]",
+            title_align="left",
+            border_style=a,
+            padding=(0, 1),
+            expand=False,
+        ))
 
 
 class CommandMenuScreen(ModalScreen):
@@ -323,9 +390,20 @@ class BytIAKODEApp(App):
         self.theme = _load_theme()
         self.config = load_config()
         self.agent = Agent(self.config)
+        self.agent.on_tool_call.append(self._on_agent_tool_call)
+        self.agent.on_tool_done.append(self._on_agent_tool_done)
         self._history: list[str] = []
         self._history_pos = -1
         self._spinner_timer = None
+
+    def _on_agent_tool_call(self, tool_name: str):
+        self.query_one(ActivityIndicator).set_status("tool", detail=f"tool:{tool_name}")
+
+    def _on_agent_tool_done(self, tool_name: str, output: str):
+        chat = self.query_one("#chat-area", VerticalScroll)
+        chat.mount(ToolBlock(tool_name, output))
+        chat.scroll_end(animate=False)
+        self.set_timer(0.5, lambda: self.query_one(ActivityIndicator).set_status("thinking"))
 
     def _get_theme_colors(self) -> dict[str, str]:
         t = self.current_theme
@@ -355,9 +433,9 @@ class BytIAKODEApp(App):
         self.query_one("#input-field", TextArea).focus()
         self.watch(self, "active_provider", self._on_provider_changed)
 
-        self._auto_detect_model_worker = self.run_worker(
-            self._auto_detect_model, exclusive=True, group="model_detect"
-        )
+        self.run_worker(self._auto_detect_model, exclusive=True, group="model_detect")
+        self.run_worker(self._poll_router_info, exclusive=True, group="router_poll")
+        self._poll_timer = self.set_interval(5.0, self._poll_router_info)
 
         activity = self.query_one(ActivityIndicator)
         activity.set_status("ready")
@@ -395,10 +473,27 @@ class BytIAKODEApp(App):
     async def _auto_detect_model(self) -> None:
         """Auto-detect loaded model from router on startup/provider switch."""
         try:
-            await self.agent.providers.auto_detect_model()
-            self.query_one(ActivityIndicator)._refresh()
+            detected = await self.agent.providers.auto_detect_model()
+            if detected:
+                self.query_one(ActivityIndicator)._refresh()
         except Exception as exc:
             logger.debug("Auto-detect model failed: %s", exc)
+
+    async def _poll_router_info(self) -> None:
+        """Poll router every 5s for model changes and real ctx metrics."""
+        try:
+            client = self.agent.providers.get(self.active_provider)
+            info = await client.get_router_info()
+            if info.get("model") and info["model"] != client.model:
+                client.model = info["model"]
+            activity = self.query_one(ActivityIndicator)
+            activity.set_router_info(
+                ctx_size=info.get("ctx_size", 0),
+                prompt_tokens=info.get("prompt_tokens", 0),
+            )
+            activity._refresh()
+        except Exception:
+            pass
 
     def watch_theme(self, theme_name: str) -> None:
         _save_theme(theme_name)

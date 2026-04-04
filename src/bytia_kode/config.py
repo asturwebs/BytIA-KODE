@@ -23,7 +23,7 @@ class ProviderConfig:
     """OpenAI-compatible provider configuration."""
     base_url: str = field(default_factory=lambda: _env("PROVIDER_BASE_URL", "http://localhost:8080/v1"))
     api_key: str = field(default_factory=lambda: _env("PROVIDER_API_KEY"))
-    model: str = field(default_factory=lambda: _env("PROVIDER_MODEL", "glm-4.7-flash"))
+    model: str = field(default_factory=lambda: _env("PROVIDER_MODEL", "auto"))
 
     # Fallback
     fallback_url: str = field(default_factory=lambda: _env("FALLBACK_BASE_URL", "https://api.z.ai/api/coding/paas/v4"))
