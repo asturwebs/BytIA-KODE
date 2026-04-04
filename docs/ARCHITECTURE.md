@@ -113,12 +113,13 @@ compose():
 ## Tools
 
 - `tools/registry.py` — registro y ejecución de tools
-- Tools actuales: `bash`, `file_read`, `file_write`
+- Tools actuales: `bash`, `file_read`, `file_write`, `web_fetch`
 
 ### Seguridad de tools
 
 - **BashTool**: allowlist de binarios (`ls`, `pwd`, `cat`, `echo`, `git`, `grep`, `find`, `mkdir`, `touch`, `uv`, `python`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace.
 - **FileReadTool / FileWriteTool**: `_resolve_workspace_path()` impide path traversal. I/O delegado a `asyncio.to_thread` para no bloquear el event loop.
+- **WebFetchTool**: HTTP GET via httpx. Solo URLs http/https. Validación de content-type (text/*, json, xml). HTML se convierte a texto plano (tag stripping). Truncation a 30k chars. Timeout configurable (15s default).
 
 ## Skills
 
