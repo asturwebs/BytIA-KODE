@@ -4,9 +4,24 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
-## [0.4.0] - 2026-04-03
+## [Unreleased]
 
-> B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.
+### Added
+
+- **Router polling en StatusBar** — `ActivityIndicator` consulta `/v1/models` cada 5s. Si el modelo cambia en la WebUI (slot swap), el StatusBar se actualiza automáticamente sin intervención del usuario.
+- **ctx-size real desde el router** — `get_router_info()` extrae `--ctx-size` de los args del modelo cargado via `/v1/models`. La capacidad de contexto ya no es un valor hardcodeado, es dinámica por modelo.
+- **ToolBlock widget** — Bloque colapsable para ejecución de tools (como ThinkingBlock pero con icono 🔧). Muestra nombre de la tool y su output. Click para expandir/colapsar.
+- **Tool execution indicators** — El ActivityIndicator muestra ⚙ durante tool calls y vuelve a ◐ Thinking 500ms después de que la tool termina.
+- **Agent callbacks** — `on_tool_call` y `on_tool_done` en `Agent.__init__` para que la TUI reaccione a tool calls en tiempo real.
+- **core_identity.yaml runtime section** — Auto-conocimiento del agente: comandos disponibles, capacidades, ubicación del proyecto y motor de inferencia.
+- **`get_router_info()` en ProviderClient** — Consulta `/v1/models` (modelo + ctx-size desde args) y `/metrics` (prompt/predicted tokens).
+
+### Changed
+
+- **PROVIDER_MODEL default → `auto`** — Coherente con router support. Ya no hardcodea `glm-4.7-flash`.
+- **Estimación de ctx usado** — Usa `agent._estimate_tokens()` (chars/3) con prefijo `~` en vez de métricas cumulativas del servidor.
+
+## [0.4.0] - 2026-04-03
 
 ### Added
 
@@ -14,8 +29,6 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - **llama.cpp Router support** — Single port (8080) multi-modelo. B-KODE se conecta al router y usa el modelo que esté cargado, sin hardcodear nombres.
 - **Bot Telegram usa router (GPU)** — Cambiado de Ollama (CPU, ~15 t/s) a router (:8080, GPU, ~133 t/s). Lazy init con auto-detect en el primer mensaje.
 - **Guard si no hay modelo cargado** — Si el router no tiene ningún modelo, el bot responde con mensaje claro en vez de fallar con 400.
-
-> B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.
 
 ### Removed (cleanup)
 
