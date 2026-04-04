@@ -530,6 +530,10 @@ class BytIAKODEApp(App):
             url = self.config.provider.base_url
         if "z.ai" in url:
             return "Z.AI"
+        if ":11434" in url:
+            return "Ollama"
+        if ":8080" in url:
+            return "Llama"
         if "localhost" in url or "127.0.0.1" in url:
             return "Local"
         if "openrouter" in url:
