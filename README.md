@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Release](https://img.shields.io/badge/release-0.4.0-success.svg)
 
-BytIA KODE es una TUI agéntica para desarrollo asistido con terminal avanzada, CLI simple y bot de Telegram. La versión 0.4.0 incorpora streaming real, soporte de razonamiento, gestión de contexto y B-KODE.md.
+BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.4.0 incorpora streaming real, soporte de razonamiento, gestión de contexto, B-KODE.md y router polling.
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
@@ -92,7 +92,7 @@ Documentación adicional:
 | `FALLBACK_API_KEY` | API key del fallback | vacío |
 | `FALLBACK_MODEL` | Modelo fallback | `glm-5-turbo` |
 | `LOCAL_BASE_URL` | Endpoint local (Ollama) | `http://localhost:11434/v1` |
-| `LOCAL_MODEL` | Modelo local | `auto` |
+| `LOCAL_MODEL` | Modelo local | `gemma4:26b` |
 | `TELEGRAM_BOT_TOKEN` | Token del bot | vacío |
 | `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
 
@@ -153,11 +153,20 @@ Pulsa `F2` para cambiar entre los 9 temas disponibles. El tema seleccionado se g
 | `solarized-light` | Claro |
 | `rose-pine-dawn` | Claro |
 
-El banner, ActivityIndicator, ThinkingBlock y todos los colores CSS se adaptan al tema activo.
+El banner, ActivityIndicator, ThinkingBlock, ToolBlock y todos los colores CSS se adaptan al tema activo.
 
 ## Skills System
 
-BytIA KODE incluye un sistema de skills persistentes inspirado en [Hermes Agent](https://github.com/hermes-agent/hermes) y el paper [_Terminal Agents Suffice for Enterprise Automation_](https://arxiv.org/abs/2604.00073). Las skills son procedimientos reutilizables que el agente carga en su system prompt.
+BytIA KODE incluye un sistema de skills persistente inspirado en [Hermes Agent](https://github.com/hermes-agent/hermes) y el paper [_Terminal Agents Suffice for Enterprise Automation_](https://arxiv.org/abs/2604.00073). Las skills son procedimientos reutilizables que el agente carga en su system prompt.
+
+### Visión (v0.5.0)
+
+Las skills evolucionarán de instrucciones estáticas a **unidades autónomas** con capacidad de ejecutar tools y scripts propios, e incluso actuar como sub-agentes con system prompt independiente:
+
+- **Tools dinámicas** — scripts en `skills/<name>/scripts/` auto-registrados como tools del agente
+- **Sub-agentes** — una skill puede definir su propio SP (identidad + instrucciones especializadas) y ejecutarse como agente dedicado
+- **Skills Hub** — instalar skills desde repos GitHub, compartir entre usuarios
+- **`write_skill` tool** — el agente crea skills programáticamente durante la ejecución
 
 ### Estructura
 
@@ -227,7 +236,7 @@ Para adaptar BytIA KODE a tu propio contexto, edita `src/bytia_kode/prompts/core
 
 | Sección | Qué contiene | Personalizar |
 | --- | --- | --- |
-| `identity` | Nombre, versión, naturaleza, creador | Tu nombre y rol |
+| `identity` | Nombre, versión, naturaleza, creador, **runtime** (capacidades, comandos) | Tu nombre y rol |
 | `valores` | Jerarquía de prioridades (seguridad, privacidad, precisión...) | Tus prioridades |
 | `protocols` | Comportamiento ante errores, overrides, auto-evaluación | Ajustar a tu flujo |
 | `interfaz` | Idioma, estilo de comunicación, formato | Tu idioma y tono |
@@ -266,7 +275,7 @@ BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCH
 
 ## Seguridad
 
-v0.3.0 incluye hardening de seguridad verificado con auditoría profesional:
+Hardening de seguridad verificado con auditoría profesional:
 
 | Issue | Mitigación |
 | --- | --- |
@@ -279,7 +288,7 @@ Motor I/O asíncrono validado con benchmark: **4.90x speedup** (80% mejora) fren
 ## Limitaciones conocidas
 
 - `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
-- Las skills no registran tools dinámicas todavía (fase 2 prevista).
+- Las skills no registran tools dinámicas todavía (previsto para v0.5.0).
 - El estimador de tokens es una heurística (chars/3), no un tokenizer real.
 - No hay auto-fallback de providers (circuit breaker pendiente).
 

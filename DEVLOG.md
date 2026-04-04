@@ -283,3 +283,60 @@ Auditoría completa del codebase para identificar código/peso muerto:
 
 - 15 tests pasando.
 - Bot Telegram respondiendo vía router GPU (~133 t/s).
+
+---
+
+## 2026-04-04 - Sesión 11: Router Polling, ToolBlock, Auto-conocimiento
+
+### Router polling en StatusBar
+
+- `ActivityIndicator` consulta `/v1/models` cada 5s vía `set_interval`.
+- `_poll_router_info()` ejecutado inmediatamente en `on_mount` + polling recurrente.
+- Si el modelo cambia en la WebUI (slot swap), nombre y ctx-size se actualizan automáticamente.
+
+### ctx-size dinámico desde API
+
+- `get_router_info()` en `ProviderClient`: consulta `/v1/models` para modelo + ctx-size desde args (`--ctx-size`), y `/metrics` para tokens.
+- `set_router_info()` en ActivityIndicator: actualiza modelo, ctx capacity y uso estimado.
+- Uso de sesión: `agent._estimate_tokens()` (chars/3) con prefijo `~`. Ya no métricas cumulativas del servidor.
+
+### ToolBlock widget
+
+- Widget colapsable para ejecución de tools (similar a ThinkingBlock pero con icono 🔧).
+- Muestra nombre de la tool y su output. Click para expandir/colapsar.
+- Se monta en el chat area cuando una tool termina de ejecutarse.
+
+### Tool execution indicators
+
+- ActivityIndicator cambia a `⚙ tool:<name>` durante tool calls.
+- 500ms delay antes de volver a `◐ Thinking...` para que el usuario vea el indicador.
+
+### Agent callbacks
+
+- `on_tool_call: list` y `on_tool_done: list` en `Agent.__init__`.
+- Callbacks se disparan en `_handle_tool_calls()`: antes y después de ejecutar la tool.
+- La TUI registra callbacks en `on_mount` para reaccionar en tiempo real.
+
+### core_identity runtime section
+
+- Añadida sección `runtime` bajo `identity` en `core_identity.yaml`.
+- Contiene: interfaz, proyecto, motor, capacidades, comandos.
+- El agente ahora tiene auto-conocimiento de sus propias capacidades.
+
+### Config fix
+
+- `PROVIDER_MODEL` default cambiado de `"glm-4.7-flash"` a `"auto"` (coherente con router support).
+
+### Documentación
+
+- CHANGELOG: sección `[Unreleased]` con 7 additions + 2 changed.
+- README: Skills vision (tools dinámicas, sub-agentes), fix duplicados, PROVIDER_MODEL → auto.
+- ROADMAP: v0.4.0 completado, items pendientes movidos a v0.4.1.
+- ARCHITECTURE: ToolBlock, polling, get_router_info, Skills evolución, fix carácter raro.
+- TUI.md: ToolBlock section, polling router, estados actualizados.
+
+### Verificación
+
+- 15 tests pasando.
+- Pre-commit hook: metadata OK + secret scan OK + pytest OK.
+- Commit `c361f1c` push a GitHub.

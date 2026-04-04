@@ -2,14 +2,14 @@
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
-Documento actualizado para la versión 0.4.0 (unreleased).
+Documento actualizado para la versión 0.4.0.
 
 ## Componentes
 
 | Componente | Descripción |
 | --- | --- |
 | `Header` | Barra superior con reloj |
-| `VerticalScroll (#chat-area)` | Área de chat con scroll. Banner, info, mensajes, reasoning |
+| `VerticalScroll (#chat-area)` | Área de chat con scroll. Banner, info, mensajes, reasoning, tools |
 | `ActivityIndicator` | Barra de estado encima del input: modelo, provider, contexto |
 | `Horizontal (#input-area)` | Input multilínea + botón de envío |
 | `Footer` | Solo muestra `Menu (Ctrl+P)` |
@@ -150,4 +150,4 @@ Pulsa `F2` para cambiar entre temas. La selección se guarda en `~/.bytia-kode/t
 | `solarized-light` | Claro |
 | `rose-pine-dawn` | Claro |
 
-Todos los colores (banner, mensajes, ActivityIndicator, ThinkingBlock) se adaptan al tema activo.
+Todos los colores (banner, mensajes, ActivityIndicator, ThinkingBlock, ToolBlock) se adaptan al tema activo.
