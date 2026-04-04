@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.3.0+ (Alpha estable)
+## Estado actual: v0.4.0+ (Alpha estable)
 
 ### Completado
 
@@ -36,19 +36,35 @@
 - [x] Skill `skill-creator` incluida (meta-skill de bootstrap)
 - [x] Progressive disclosure: metadata en lista, contenido bajo demanda
 
+**v0.4.0 — Router, Streaming y TUI Avanzada**
+- [x] Streaming token a token en la TUI (deltas SSE en tiempo real)
+- [x] Reasoning/Thinking con ThinkingBlock colapsable
+- [x] B-KODE.md: instrucciones de proyecto por directorio
+- [x] Context window management (chars/3, compresión al 75%)
+- [x] llama.cpp Router support (single port, multi-modelo, auto-detect)
+- [x] Bot Telegram usa router (GPU, ~133 t/s)
+- [x] Guard si no hay modelo cargado
+- [x] Router polling en StatusBar (cada 5s, detecta swaps)
+- [x] ctx-size dinámico desde router API
+- [x] ToolBlock widget (ejecución de tools colapsable)
+- [x] Agent callbacks (on_tool_call / on_tool_done)
+- [x] core_identity runtime section (auto-conocimiento del agente)
+- [x] Limpieza de peso muerto (3 deps, cli.py, memory/store.py)
+- [x] 15 tests pasando con pre-commit hook
+
 ---
 
-## v0.4.0 — Herramientas y estabilidad
+## v0.4.1 — Herramientas y estabilidad (pendiente)
 
 **Objetivo:** Robustez del agente y herramientas de desarrollo.
 
-- [ ] Streaming token a token en la TUI (deltas del provider en tiempo real)
 - [ ] Safe mode backend real (confirmación de comandos destructivos)
 - [ ] Tools de exploración: `grep`, `tree`, `glob` nativos en Python
 - [ ] Integración Git autónoma (diffs, branches, commits desde la TUI)
 - [ ] Auto-fallback de providers con circuit breaker
 - [ ] Cobertura de tests >= 60%
 - [ ] Rate limiting en Telegram
+- [ ] Web search/fetch tool
 
 ## v0.5.0 — Skills avanzadas y memoria
 

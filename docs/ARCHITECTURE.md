@@ -1,6 +1,6 @@
 # Arquitectura técnica
 
-Documento actualizado para la release 0.4.0 (unreleased).
+Documento actualizado para la release 0.4.0.
 
 ## Entrada principal
 
@@ -41,8 +41,9 @@ excepciones → yield error (NO se persiste en historial)
 
 ### Gestión de contexto
 
-- `MAX_CONTEXT_TOKENS = 16384` (configurable)
-- `_estimate_tokens()`: heurística chars/3
+- `MAX_CONTEXT_TOKENS = 16384` — fallback cuando el router no devuelve ctx-size
+- `_estimate_tokens()`: heurística chars/3 para uso de sesión
+- `get_router_info()`: extrae ctx-size real de los args del modelo (`--ctx-size`) vía `/v1/models`
 - `_manage_context()`: cuando se supera 75% del límite, comprime los 2 mensajes más antiguos en un resumen de sistema
 
 ### B-KODE.md
@@ -51,7 +52,7 @@ Fichero de instrucciones a nivel proyecto. Se busca desde CWD hacia arriba hasta
 
 ## Providers
 
-- `providers/client.py` — cliente HTTP async (httpx) con streaming SSE y `list_models()`
+- `providers/client.py` — cliente HTTP async (httpx) con streaming SSE, `list_models()` y `get_router_info()`
 - `providers/manager.py` — gestión de provider primario, fallback y local con `list_available()` y `set_model()`
 
 ### Streaming SSE
@@ -80,6 +81,7 @@ compose():
     → Info line (B-KODE status, versión)
     → ChatMessage widgets (user/assistant/tool/error)
     → ThinkingBlock widgets (razonamiento colapsable)
+    → ToolBlock widgets (ejecución de tools colapsable)
     → System messages
   ActivityIndicator (estado + modelo + contexto)
   Horizontal (#input-area)
@@ -94,7 +96,8 @@ compose():
 | --- | --- |
 | `ChatMessage` | Mensaje con Panel temático (user=secondary, assistant=accent, tool=warning, error=error) |
 | `ThinkingBlock` | Razonamiento colapsable. Click o Ctrl+D para toggle. `can_focus = True`. |
-| `ActivityIndicator` | Barra de estado: `● Ready | provider | model | ctx Xk/Yk`. Cambia a `◐ Thinking...` o `● Running: tool`. |
+| `ToolBlock` | Ejecución de tools colapsable. Muestra nombre y output. Click para toggle. |
+| `ActivityIndicator` | Barra de estado: `● Ready | provider | model | ctx ~Xk/Yk`. Polling cada 5s. Estados: Thinking (◐), Tool (⚙), Ready (●). |
 | `CommandMenuScreen` | Modal con ListView de comandos. Se abre con Ctrl+P. |
 | `PromptTextArea` | TextArea con `Submitted` message en Enter. |
 
@@ -104,9 +107,8 @@ compose():
 | --- | --- | --- |
 | `ready` | `●` (green) | Idle, esperando input |
 | `thinking` | `◐` (warning) | Provider procesando |
-| `tool` | `●` (accent) | Ejecutando tool: nombre |
+| `tool` | `⚙` (accent) | Ejecutando tool: nombre |
 | `error` | `✗` (red) | Error del provider |
-| `skill` | `✎` (warning) | Procesando skill |
 
 ## Tools
 
@@ -126,13 +128,21 @@ Skills son procedimientos reutilizables almacenados como archivos SKILL.md con f
 
 **Directorio:** `~/.bytia-kode/skills/<skill-name>/SKILL.md`
 
-**Capacidades:**
+**Capacidades actuales:**
 
 - `load_all()`: escanea directorios y parsea SKILL.md files
 - `save_skill()`: crea nueva skill con frontmatter auto-generado
 - `get_relevant(query)`: búsqueda por scoring (trigger +3, description +2, content +1)
 - `verify_skill()`: marca como verificada tras validación del usuario
 - `skill_summary()`: genera resumen para inyección en system prompt
+
+**Evolución prevista (v0.5.0):**
+
+Las skills pasarán de instrucciones estáticas a unidades autónomas:
+- **Tools dinámicas**: scripts en `skills/<name>/scripts/` auto-registrados como tools
+- **Sub-agentes**: skill con SP propio que se ejecuta como agente dedicado
+- **Skills Hub**: distribución desde repos GitHub
+- **`write_skill` tool**: el agente crea skills programáticamente
 
 ---
 
@@ -200,4 +210,4 @@ Librerías y frameworks que usamos, no creamos. Versión mínima según `pyproje
 - La memoria semántica avanzada sigue fuera de producción (requiere grupo `memory`).
 - No hay auto-fallback de providers (circuit breaker pendiente).
 - Telegram comparte un solo Agent entre todos los usuarios.
-- El估算 de tokens es una heurística (chars/3), no un tokenizer real.
+- El estimador de tokens es una heurística (chars/3), no un tokenizer real.
