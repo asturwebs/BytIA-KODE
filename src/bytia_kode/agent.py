@@ -93,6 +93,8 @@ class Agent:
         self._system_prompt = load_system_prompt()
         self._bkode_path, self._bkode_content = self._load_bkode()
         self._initialized = False
+        self.on_tool_call: list = []  # callbacks: fn(tool_name: str)
+        self.on_tool_done: list = []  # callbacks: fn(tool_name: str, output: str)
 
     def _load_bkode(self) -> tuple[Path | None, str]:
         """Walk up from CWD looking for B-KODE.md (like CLAUDE.md, HERMES.md)."""
@@ -170,7 +172,11 @@ class Agent:
                 continue
 
             logger.info("Tool call: %s(%s)", tool_name, arguments)
+            for cb in self.on_tool_call:
+                cb(tool_name)
             result: ToolResult = await self.tools.execute(tool_name, arguments)
+            for cb in self.on_tool_done:
+                cb(tool_name, result.output)
             self.messages.append(Message(
                 role="tool",
                 content=result.output,
