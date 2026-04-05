@@ -38,8 +38,11 @@ BANNER_TEMPLATE = """[bold {accent}]██████╗      ██╗  ██
 [dim italic]Agente + Skills + Terminal = Enterprise Automation[/]"""
 
 _THEME_FILE = Path.home() / ".bytia-kode" / "theme.json"
-DARK_THEMES = ["gruvbox", "monokai", "nord", "dracula", "catppuccin-mocha", "tokyo-night",
-                   "catppuccin-latte", "solarized-light", "rose-pine-dawn"]
+ALL_THEMES = [
+    "gruvbox", "monokai", "nord", "dracula", "catppuccin-mocha", "tokyo-night",
+    "catppuccin-latte", "solarized-light", "rose-pine-dawn",
+]
+LIGHT_THEMES = {"catppuccin-latte", "solarized-light", "rose-pine-dawn"}
 DEFAULT_THEME = "gruvbox"
 
 
@@ -47,7 +50,7 @@ def _load_theme() -> str:
     try:
         if _THEME_FILE.exists():
             t = json.loads(_THEME_FILE.read_text()).get("theme", DEFAULT_THEME)
-            return t if t in DARK_THEMES else DEFAULT_THEME
+            return t if t in ALL_THEMES else DEFAULT_THEME
     except Exception:
         pass
     return DEFAULT_THEME
@@ -528,11 +531,11 @@ class BytIAKODEApp(App):
     def action_change_theme(self) -> None:
         current = self.theme
         try:
-            idx = DARK_THEMES.index(current)
-            next_idx = (idx + 1) % len(DARK_THEMES)
+            idx = ALL_THEMES.index(current)
+            next_idx = (idx + 1) % len(ALL_THEMES)
         except ValueError:
             next_idx = 0
-        self.theme = DARK_THEMES[next_idx]
+        self.theme = ALL_THEMES[next_idx]
         self._add_system_message(f"Theme: {self.theme}")
 
     def _provider_name(self) -> str:
