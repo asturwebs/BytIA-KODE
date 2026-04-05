@@ -43,7 +43,7 @@ ALL_THEMES = [
     "atom-one-dark", "atom-one-light", "catppuccin-frappe", "catppuccin-latte",
     "catppuccin-macchiato", "flexoki", "rose-pine", "rose-pine-dawn",
     "rose-pine-moon", "solarized-dark", "solarized-light", "textual-dark",
-    "textual-light", "textual-ansi",
+    "textual-light",
 ]
 LIGHT_THEMES = {"atom-one-light", "catppuccin-latte", "flexoki", "rose-pine", "rose-pine-dawn", "solarized-light", "textual-light"}
 DEFAULT_THEME = "gruvbox"
