@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import logging
 import re
 import shlex
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -69,12 +72,12 @@ def _write_file(path: Path, content: str) -> None:
 def _create_backup(path: Path) -> Path:
     """Create a timestamped backup of a file before editing.
 
+    Uses shutil.copy2 for atomic copy preserving metadata.
     Backup location: <file>.backup-YYYYMMDD-HHMMSS
     """
-    from datetime import datetime
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     backup = path.parent / f"{path.name}.backup-{timestamp}"
-    backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    shutil.copy2(path, backup)
     return backup
 
 
@@ -435,7 +438,6 @@ class FileEditTool(Tool):
 
 def _make_unified_diff(old: str, new: str, path: str, context: int = 3) -> str:
     """Generate a compact unified diff for display."""
-    import difflib
     old_lines = old.splitlines(keepends=True)
     new_lines = new.splitlines(keepends=True)
     diff = difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}", n=context)
