@@ -40,9 +40,12 @@ BANNER_TEMPLATE = """[bold {accent}]██████╗      ██╗  ██
 _THEME_FILE = Path.home() / ".bytia-kode" / "theme.json"
 ALL_THEMES = [
     "gruvbox", "monokai", "nord", "dracula", "catppuccin-mocha", "tokyo-night",
-    "catppuccin-latte", "solarized-light", "rose-pine-dawn",
+    "atom-one-dark", "atom-one-light", "catppuccin-frappe", "catppuccin-latte",
+    "catppuccin-macchiato", "flexoki", "rose-pine", "rose-pine-dawn",
+    "rose-pine-moon", "solarized-dark", "solarized-light", "textual-dark",
+    "textual-light",
 ]
-LIGHT_THEMES = {"catppuccin-latte", "solarized-light", "rose-pine-dawn"}
+LIGHT_THEMES = {"atom-one-light", "catppuccin-latte", "flexoki", "rose-pine", "rose-pine-dawn", "solarized-light", "textual-light"}
 DEFAULT_THEME = "gruvbox"
 
 
