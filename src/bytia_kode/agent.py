@@ -94,7 +94,12 @@ class Agent:
         self._bkode_path, self._bkode_content = self._load_bkode()
         self._initialized = False
         self.on_tool_call: list = []  # callbacks: fn(tool_name: str)
-        self.on_tool_done: list = []  # callbacks: fn(tool_name: str, output: str)
+        self.on_tool_done: list = []  # callbacks: fn(tool_name: str, output: str, error: bool)
+
+    def update_context_limit(self, ctx_size: int) -> None:
+        """Update max context tokens from router info (dynamic ctx_size)."""
+        if ctx_size > 0:
+            self._max_context_tokens = ctx_size
 
     def _load_bkode(self) -> tuple[Path | None, str]:
         """Walk up from CWD looking for B-KODE.md (like CLAUDE.md, HERMES.md)."""
@@ -122,29 +127,80 @@ class Agent:
             parts.append(skill_summary)
         return "\n\n".join(parts)
 
+    @staticmethod
+    def estimate_tokens(text: str) -> int:
+        """Rough token estimate: chars / 3 for mixed EN/ES content."""
+        return len(text) // 3
+
     def _estimate_tokens(self) -> int:
-        """Rough token estimate: chars / 3.5 for mixed content."""
         total = len(self._build_system_prompt())
         for m in self.messages:
             if m.content:
                 total += len(m.content)
             if m.tool_calls:
                 total += sum(len(str(tc)) for tc in m.tool_calls)
-        return total // 3
+        return self.estimate_tokens(str(total))
 
-    def _manage_context(self) -> None:
-        """Compress old messages when context exceeds 75% of max."""
-        threshold = int(MAX_CONTEXT_TOKENS * 0.75)
+    async def _manage_context(self, provider_client) -> None:
+        """Compress old messages when context exceeds 75% of max.
+
+        Strategy:
+        1. If dynamic ctx_size available from router, use it; else use _max_context_tokens.
+        2. When threshold exceeded, summarize oldest messages using the model itself.
+        3. System messages are never summarized.
+        4. Fallback to truncation if summarization fails.
+        """
+        threshold = int(self._max_context_tokens * 0.75)
         while self._estimate_tokens() > threshold and len(self.messages) > 4:
-            old = self.messages[:2]
-            summary_text = " | ".join(
-                f"{m.role[:3].upper()}: {m.content[:80]}..." for m in old
-            )
+            candidates = [m for m in self.messages if m.role != "system"]
+            if len(candidates) < 2:
+                break
+
+            old = candidates[:2]
+            summary = await self._summarize_messages(old, provider_client)
             summary_msg = Message(
                 role="system",
-                content=f"[Previous conversation summarized] {summary_text}",
+                content=f"[Previous conversation summarized] {summary}",
             )
-            self.messages = [summary_msg] + self.messages[len(old):]
+
+            old_indices = []
+            for msg in old:
+                try:
+                    old_indices.append(self.messages.index(msg))
+                except ValueError:
+                    continue
+
+            for idx in sorted(old_indices, reverse=True):
+                self.messages.pop(idx)
+
+            self.messages.insert(0, summary_msg)
+
+    async def _summarize_messages(self, messages: list[Message], provider_client) -> str:
+        """Ask the model to summarize a list of messages. Fallback to truncation."""
+        conversation_text = "\n".join(
+            f"{m.role}: {m.content}" for m in messages if m.content
+        )
+        prompt = (
+            "Summarize the following conversation excerpt concisely in 2-3 sentences. "
+            "Preserve key facts, decisions, and context. "
+            "Output ONLY the summary, nothing else.\n\n"
+            f"{conversation_text}"
+        )
+        try:
+            response = await provider_client.chat(
+                messages=[Message(role="user", content=prompt)],
+                temperature=0.0,
+                max_tokens=256,
+            )
+            if response.content:
+                return response.content.strip()
+        except Exception as exc:
+            logger.warning("Summarization failed, falling back to truncation: %s", exc)
+
+        fallback = " | ".join(
+            f"{m.role[:3].upper()}: {m.content[:80]}..." for m in messages if m.content
+        )
+        return fallback
 
     async def _handle_tool_calls(self, tool_calls) -> None:
         for tool_call in tool_calls:
@@ -176,7 +232,7 @@ class Agent:
                 cb(tool_name)
             result: ToolResult = await self.tools.execute(tool_name, arguments)
             for cb in self.on_tool_done:
-                cb(tool_name, result.output)
+                cb(tool_name, result.output, result.error)
             self.messages.append(Message(
                 role="tool",
                 content=result.output,
@@ -206,7 +262,7 @@ class Agent:
         self.messages.append(Message(role="user", content=sanitized_message))
         provider_client = self.providers.get(provider)
         tool_defs = self.tools.get_tool_defs()
-        self._manage_context()
+        await self._manage_context(provider_client)
 
         try:
             for _iteration in range(self.max_iterations):
