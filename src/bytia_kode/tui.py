@@ -89,7 +89,7 @@ class ChatMessage(Static):
                 title_align="left",
                 border_style=c["secondary"],
                 padding=(0, 1),
-                expand=False,
+                expand=True,
             ))
         elif self.role == "assistant":
             self.update(Panel(
@@ -98,7 +98,7 @@ class ChatMessage(Static):
                 title_align="left",
                 border_style=c["accent"],
                 padding=(0, 1),
-                expand=False,
+                expand=True,
             ))
         elif self.role == "tool":
             content = self.msg_content[:2000]
@@ -112,7 +112,7 @@ class ChatMessage(Static):
                 title_align="left",
                 border_style=c["warning"],
                 padding=(0, 1),
-                expand=False,
+                expand=True,
             ))
         elif self.role == "error":
             self.update(Panel(
