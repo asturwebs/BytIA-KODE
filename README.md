@@ -21,8 +21,13 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 <p align="center">
   <img src="docs/img/bytia-kode-3-TUI-comandos.png" width="350">
+  <img src="docs/img/bytia-kode-5-benchmark.png" width="350"><br>
+  <em>Comandos integrados · Benchmark: 4.90x speedup async</em>
+</p>
+
+<p align="center">
   <img src="docs/img/bytia-kode-6-menu.png" width="350"><br>
-  <em>Comandos integrados · Menú rápido (Ctrl+P)</em>
+  <em>Menú rápido (Ctrl+P)</em>
 </p>
 
 > Release actual: `0.4.1`
