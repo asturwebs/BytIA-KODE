@@ -101,7 +101,7 @@ class ChatMessage(Static):
                 expand=False,
             ))
         elif self.role == "tool":
-            content = self.msg_content[:2000]
+            content = self.msg_content[:10000]
             if len(content) > 50:
                 body = Syntax(content, "bash", theme="monokai", line_numbers=False)
             else:
@@ -245,8 +245,8 @@ class ThinkingBlock(Static):
         lines = self.thinking_content.strip().split("\n")
         n_lines = len(lines)
         if self._expanded:
-            preview = self.thinking_content[:3000]
-            if len(self.thinking_content) > 3000:
+            preview = self.thinking_content[:10000]
+            if len(self.thinking_content) > 10000:
                 preview += f"\n... ({n_lines} lines total)"
             self.update(Panel(
                 Text(preview, style=f"italic {w}"),
@@ -310,8 +310,8 @@ class ToolBlock(Static):
         n_lines = len(lines)
         if self._expanded:
             preview = self.tool_output[:5000]
-            if n_lines > 20:
-                preview = "\n".join(lines[:20])
+            if n_lines > 200:
+                preview = "\n".join(lines[:200])
                 preview += f"\n... ({n_lines} lines total)"
             body = Syntax(preview, "bash", theme="monokai", line_numbers=False)
         else:
