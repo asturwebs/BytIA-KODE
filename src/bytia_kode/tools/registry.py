@@ -66,6 +66,18 @@ def _write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _create_backup(path: Path) -> Path:
+    """Create a timestamped backup of a file before editing.
+
+    Backup location: <file>.backup-YYYYMMDD-HHMMSS
+    """
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = path.parent / f"{path.name}.backup-{timestamp}"
+    backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    return backup
+
+
 class BashTool(Tool):
     name = "bash"
     description = "Execute a shell command and return the output"
@@ -222,6 +234,220 @@ class WebFetchTool(Tool):
             return ToolResult(output=f"Fetch failed: {exc}", error=True)
 
 
+class FileEditTool(Tool):
+    """Search/replace edits in files — the backbone of agentic coding.
+
+    Two strategies:
+      - 'replace': find exact old_text and replace with new_text (default, safe)
+      - 'create': create a new file with the given content (fails if file exists unless force=True)
+
+    Security: all paths resolved against workspace, no escapes.
+    """
+
+    name = "file_edit"
+    description = (
+        "Edit a file by replacing exact text matches. "
+        "Use 'replace' strategy to find/replace specific text, or 'create' to make a new file. "
+        "For replace: old_text must match exactly (including whitespace/indentation). "
+        "Returns a unified diff showing what changed."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to the file to edit",
+            },
+            "strategy": {
+                "type": "string",
+                "enum": ["replace", "create"],
+                "description": "'replace' to find/replace text in existing file, 'create' to make a new file",
+                "default": "replace",
+            },
+            "old_text": {
+                "type": "string",
+                "description": "(replace only) Exact text to find — must match including whitespace",
+            },
+            "new_text": {
+                "type": "string",
+                "description": "(replace only) Text to replace old_text with",
+            },
+            "content": {
+                "type": "string",
+                "description": "(create only) Full content for the new file",
+            },
+            "replace_all": {
+                "type": "boolean",
+                "description": "Replace all occurrences (default: only the first)",
+                "default": "false",
+            },
+            "force": {
+                "type": "boolean",
+                "description": "(create only) Overwrite if file already exists",
+                "default": "false",
+            },
+        },
+        "required": ["path"],
+    }
+
+    async def execute(
+        self,
+        path: str,
+        strategy: str = "replace",
+        old_text: str | None = None,
+        new_text: str | None = None,
+        content: str | None = None,
+        replace_all: bool = False,
+        force: bool = False,
+        **_,
+    ) -> ToolResult:
+        try:
+            resolved = _resolve_workspace_path(path)
+        except PermissionError as exc:
+            return ToolResult(output=str(exc), error=True)
+
+        if strategy == "create":
+            return await self._create_file(resolved, content, force)
+        elif strategy == "replace":
+            return await self._replace_text(resolved, old_text, new_text, replace_all)
+        else:
+            return ToolResult(
+                output=f"Unknown strategy: {strategy!r}. Use 'replace' or 'create'.",
+                error=True,
+            )
+
+    async def _create_file(
+        self, path: Path, content: str | None, force: bool
+    ) -> ToolResult:
+        if content is None:
+            return ToolResult(
+                output="Strategy 'create' requires 'content' parameter.", error=True
+            )
+        if path.exists() and not force:
+            return ToolResult(
+                output=f"File already exists: {path}. Use force=True to overwrite.",
+                error=True,
+            )
+        try:
+            await asyncio.to_thread(_write_file, path, content)
+            lines = content.count("\n") + (0 if content.endswith("\n") else 1)
+            return ToolResult(
+                output=f"Created {path} ({lines} lines, {len(content)} chars)"
+            )
+        except Exception as exc:
+            logger.error("file_edit create error: %s", exc)
+            return ToolResult(output=f"Failed to create file: {exc}", error=True)
+
+    async def _replace_text(
+        self,
+        path: Path,
+        old_text: str | None,
+        new_text: str | None,
+        replace_all: bool,
+    ) -> ToolResult:
+        if old_text is None:
+            return ToolResult(
+                output="Strategy 'replace' requires 'old_text' parameter.", error=True
+            )
+        if new_text is None:
+            new_text = ""
+        if not path.exists():
+            return ToolResult(output=f"File not found: {path}", error=True)
+        if path.is_dir():
+            return ToolResult(output=f"Path is a directory, not a file: {path}", error=True)
+
+        try:
+            original = await asyncio.to_thread(path.read_text, "utf-8")
+        except Exception as exc:
+            return ToolResult(output=f"Failed to read file: {exc}", error=True)
+
+        if old_text not in original:
+            # Provide helpful context: show nearby lines if partial match
+            return self._no_match_help(original, old_text, path)
+
+        count = original.count(old_text)
+        if count > 1 and not replace_all:
+            return ToolResult(
+                output=(
+                    f"Found {count} occurrences of old_text in {path}. "
+                    f"Use replace_all=True to replace all, or provide more context "
+                    f"to match a single occurrence."
+                ),
+                error=True,
+            )
+
+        modified = original.replace(old_text, new_text) if replace_all else original.replace(old_text, new_text, 1)
+
+        # Create backup before writing
+        backup_path = await asyncio.to_thread(_create_backup, path)
+
+        try:
+            await asyncio.to_thread(_write_file, path, modified)
+        except Exception as exc:
+            # Rollback: restore original
+            try:
+                await asyncio.to_thread(_write_file, path, original)
+            except Exception:
+                pass  # Best effort rollback
+            return ToolResult(output=f"Failed to write file (rolled back): {exc}", error=True)
+
+        diff = _make_unified_diff(original, modified, str(path))
+        return ToolResult(
+            output=(
+                f"Replaced {count if replace_all else 1} occurrence(s) in {path}\n"
+                f"Backup: {backup_path}\n"
+                f"{diff}"
+            )
+        )
+
+    def _no_match_help(self, original: str, old_text: str, path: Path) -> ToolResult:
+        """Provide helpful diagnostics when old_text is not found."""
+        # Check for whitespace issues
+        stripped_old = old_text.strip()
+        if stripped_old in original:
+            return ToolResult(
+                output=(
+                    f"old_text not found in {path}, but a match exists with different "
+                    f"leading/trailing whitespace. Check indentation and line endings."
+                ),
+                error=True,
+            )
+
+        # Check for partial match (first line)
+        first_line = old_text.split("\n")[0].strip()
+        if first_line:
+            for i, line in enumerate(original.split("\n"), 1):
+                if first_line in line:
+                    return ToolResult(
+                        output=(
+                            f"old_text not found in {path}. "
+                            f"Partial match on line {i}: '{line.strip()[:80]}'. "
+                            f"Check for differences in surrounding lines."
+                        ),
+                        error=True,
+                    )
+
+        return ToolResult(
+            output=f"old_text not found in {path}. No partial matches detected.",
+            error=True
+        )
+
+
+def _make_unified_diff(old: str, new: str, path: str, context: int = 3) -> str:
+    """Generate a compact unified diff for display."""
+    import difflib
+    old_lines = old.splitlines(keepends=True)
+    new_lines = new.splitlines(keepends=True)
+    diff = difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}", n=context)
+    result = "".join(diff)
+    if not result:
+        return "(no changes)"
+    # Truncate very long diffs
+    if len(result) > 10000:
+        result = result[:10000] + f"\n... (diff truncated at 10000 chars)"
+    return result
+
+
 class ToolRegistry:
     """Registry of available tools."""
 
@@ -230,7 +456,7 @@ class ToolRegistry:
         self._register_defaults()
 
     def _register_defaults(self):
-        for tool_cls in [BashTool, FileReadTool, FileWriteTool, WebFetchTool]:
+        for tool_cls in [BashTool, FileReadTool, FileWriteTool, FileEditTool, WebFetchTool]:
             self.register(tool_cls())
 
     def register(self, tool: Tool):
