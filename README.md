@@ -26,7 +26,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 </p>
 
 <p align="center">
-  <img src="docs/img/bytia-kode-6-menu.png" width="350"><br>
+  <img src="docs/img/bytia-kode-6-TUI-menu.png" width="350"><br>
   <em>Menú rápido (Ctrl+P)</em>
 </p>
 
