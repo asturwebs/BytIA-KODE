@@ -1,10 +1,10 @@
-# BytIA KODE v0.4.0
+# BytIA KODE v0.4.1
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.4.0-success.svg)
+![Release](https://img.shields.io/badge/release-0.4.1-success.svg)
 
-BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.4.0 incorpora streaming real, soporte de razonamiento, gestión de contexto, B-KODE.md y router polling.
+BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.4.1 añade `file_edit` tool con backup, context management con summarización, ToolBlock color coding y 27 tests.
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
@@ -25,7 +25,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
   <em>Comandos integrados · Benchmark: 4.90x speedup async</em>
 </p>
 
-> Release actual: `0.4.0`
+> Release actual: `0.4.1`
 >
 > Formato de identidad del sistema: `YAML`
 >
@@ -163,6 +163,7 @@ El banner, ActivityIndicator, ThinkingBlock, ToolBlock y todos los colores CSS s
 | `bash` | Ejecutar comandos shell | Allowlist de binarios, sandbox CWD |
 | `file_read` | Leer archivos | Path traversal bloqueado |
 | `file_write` | Escribir archivos | Path traversal bloqueado |
+| `file_edit` | Editar archivos (search/replace + create) | Backup automático, sandbox CWD |
 | `web_fetch` | Fetch URLs (HTTP GET) | Solo http/https, content type validation |
 
 Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.

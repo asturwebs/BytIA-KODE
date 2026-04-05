@@ -6,7 +6,24 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-04-05
+
 ### Added
+
+- **`file_edit` tool** — Search/replace y create con dos estrategias. Backup automático con timestamp antes de cada edición. Diff unificado mostrando cambios. Diagnósticos `_no_match_help` cuando old_text no coincide (whitespace, partial match).
+- **Context management con summarización** — Cuando el contexto supera el 75% del límite, el agente pide al propio modelo que resuma los mensajes más antiguos. Fallback a truncación si la summarización falla. Threshold dinámico por `ctx_size` del router.
+- **`Agent.estimate_tokens()`** — Método estático como single source of truth para estimación de tokens (chars/3). Usado por agent y TUI.
+- **ToolBlock color coding** — Indicador visual: rojo ❌ si la tool retorna error, verde ✅ si éxito. Propagado vía callback `on_tool_done(tool_name, output, error)`.
+- **Router polling con alertas progresivas** — Logging de cada fallo de polling. Alerta visual en la TUI tras 3 fallos consecutivos.
+- **13 tests de context management** — Cubren `estimate_tokens`, `_manage_context` (threshold, summarización, preservación de mensajes recientes, stop condition), `_summarize_messages` (summary, error fallback, empty response fallback) y `update_context_limit` (valid, zero, negative).
+- **14 tests de file_edit** — Cubren replace (single, multiple, all, not found, indented), create (new, existing, force), path traversal, diff output y validación de parámetros.
+
+### Changed
+
+- **`on_tool_done` callback** — Firma actualizada a `fn(tool_name: str, output: str, error: bool)` para soportar color coding.
+- **Token estimation unificada** — TUI usa `Agent.estimate_tokens()` en vez de cálculo propio (chars/4 → chars/3).
+
+### Total tests: 27 (14 file_edit + 13 context_management)
 
 - **Router polling en StatusBar** — `ActivityIndicator` consulta `/v1/models` cada 5s. Si el modelo cambia en la WebUI (slot swap), el StatusBar se actualiza automáticamente sin intervención del usuario.
 - **ctx-size real desde el router** — `get_router_info()` extrae `--ctx-size` de los args del modelo cargado via `/v1/models`. La capacidad de contexto ya no es un valor hardcodeado, es dinámica por modelo.
