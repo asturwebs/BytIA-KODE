@@ -132,7 +132,6 @@ class PromptTextArea(TextArea):
             event.prevent_default()
             event.stop()
             self.post_message(self.Submitted(self.text))
-            return
 
 
 class ActivityIndicator(Static):
@@ -273,9 +272,10 @@ class ToolBlock(Static):
 
     _expanded: reactive[bool] = reactive(False)
 
-    def __init__(self, tool_name: str, output: str, **kwargs):
+    def __init__(self, tool_name: str, output: str, error: bool = False, **kwargs):
         self.tool_name = tool_name
         self.tool_output = output
+        self.tool_error = error
         super().__init__("", **kwargs)
 
     def on_mount(self) -> None:
@@ -295,8 +295,11 @@ class ToolBlock(Static):
         try:
             c = self.app._get_theme_colors()
         except Exception:
-            c = {"warning": "#f0883e", "accent": "#7ee787"}
+            c = {"warning": "#f0883e", "accent": "#7ee787", "error": "#ff5555"}
         a = c.get("accent", "#7ee787")
+        e = c.get("error", "#ff5555")
+        color = e if self.tool_error else a
+        icon = "\u274c" if self.tool_error else "\u2705"
         lines = self.tool_output.strip().split("\n")
         n_lines = len(lines)
         if self._expanded:
@@ -306,12 +309,12 @@ class ToolBlock(Static):
                 preview += f"\n... ({n_lines} lines total)"
             body = Syntax(preview, "bash", theme="monokai", line_numbers=False)
         else:
-            body = Text(f"  {n_lines} lines of output", style=f"dim italic {a}")
+            body = Text(f"  {n_lines} lines of output", style=f"dim italic {color}")
         self.update(Panel(
             body,
-            title=f"[bold {a}]\U0001f527 {self.tool_name}[/] [dim]click expand[/]",
+            title=f"[bold {color}]{icon} {self.tool_name}[/] [dim]click expand[/]",
             title_align="left",
-            border_style=a,
+            border_style=color,
             padding=(0, 1),
             expand=False,
         ))
@@ -399,9 +402,9 @@ class BytIAKODEApp(App):
     def _on_agent_tool_call(self, tool_name: str):
         self.query_one(ActivityIndicator).set_status("tool", detail=f"tool:{tool_name}")
 
-    def _on_agent_tool_done(self, tool_name: str, output: str):
+    def _on_agent_tool_done(self, tool_name: str, output: str, error: bool = False):
         chat = self.query_one("#chat-area", VerticalScroll)
-        chat.mount(ToolBlock(tool_name, output))
+        chat.mount(ToolBlock(tool_name, output, error=error))
         chat.scroll_end(animate=False)
         self.set_timer(0.5, lambda: self.query_one(ActivityIndicator).set_status("thinking"))
 
@@ -479,6 +482,8 @@ class BytIAKODEApp(App):
         except Exception as exc:
             logger.debug("Auto-detect model failed: %s", exc)
 
+    _poll_failures: reactive[int] = reactive(0)
+
     async def _poll_router_info(self) -> None:
         """Poll router every 5s for model changes and real ctx metrics."""
         try:
@@ -486,14 +491,22 @@ class BytIAKODEApp(App):
             info = await client.get_router_info()
             if info.get("model") and info["model"] != client.model:
                 client.model = info["model"]
+            if info.get("ctx_size"):
+                self.agent.update_context_limit(info["ctx_size"])
             activity = self.query_one(ActivityIndicator)
             activity.set_router_info(
                 ctx_size=info.get("ctx_size", 0),
                 prompt_tokens=info.get("prompt_tokens", 0),
             )
             activity._refresh()
-        except Exception:
-            pass
+            self._poll_failures = 0
+        except Exception as exc:
+            self._poll_failures += 1
+            logger.debug("Router poll failed (%d): %s", self._poll_failures, exc)
+            if self._poll_failures == 3:
+                activity = self.query_one(ActivityIndicator)
+                activity.set_status("error")
+                self._add_system_message(f"Router unreachable ({self._poll_failures} consecutive failures)")
 
     def watch_theme(self, theme_name: str) -> None:
         _save_theme(theme_name)
@@ -577,13 +590,13 @@ class BytIAKODEApp(App):
         tokens_out = 0
         for m in self.agent.messages:
             if m.content:
-                chars = len(m.content)
+                t = Agent.estimate_tokens(m.content)
                 if m.role == "user":
-                    tokens_in += chars // 4
+                    tokens_in += t
                 elif m.role == "assistant":
-                    tokens_out += chars // 4
+                    tokens_out += t
                 elif m.role == "tool":
-                    tokens_in += chars // 4
+                    tokens_in += t
         return tokens_in, tokens_out
 
     def on_prompt_text_area_submitted(self, event: PromptTextArea.Submitted) -> None:
