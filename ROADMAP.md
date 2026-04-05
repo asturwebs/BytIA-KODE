@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.4.0+ (Alpha estable)
+## Estado actual: v0.4.1 (Alpha estable)
 
 ### Completado
 
@@ -52,50 +52,35 @@
 - [x] Limpieza de peso muerto (3 deps, cli.py, memory/store.py)
 - [x] 15 tests pasando con pre-commit hook
 
+**v0.4.1 — Herramientas y estabilidad**
+- [x] `file_edit` tool — search/replace + create con backup automático, diff unificado y diagnósticos (_no_match_help) (BytIA OpenClaw)
+- [x] Context management con summarization por modelo (threshold dinámico por ctx_size, fallback a truncación) (BytIA Claude Code)
+- [x] Token estimation unificado — `Agent.estimate_tokens()` como single source of truth (chars/3) (BytIA Claude Code)
+- [x] ToolBlock color coding — rojo ❌ si error, verde ✅ si ok (BytIA Claude Code)
+- [x] Router polling: logging en `_poll_router_info` con alertas progresivas (BytIA Claude Code)
+- [x] 27 tests pasando (14 file_edit + 13 context_management)
+
 ---
 
-## v0.4.1 — Herramientas y estabilidad (pendiente)
+## v0.4.1 — Herramientas y estabilidad (completado)
 
 **Objetivo:** Robustez del agente y herramientas de desarrollo.
 
 **Reparto por instancia (zero merge conflicts — cada una en archivos distintos):**
 
-| Instancia | Plataforma | Archivos | Branch base |
-|-----------|-----------|----------|-------------|
+| Instancia | Plataforma | Archivos | Branch |
+|-----------|-----------|----------|--------|
 | **BytIA OpenClaw** | GLM-5.1 · VPS Hetzner | `tools/registry.py` | `feature/file-edit-claw` |
 | **BytIA (Claude Code)** | GLM-5-Turbo · WSL2 local | `agent.py`, `tui.py` | `feature/context-bytia` |
 
-### BytIA OpenClaw (VPS) — `tools/registry.py`
+(Ver sección "Completado" arriba para el detalle de tareas)
 
-- [ ] `file_edit` tool (search/replace) — sin edit parcial el agente no puede hacer refactors reales
-- [ ] Bash allowlist diferenciada por safe_mode (ON: restrictiva extendida, OFF: todo + confirmación destructivos)
-  - Añadir: cd, cp, mv, rm, sed, awk, curl, npm, docker, node
+### Reubicado a v0.5.0 (no completado en v0.4.1)
+
+- [ ] PromptTextArea: Shift+Enter/Ctrl+Enter = newline (Textual Key no expone modifiers de forma fiable)
+- [ ] Bash allowlist diferenciada por safe_mode
 - [ ] Safe mode backend real (confirmación de comandos destructivos)
 - [ ] Tools de exploración: `grep`, `tree`, `glob` nativos en Python
-
-### BytIA / Claude Code (WSL2) — `agent.py` + `tui.py`
-
-- [ ] Context management con summarization (P1 — reubicado desde v0.5.0 por impacto)
-  - Archivo: `agent.py:135-147`
-  - Summarization por el propio modelo antes de podar
-  - Threshold dinámico por ctx_size del modelo
-- [ ] Token estimation unificado (`//3` en agent vs `//4` en TUI → unificar)
-  - Archivo: `agent.py:125-133`, `tui.py:575-587`
-- [ ] PromptTextArea: Shift+Enter/Ctrl+Enter = newline, Enter = submit
-  - Archivo: `tui.py:130-135`
-- [ ] ToolBlock color coding por exit code (error → rojo, ok → accent)
-  - Archivo: `agent.py:97,179` + `tui.py:276,294-317,402-404`
-- [ ] Router polling: logging en `_poll_router_info` (actualmente `except: pass`)
-  - Archivo: `tui.py:496`
-
-### Sin asignar (quien llegue primero o Pedro)
-
-- [ ] Integración Git autónoma (diffs, branches, commits desde la TUI)
-- [ ] Auto-fallback de providers con circuit breaker
-- [ ] Cobertura de tests >= 60%
-- [ ] Rate limiting en Telegram
-- [ ] Error retry en mensajes de provider
-- [x] Web search/fetch tool
 
 ## v0.5.0 — Contexto, Skills inteligentes y memoria
 
