@@ -140,31 +140,7 @@ Documentación adicional:
 
 ### Temas
 
-Pulsa `F2` para cambiar entre los 19 temas disponibles. El tema seleccionado se guarda automáticamente en `~/.bytia-kode/theme.json`.
-
-| Tema | Tipo |
-| --- | --- |
-| `gruvbox` (por defecto) | Oscuro |
-| `monokai` | Oscuro |
-| `nord` | Oscuro |
-| `dracula` | Oscuro |
-| `catppuccin-mocha` | Oscuro |
-| `catppuccin-frappe` | Oscuro |
-| `catppuccin-macchiato` | Oscuro |
-| `tokyo-night` | Oscuro |
-| `atom-one-dark` | Oscuro |
-| `solarized-dark` | Oscuro |
-| `rose-pine-moon` | Oscuro |
-| `textual-dark` | Oscuro |
-| `atom-one-light` | Claro |
-| `catppuccin-latte` | Claro |
-| `flexoki` | Claro |
-| `rose-pine` | Claro |
-| `rose-pine-dawn` | Claro |
-| `solarized-light` | Claro |
-| `textual-light` | Claro |
-
-El banner, ActivityIndicator, ThinkingBlock, ToolBlock y todos los colores CSS se adaptan al tema activo.
+Pulsa `F2` para cambiar entre los 19 temas disponibles (12 oscuros + 7 claros, por defecto `gruvbox`). El tema se guarda en `~/.bytia-kode/theme.json`.
 
 ## Tools
 
