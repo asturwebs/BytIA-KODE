@@ -140,7 +140,7 @@ Documentación adicional:
 
 ### Temas
 
-Pulsa `F2` para cambiar entre los 19 temas disponibles. El tema seleccionado se guarda automáticamente en `~/.bytia-kode/theme.json`.
+Pulsa `F2` para cambiar entre los 20 temas disponibles. El tema seleccionado se guarda automáticamente en `~/.bytia-kode/theme.json`.
 
 | Tema | Tipo |
 | --- | --- |
@@ -163,6 +163,7 @@ Pulsa `F2` para cambiar entre los 19 temas disponibles. El tema seleccionado se 
 | `rose-pine-dawn` | Claro |
 | `solarized-light` | Claro |
 | `textual-light` | Claro |
+| `textual-ansi` | Monocromático |
 
 El banner, ActivityIndicator, ThinkingBlock, ToolBlock y todos los colores CSS se adaptan al tema activo.
 
