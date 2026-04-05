@@ -104,7 +104,7 @@ CommandMenuScreen {
 
 #command-list {
     width: 40;
-    height: 11;
+    height: 13;
     background: $surface;
     border: tall $accent;
 }
