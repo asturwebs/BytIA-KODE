@@ -78,17 +78,23 @@ Footer .footer--key {
 }
 
 #send-button {
-    width: 5;
-    min-width: 5;
+    width: 3;
+    min-width: 3;
+    height: 3;
     margin-left: 1;
     background: $accent;
     color: $text;
-    border: tall $accent;
+    border: none;
     text-style: bold;
+    content-align: center middle;
 }
 
 #send-button:hover {
     background: $primary;
+}
+
+#send-button:focus {
+    border: none;
 }
 
 /* Command menu popup */
