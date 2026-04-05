@@ -435,7 +435,7 @@ class BytIAKODEApp(App):
         yield ActivityIndicator()
         with Horizontal(id="input-area"):
             yield PromptTextArea(id="input-field", show_line_numbers=False, language="markdown")
-            yield Button("\u276f", id="send-button")
+            yield Button("\u25b6", id="send-button")
         yield Footer()
 
     def on_mount(self) -> None:
