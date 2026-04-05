@@ -58,6 +58,9 @@
 
 **Objetivo:** Robustez del agente y herramientas de desarrollo.
 
+- [ ] `file_edit` tool (search/replace) — sin edit parcial el agente no puede hacer refactors reales
+- [ ] Bash allowlist diferenciada por safe_mode (ON: restrictiva extendida, OFF: todo + confirmación destructivos)
+  - Añadir: cd, cp, mv, rm, sed, awk, curl, npm, docker, node
 - [ ] Safe mode backend real (confirmación de comandos destructivos)
 - [ ] Tools de exploración: `grep`, `tree`, `glob` nativos en Python
 - [ ] Integración Git autónoma (diffs, branches, commits desde la TUI)
@@ -66,9 +69,37 @@
 - [ ] Rate limiting en Telegram
 - [x] Web search/fetch tool
 
-## v0.5.0 — Skills avanzadas y memoria
+### Polish UX (v0.4.1)
 
-**Objetivo:** Skills con tools dinámicas y memoria semántica.
+- [ ] PromptTextArea: Shift+Enter/Ctrl+Enter = newline, Enter = submit (actualmente Enter siempre envía)
+- [ ] ToolBlock color coding por exit code (error → rojo, ok → accent)
+- [ ] Token estimation unificado (`//3` en agent vs `//4` en TUI → unificar a `//3.5`)
+- [ ] Router polling: logging en `_poll_router_info` (actualmente `except: pass` silencioso)
+- [ ] Error retry en mensajes de provider (botón "Reintentar" en errores de conexión/timeout)
+
+## v0.5.0 — Contexto, Skills inteligentes y memoria
+
+**Objetivo:** Context management real, auto-selección de skills y persistencia.
+
+### P1 — Critical
+
+- [ ] Context management con summarization (actual: corta 2 msgs y resume a 80 chars)
+  - Summarization por el propio modelo antes de podar
+  - Preservar system messages (índice 0) siempre
+  - Threshold dinámico por ctx_size del modelo (Gemma 1M vs GLM 131k vs Ollama 8-32k)
+  - Archivo: `agent.py:135-147`
+
+### P2 — High
+
+- [ ] Auto-selección de skills (cargar solo relevantes al query actual)
+  - `get_relevant()` existe en SkillLoader pero NO se invoca en `_build_system_prompt()`
+  - Scoring: trigger 3pt, description 2pt, content 1pt (ya diseñado)
+  - Archivo: `agent.py:120-122`
+- [ ] Persistencia de sesiones (`/save`, `/load`, `/sessions`)
+  - Almacenamiento: `~/.bytia-kode/sessions/` con timestamp
+  - Actual: `/reset` pierde todo sin opción de recuperar
+
+### P3 — Features
 
 - [ ] Tools dinámicas en skills (scripts en `skills/<name>/scripts/` auto-registrados)
 - [ ] `write_skill` tool para que el agente cree skills programáticamente
