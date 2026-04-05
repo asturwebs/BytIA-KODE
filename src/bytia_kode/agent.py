@@ -139,7 +139,7 @@ class Agent:
                 total += len(m.content)
             if m.tool_calls:
                 total += sum(len(str(tc)) for tc in m.tool_calls)
-        return self.estimate_tokens(str(total))
+        return total // 3
 
     async def _manage_context(self, provider_client) -> None:
         """Compress old messages when context exceeds 75% of max.
@@ -181,9 +181,9 @@ class Agent:
             f"{m.role}: {m.content}" for m in messages if m.content
         )
         prompt = (
-            "Summarize the following conversation excerpt concisely in 2-3 sentences. "
-            "Preserve key facts, decisions, and context. "
-            "Output ONLY the summary, nothing else.\n\n"
+            "Resume el siguiente fragmento de conversación en 2-3 frases. "
+            "Preserva hechos clave, decisiones y contexto importante. "
+            "Responde SOLO con el resumen, nada más.\n\n"
             f"{conversation_text}"
         )
         try:
