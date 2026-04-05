@@ -58,24 +58,44 @@
 
 **Objetivo:** Robustez del agente y herramientas de desarrollo.
 
+**Reparto por instancia (zero merge conflicts — cada una en archivos distintos):**
+
+| Instancia | Plataforma | Archivos | Branch base |
+|-----------|-----------|----------|-------------|
+| **BytIA OpenClaw** | GLM-5.1 · VPS Hetzner | `tools/registry.py` | `feature/file-edit-claw` |
+| **BytIA (Claude Code)** | GLM-5-Turbo · WSL2 local | `agent.py`, `tui.py` | `feature/context-bytia` |
+
+### BytIA OpenClaw (VPS) — `tools/registry.py`
+
 - [ ] `file_edit` tool (search/replace) — sin edit parcial el agente no puede hacer refactors reales
 - [ ] Bash allowlist diferenciada por safe_mode (ON: restrictiva extendida, OFF: todo + confirmación destructivos)
   - Añadir: cd, cp, mv, rm, sed, awk, curl, npm, docker, node
 - [ ] Safe mode backend real (confirmación de comandos destructivos)
 - [ ] Tools de exploración: `grep`, `tree`, `glob` nativos en Python
+
+### BytIA / Claude Code (WSL2) — `agent.py` + `tui.py`
+
+- [ ] Context management con summarization (P1 — reubicado desde v0.5.0 por impacto)
+  - Archivo: `agent.py:135-147`
+  - Summarization por el propio modelo antes de podar
+  - Threshold dinámico por ctx_size del modelo
+- [ ] Token estimation unificado (`//3` en agent vs `//4` en TUI → unificar)
+  - Archivo: `agent.py:125-133`, `tui.py:575-587`
+- [ ] PromptTextArea: Shift+Enter/Ctrl+Enter = newline, Enter = submit
+  - Archivo: `tui.py:130-135`
+- [ ] ToolBlock color coding por exit code (error → rojo, ok → accent)
+  - Archivo: `agent.py:97,179` + `tui.py:276,294-317,402-404`
+- [ ] Router polling: logging en `_poll_router_info` (actualmente `except: pass`)
+  - Archivo: `tui.py:496`
+
+### Sin asignar (quien llegue primero o Pedro)
+
 - [ ] Integración Git autónoma (diffs, branches, commits desde la TUI)
 - [ ] Auto-fallback de providers con circuit breaker
 - [ ] Cobertura de tests >= 60%
 - [ ] Rate limiting en Telegram
+- [ ] Error retry en mensajes de provider
 - [x] Web search/fetch tool
-
-### Polish UX (v0.4.1)
-
-- [ ] PromptTextArea: Shift+Enter/Ctrl+Enter = newline, Enter = submit (actualmente Enter siempre envía)
-- [ ] ToolBlock color coding por exit code (error → rojo, ok → accent)
-- [ ] Token estimation unificado (`//3` en agent vs `//4` en TUI → unificar a `//3.5`)
-- [ ] Router polling: logging en `_poll_router_info` (actualmente `except: pass` silencioso)
-- [ ] Error retry en mensajes de provider (botón "Reintentar" en errores de conexión/timeout)
 
 ## v0.5.0 — Contexto, Skills inteligentes y memoria
 
@@ -83,21 +103,18 @@
 
 ### P1 — Critical
 
-- [ ] Context management con summarization (actual: corta 2 msgs y resume a 80 chars)
-  - Summarization por el propio modelo antes de podar
-  - Preservar system messages (índice 0) siempre
-  - Threshold dinámico por ctx_size del modelo (Gemma 1M vs GLM 131k vs Ollama 8-32k)
-  - Archivo: `agent.py:135-147`
+- [x] → Promovido a v0.4.1 (BytIA Claude Code)
 
 ### P2 — High
 
 - [ ] Auto-selección de skills (cargar solo relevantes al query actual)
   - `get_relevant()` existe en SkillLoader pero NO se invoca en `_build_system_prompt()`
   - Scoring: trigger 3pt, description 2pt, content 1pt (ya diseñado)
-  - Archivo: `agent.py:120-122`
+  - Archivo: `agent.py:120-122` → **BytIA (Claude Code)**
 - [ ] Persistencia de sesiones (`/save`, `/load`, `/sessions`)
   - Almacenamiento: `~/.bytia-kode/sessions/` con timestamp
   - Actual: `/reset` pierde todo sin opción de recuperar
+  - **Sin asignar** — nuevo módulo, no pisa archivos existentes
 
 ### P3 — Features
 
