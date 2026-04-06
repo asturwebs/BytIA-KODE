@@ -11,7 +11,7 @@ from textual.app import App, ComposeResult
 from textual import events
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Horizontal
-from textual.widgets import Header, Footer, Static, TextArea, Button, ListView, ListItem, Label
+from textual.widgets import Header, Footer, Static, TextArea, Button, ListView, ListItem, Label, Input
 from textual.screen import ModalScreen
 from textual.reactive import reactive
 from textual.message import Message as TextualMessage
@@ -339,7 +339,6 @@ class InputScreen(ModalScreen):
         self._placeholder = placeholder
 
     def compose(self) -> ComposeResult:
-        from textual.widgets import Input
         yield Label(self._title, id="prompt-label")
         yield Input(placeholder=self._placeholder, id="prompt-input")
 
