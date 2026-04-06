@@ -64,7 +64,7 @@ def test_agent_loads_system_prompt_from_package_resource(caplog):
     with caplog.at_level("INFO"):
         payload = load_identity()
 
-    assert payload["identity"]["version"] == "12.0.0"
+    assert payload["identity"]["version"] == "12.1.0"
     assert "Identity loaded from package resource" in caplog.text
 
     prompt = load_system_prompt()

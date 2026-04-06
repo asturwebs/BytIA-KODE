@@ -158,3 +158,73 @@ class TestGetContext:
     def test_get_context_not_found(self, store):
         context = store.get_session_context("nonexistent")
         assert "not found" in context.lower()
+
+
+class TestPreviousSessionSummary:
+    """Tests for Agent._get_previous_session_summary — context continuity."""
+
+    @pytest.fixture
+    def agent(self, tmp_path):
+        from bytia_kode.agent import Agent
+        from bytia_kode.config import AppConfig
+        from unittest.mock import patch
+
+        config = AppConfig(data_dir=tmp_path)
+        with patch("bytia_kode.agent.ProviderManager"):
+            ag = Agent.__new__(Agent)
+            ag.config = config
+            ag._session_store = SessionStore(tmp_path / "test.db")
+            ag._current_session_id = None
+            ag._system_prompt = "test"
+            ag._bkode_content = ""
+            return ag
+
+    def test_no_previous_session_returns_empty(self, agent):
+        result = agent._get_previous_session_summary()
+        assert result == ""
+
+    def test_summary_with_previous_session(self, agent):
+        sid = agent._session_store.create_session("tui", title="Sesión de prueba")
+        agent._session_store.append_message(sid, "user", "Hola, cómo estás?")
+        agent._session_store.append_message(sid, "assistant", "Bien, gracias!")
+
+        agent._current_session_id = agent._session_store.create_session("tui")
+        result = agent._get_previous_session_summary()
+
+        assert "Previous Session Context" in result
+        assert "Sesión de prueba" in result
+        assert sid in result
+
+    def test_summary_excludes_current_session(self, agent):
+        sid = agent._session_store.create_session("tui", title="Actual")
+        agent._session_store.append_message(sid, "user", "mensaje actual")
+
+        agent._current_session_id = sid
+        result = agent._get_previous_session_summary()
+        assert result == ""
+
+    def test_summary_filters_by_source(self, agent):
+        tui_sid = agent._session_store.create_session("tui", title="Sesión TUI")
+        agent._session_store.append_message(tui_sid, "user", "desde TUI")
+        tg_sid = agent._session_store.create_session("telegram", title="Sesión Telegram")
+        agent._session_store.append_message(tg_sid, "user", "desde Telegram")
+
+        agent._current_session_id = agent._session_store.create_session("tui")
+        result = agent._get_previous_session_summary()
+
+        assert "Sesión TUI" in result
+        assert "Sesión Telegram" not in result
+
+    def test_summary_shows_last_3_messages(self, agent):
+        sid = agent._session_store.create_session("tui", title="Múltiples mensajes")
+        for i in range(5):
+            agent._session_store.append_message(sid, "user", f"Mensaje {i}")
+
+        agent._current_session_id = agent._session_store.create_session("tui")
+        result = agent._get_previous_session_summary()
+
+        assert "Mensaje 2" in result
+        assert "Mensaje 3" in result
+        assert "Mensaje 4" in result
+        assert "Mensaje 0" not in result
+        assert "Mensaje 1" not in result
