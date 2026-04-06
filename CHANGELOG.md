@@ -6,6 +6,22 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-06
+
+### Added
+
+- **Auto-resumen de sesión anterior** — Al iniciar una conversación, el system prompt incluye automáticamente un resumen compacto de la última sesión del mismo source (TUI o Telegram): título, fecha, nº mensajes y los últimos 3 mensajes truncados. El modelo puede usar `session_load` para obtener contexto completo si lo necesita.
+
+### Changed
+
+- **core_identity.yaml: capacidades actualizadas** — Añadidas session tools (`session_list`, `session_search`, `session_load`) a la lista de capacidades del runtime. Añadidos comandos `/sessions`, `/load <id>`, `/new` a la lista de comandos disponibles.
+- **core_identity.yaml: directiva de tools proactivas** — Reemplazada "Usar herramientas solo cuando sean verificación" por directiva expandida que permite uso proactivo de tools (verificación, contexto histórico, archivos).
+- **core_identity.yaml: directivas de session tools** — Nuevas directivas que instruyen al modelo a usar `session_search` cuando el usuario pregunte sobre trabajo anterior, y a revisar el resumen de sesión anterior inyectado automáticamente.
+
+### Tests
+
+- 5 nuevos tests en `TestPreviousSessionSummary`: sin sesiones previas, resumen con sesión anterior, exclusión de sesión actual, filtro por source, y límite de 3 mensajes.
+
 ## [0.5.0] - 2026-04-06
 
 ### Added

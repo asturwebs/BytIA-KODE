@@ -136,7 +136,44 @@ class Agent:
         skill_summary = self.skills.skill_summary()
         if skill_summary:
             parts.append(skill_summary)
+        session_context = self._get_previous_session_summary()
+        if session_context:
+            parts.append(session_context)
         return "\n\n".join(parts)
+
+    def _get_previous_session_summary(self, source: str | None = None) -> str:
+        """Build a compact summary of the most recent past session for context continuity.
+
+        Uses last 3 messages (truncated) — lightweight, deterministic, no LLM call needed.
+        The model can use session_load to retrieve full context if needed.
+        """
+        if self._current_session_id:
+            source_filter = self._current_session_id.split("_")[0] if "_" in self._current_session_id else source
+        else:
+            source_filter = source or "tui"
+        sessions = self._session_store.list_sessions(source=source_filter, limit=5)
+        previous = [s for s in sessions if s.session_id != self._current_session_id]
+        if not previous:
+            return ""
+        latest = previous[0]
+        messages = self._session_store.load_messages(latest.session_id)
+        if not messages:
+            return ""
+        lines = [
+            f"# Previous Session Context",
+            f"Session: {latest.session_id} | Source: {latest.source}",
+            f"Title: {latest.title or '(untitled)'} | Updated: {latest.updated_at[:16] if latest.updated_at else '?'}",
+            f"Messages: {latest.message_count}",
+            "",
+            "Recent messages (last 3):",
+        ]
+        for msg in messages[-3:]:
+            role = msg["role"].upper()
+            content = (msg.get("content") or "")[:200]
+            lines.append(f"  [{role}] {content}")
+        lines.append("")
+        lines.append("Use session_load to retrieve full context from this or other past sessions.")
+        return "\n".join(lines)
 
     @staticmethod
     def estimate_tokens(text: str) -> int:
