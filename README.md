@@ -1,14 +1,14 @@
-# BytIA KODE v0.5.0
+# BytIA KODE v0.5.1
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.5.0-success.svg)
-![Tests](https://img.shields.io/badge/tests-61%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.5.1-success.svg)
+![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
 
-BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.5.0 añade persistencia de sesiones en tiempo real con SQLite WAL, aislamiento por usuario en Telegram, session tools para el modelo y 61 tests.
+BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.5.1 añade session awareness automática, resumen de sesión anterior inyectado en el prompt, y 66 tests.
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
