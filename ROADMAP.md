@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.5.0 (Alpha estable)
+## Estado actual: v0.5.1 (Alpha estable)
 
 ### Completado
 
@@ -73,7 +73,31 @@
 
 ---
 
-## v0.5.1 — Pulido y estabilidad
+**v0.5.1 — Session Awareness y UX**
+- [x] Session tools añadidas a capacidades del prompt (session_list, session_search, session_load)
+- [x] Directiva de tools proactivas (reemplaza "solo verificación")
+- [x] Directivas conductuales para uso autónomo de session tools
+- [x] Auto-resumen de sesión anterior inyectado en system prompt (título, fecha, 3 mensajes)
+- [x] Menú Ctrl+P expandido: 11 → 17 items (sessions, model select, history, reasoning)
+- [x] InputScreen modal para prompts de texto (session ID, model name)
+- [x] 66 tests pasando (24 session + 14 file_edit + 13 context_management + 15 basics)
+
+---
+
+## v0.5.2 — Tests de TUI y pulido
+
+**Objetivo:** Tests de integración para la TUI, el punto ciego actual.
+
+- [ ] Tests de TUI con `pytest-textual` o `app_test` (pilot, screen mounting, key simulation)
+- [ ] Test: CommandMenuScreen muestra 17 items y dispara acciones correctas
+- [ ] Test: InputScreen acepta texto, cancela con Escape
+- [ ] Test: _handle_command() enruta todos los comandos (/help, /sessions, /new, /reset, etc.)
+- [ ] Test: ActivityIndicator muestra modelo y contexto
+- [ ] Test: ThinkingBlock toggle expand/collapse
+- [ ] Test: ToolBlock muestra output de tools
+- [ ] Test: on_mount crea sesión y detecta modelo
+
+## v0.6.0 — Pulido avanzado y Skills Inteligentes
 
 **Objetivo:** Resolver issues menores pendientes y mejorar UX.
 
