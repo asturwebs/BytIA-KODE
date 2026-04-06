@@ -2,7 +2,7 @@
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
-Documento actualizado para la versión 0.4.0.
+Documento actualizado para la versión 0.5.0.
 
 ## Componentes
 
@@ -17,13 +17,44 @@ Documento actualizado para la versión 0.4.0.
 ## Flujo
 
 1. Inicia con `bytia-kode`.
-2. Escribe el prompt en la caja inferior.
-3. Pulsa `Enter` o el botón de envío.
-4. El ActivityIndicator cambia a `◐ Thinking...`.
-5. Si el modelo razona, aparece un bloque `ThinkingBlock` colapsable.
-6. La respuesta se muestra con streaming token a token.
-7. Si hay tool calls, el indicador cambia a `⚙ tool:bash`. Al terminar, aparece un `ToolBlock` colapsable con el output.
-8. Al terminar, vuelve a `● Ready | provider | model | ctx ~Xk/Yk`.
+2. Se crea automáticamente una sesión con auto-save habilitado.
+3. Escribe el prompt en la caja inferior.
+4. Pulsa `Enter` o el botón de envío.
+5. El ActivityIndicator cambia a `◐ Thinking...`.
+6. Si el modelo razona, aparece un bloque `ThinkingBlock` colapsable.
+7. La respuesta se muestra con streaming token a token.
+8. Si hay tool calls, el indicador cambia a `⚙ tool:bash`. Al terminar, aparece un `ToolBlock` colapsable con el output.
+9. El mensaje y la respuesta se guardan automáticamente en la sesión.
+10. Al terminar, vuelve a `● Ready | provider | model | ctx ~Xk/Yk`.
+
+## Sesiones
+
+Todas las conversaciones se guardan automáticamente en `~/.bytia-kode/sessions.db` (SQLite WAL). No se pierde nada al cerrar la TUI.
+
+### Comandos de sesión
+
+| Comando | Descripción |
+| --- | --- |
+| `/sessions` | Listar sesiones guardadas en tabla |
+| `/load <session_id>` | Cargar una sesión específica (reemplaza historial actual) |
+| `/new` | Crear sesión nueva (limpia historial, habilita auto-save) |
+| `/reset` | Limpiar conversación en memoria (no borra la sesión del disco) |
+
+### Tabla de sesiones
+
+Al ejecutar `/sessions`, se muestra una tabla con:
+
+| Columna | Contenido |
+| --- | --- |
+| ID | Identificador único (ej: `tui_a1b2c3d4`) |
+| Source | `tui` o `telegram` |
+| Title | Título auto-generado del primer mensaje (o "Untitled") |
+| Msgs | Número de mensajes en la sesión |
+| Updated | Fecha y hora de última actividad |
+
+### Acceso cruzado
+
+Las sesiones de TUI y Telegram se almacenan en la misma base de datos. Desde la TUI puedes cargar sesiones de Telegram con `/load <id>` (y viceversa). El modelo también puede acceder a sesiones pasadas usando las session tools (`session_list`, `session_load`, `session_search`).
 
 ## Barra de estado (ActivityIndicator)
 
@@ -68,9 +99,9 @@ Interacción:
 
 ## Tool Execution (ToolBlock)
 
-Cuando el agente ejecuta una tool (bash, file_read, file_write), se muestra un bloque colapsable con el resultado:
+Cuando el agente ejecuta una tool (bash, file_read, file_write, session_*), se muestra un bloque colapsable con el resultado:
 
-- **Colapsado**: `🔧 bash — N chars` (click para expandir)
+- **Colapsado**: `✅ bash — N chars` o `❌ bash — error` (click para expandir)
 - **Expandido**: Output completo de la tool (click para colapsar)
 
 El ActivityIndicator cambia a `⚙ tool:bash` durante la ejecución y vuelve a `◐ Thinking...` 500ms después. El ToolBlock aparece en el chat cuando la tool termina.
@@ -82,7 +113,7 @@ Popup modal con lista de comandos seleccionable:
 | Comando | Acción |
 | --- | --- |
 | Quit | Salir |
-| Reset conversation | Reiniciar chat |
+| Reset conversation | Reiniciar chat (en memoria) |
 | Clear screen | Limpiar pantalla |
 | List tools | Mostrar tools |
 | List skills | Mostrar skills |
@@ -101,7 +132,10 @@ Navegación: `↑`/`↓` para mover, `Enter` para seleccionar, `Escape` para cer
 | --- | --- |
 | `/help` | Ayuda integrada |
 | `/quit`, `/exit`, `/q` | Cerrar aplicación |
-| `/reset` | Reset conversación |
+| `/reset` | Reset conversación (en memoria, no borra sesión) |
+| `/new` | Nueva sesión con auto-save |
+| `/sessions` | Listar sesiones guardadas |
+| `/load <id>` | Cargar sesión por ID |
 | `/clear` | Limpiar chat |
 | `/model`, `/provider` | Mostrar proveedor y modelo |
 | `/tools` | Listar tools |
@@ -146,8 +180,18 @@ Pulsa `F2` para cambiar entre temas. La selección se guarda en `~/.bytia-kode/t
 | `dracula` | Oscuro |
 | `catppuccin-mocha` | Oscuro |
 | `tokyo-night` | Oscuro |
+| `atom-one-dark` | Oscuro |
+| `catppuccin-frappe` | Oscuro |
+| `catppuccin-macchiato` | Oscuro |
+| `rose-pine` | Oscuro |
+| `rose-pine-moon` | Oscuro |
+| `solarized-dark` | Oscuro |
+| `textual-dark` | Oscuro |
 | `catppuccin-latte` | Claro |
 | `solarized-light` | Claro |
 | `rose-pine-dawn` | Claro |
+| `atom-one-light` | Claro |
+| `flexoki` | Claro |
+| `textual-light` | Claro |
 
 Todos los colores (banner, mensajes, ActivityIndicator, ThinkingBlock, ToolBlock) se adaptan al tema activo.

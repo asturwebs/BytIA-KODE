@@ -14,13 +14,15 @@ import yaml
 from bytia_kode.config import AppConfig
 from bytia_kode.providers.client import Message
 from bytia_kode.providers.manager import ProviderManager
+from bytia_kode.session import SessionStore
 from bytia_kode.skills.loader import SkillLoader
 from bytia_kode.tools.registry import ToolRegistry, ToolResult
+from bytia_kode.tools.session import SessionListTool, SessionLoadTool, SessionSearchTool
 
 logger = logging.getLogger(__name__)
 CORE_IDENTITY_PACKAGE = "bytia_kode.prompts"
 CORE_IDENTITY_RESOURCE = "core_identity.yaml"
-MAX_CONTEXT_TOKENS = 16384  # ~16k tokens default
+MAX_CONTEXT_TOKENS = 131072  # ~128k tokens default (Gemma 4 26B supports 256k)
 
 
 def load_identity() -> dict[str, Any]:
@@ -81,7 +83,7 @@ def _format_chat_error(exc: Exception) -> str:
 class Agent:
     """The agentic loop: think -> act -> observe -> repeat."""
 
-    def __init__(self, config: AppConfig):
+    def __init__(self, config: AppConfig, session_store: SessionStore | None = None):
         self.config = config
         self.providers = ProviderManager(config.provider)
         self.tools = ToolRegistry()
@@ -95,6 +97,15 @@ class Agent:
         self._initialized = False
         self.on_tool_call: list = []  # callbacks: fn(tool_name: str)
         self.on_tool_done: list = []  # callbacks: fn(tool_name: str, output: str, error: bool)
+
+        # Session persistence
+        self._session_store = session_store or SessionStore(config.data_dir / "sessions.db")
+        self._current_session_id: str | None = None
+
+        # Register session tools (need store reference)
+        self.tools.register(SessionListTool(self._session_store))
+        self.tools.register(SessionLoadTool(self._session_store))
+        self.tools.register(SessionSearchTool(self._session_store))
 
     def update_context_limit(self, ctx_size: int) -> None:
         """Update max context tokens from router info (dynamic ctx_size)."""
@@ -239,6 +250,13 @@ class Agent:
                 tool_call_id=tool_call.id,
                 name=tool_name,
             ))
+            # Auto-save tool results
+            if self._current_session_id:
+                self._session_store.append_message(
+                    self._current_session_id,
+                    role="tool", content=result.output or "",
+                    tool_call_id=tool_call.id, name=tool_name,
+                )
 
     async def chat(self, user_message: str, provider: str = "primary") -> AsyncIterator[str | tuple[str, str]]:
         """Process a user message through the agentic loop, streaming text and reasoning chunks.
@@ -282,11 +300,29 @@ class Agent:
                     elif chunk_type == "tool_calls" and isinstance(data, list):
                         tool_calls_accum = data
 
+                msg_count_before = len(self.messages)
                 self.messages.append(Message(
                     role="assistant",
                     content=response_text or None,
                     tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
                 ))
+
+                # Auto-save: append user message + assistant response
+                if self._current_session_id:
+                    self._session_store.append_message(
+                        self._current_session_id,
+                        role="user", content=sanitized_message,
+                    )
+                    self._session_store.append_message(
+                        self._current_session_id,
+                        role="assistant", content=response_text or "",
+                        tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
+                    )
+                    # Auto-title from first user message
+                    if msg_count_before == 0 and sanitized_message:
+                        self._session_store.update_title(
+                            self._current_session_id, sanitized_message[:80],
+                        )
 
                 if not tool_calls_accum:
                     break
@@ -299,9 +335,69 @@ class Agent:
             logger.error("Agent chat failure: %s", error_message)
             yield error_message
 
+    def set_session(self, source: str = "tui", source_ref: str = "") -> str:
+        """Set the current session. Creates or resumes if exists."""
+        session_id = f"{source}_{source_ref}" if source_ref else self._session_store.create_session(source, source_ref)
+        if self._session_store.get_metadata(session_id):
+            self.messages = self._load_messages_from_store(session_id)
+        else:
+            session_id = self._session_store.create_session(source, source_ref)
+        self._current_session_id = session_id
+        logger.info("Session set: %s", session_id)
+        return session_id
+
+    def load_session_by_id(self, session_id: str) -> bool:
+        """Load a specific session by ID, replacing current messages."""
+        messages = self._session_store.load_messages(session_id)
+        if not messages:
+            logger.warning("Session not found: %s", session_id)
+            return False
+        self._current_session_id = session_id
+        self.messages: list[Message] = messages  # type: ignore[assignment]
+        logger.info("Session loaded: %s (%d messages)", session_id, len(messages))
+        return True
+
+    def save_current_session(self) -> bool:
+        """Save current messages to the active session."""
+        if not self._current_session_id:
+            return False
+        for msg in self.messages:
+            self._session_store.append_message(
+                self._current_session_id,
+                msg.role, msg.content,
+                msg.tool_calls, msg.tool_call_id, msg.name,
+            )
+        logger.debug("Session saved: %s", self._current_session_id)
+        return True
+
+    def list_sessions(self, source: str | None = None, limit: int = 20) -> list[dict]:
+        """List available sessions, optionally filtered by source."""
+        metas = self._session_store.list_sessions(source=source, limit=limit)
+        return [m.to_dict() for m in metas]
+
+    def get_session_context(self, session_id: str, max_messages: int = 20) -> str:
+        """Get formatted context from another session for model consumption."""
+        return self._session_store.get_session_context(session_id, max_messages)
+
+    def _load_messages_from_store(self, session_id: str) -> list[Message]:
+        """Convert stored dicts back to Message objects."""
+        """Convert stored dicts back to Message objects."""
+        rows = self._session_store.load_messages(session_id)
+        messages = []
+        for row in rows:
+            messages.append(Message(
+                role=row["role"],
+                content=row.get("content"),
+                tool_calls=row.get("tool_calls"),
+                tool_call_id=row.get("tool_call_id"),
+                name=row.get("name"),
+            ))
+        return messages
+
     def reset(self):
-        """Clear conversation history."""
+        """Clear conversation history. Note: does NOT delete the session from disk."""
         self.messages.clear()
+        self._current_session_id = None
 
     async def close(self):
         await self.providers.close_all()

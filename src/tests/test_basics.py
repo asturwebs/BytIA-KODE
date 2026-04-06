@@ -200,7 +200,7 @@ def test_telegram_bot_chat_hides_internal_errors():
         telegram=TelegramConfig(bot_token='token', allowed_users=['1']),
     )
     bot = TelegramBot(config)
-    bot.agent = BrokenAgent()
+    bot._agents["1"] = BrokenAgent()
     update = DummyUpdate()
 
     asyncio.run(bot._chat(update, None))
