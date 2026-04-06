@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 
-from textual import work
+from textual import work, on
 from textual.app import App, ComposeResult
 from textual import events
 from textual.binding import Binding
