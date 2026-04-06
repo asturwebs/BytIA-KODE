@@ -4,6 +4,8 @@
 
 BytIA KODE is an agentic TUI for assisted development with terminal and Telegram bot. Built with Python 3.11+ and Textual.
 
+**Contexto de ejecución:** Consulta `CONTEXT.md` para estado real del proyecto, configuración, skills y patrones de código.
+
 ## Architecture
 
 - `agent.py` — Agentic loop (think → act → observe)
@@ -45,4 +47,4 @@ BytIA KODE is an agentic TUI for assisted development with terminal and Telegram
 
 ## Version
 
-Current release: 0.4.1
+Current release: 0.5.0

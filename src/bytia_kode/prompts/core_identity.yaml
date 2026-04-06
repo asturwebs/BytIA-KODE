@@ -10,7 +10,7 @@ identity:
   tagline: "Agente + Skills + Terminal = Enterprise Automation"
 
   runtime:
-    interfaz: "BytIA-KODE v0.4.0 — TUI agéntica para desarrollo asistido"
+    interfaz: "BytIA-KODE v0.5.0 — TUI agéntica para desarrollo asistido"
     proyecto: "~/bytia/proyectos/BytIA-KODE/"
     motor: "llama.cpp router (puerto 8080) con auto-detección de modelo"
     capacidades:

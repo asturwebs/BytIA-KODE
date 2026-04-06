@@ -1,10 +1,14 @@
-# BytIA KODE v0.4.1
+# BytIA KODE v0.5.0
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.4.1-success.svg)
+![Release](https://img.shields.io/badge/release-0.5.0-success.svg)
+![Tests](https://img.shields.io/badge/tests-46%20passing-brightgreen.svg)
+![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
+![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
+![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
 
-BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.4.1 añade `file_edit` tool con backup, context management con summarización, ToolBlock color coding y 27 tests.
+BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.5.0 añade persistencia de sesiones en tiempo real con SQLite WAL, aislamiento por usuario en Telegram, session tools para el modelo y 46 tests.
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
@@ -30,11 +34,19 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
   <em>Benchmark: 4.90x speedup async</em>
 </p>
 
-> Release actual: `0.4.1`
+> Release actual: `0.5.0`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+## Novedades en v0.5.0
+
+- **Sesiones persistentes** — Todas las conversaciones se guardan automáticamente en SQLite WAL. No se pierde nada al reiniciar.
+- **Acceso cruzado TUI ↔ Telegram** — Desde la TUI puedes ver sesiones de Telegram y viceversa. El modelo también puede acceder a sesiones pasadas.
+- **Aislamiento por usuario en Telegram** — Cada usuario tiene su propia sesión e historial privado.
+- **Session tools** — El modelo puede listar, buscar y cargar contexto de sesiones pasadas.
+- **Contexto ampliado** — `MAX_CONTEXT_TOKENS` subido a 128k (antes 16k), optimizado para modelos GGUF con 256k.
 
 ## Instalación
 
@@ -72,9 +84,11 @@ __main__.py
 
 agent.py
   ├─ prompts/core_identity.yaml
+  ├─ session.py                    ← NUEVO: SQLite WAL persistence
   ├─ providers/manager.py
   ├─ providers/client.py
   ├─ tools/registry.py
+  ├─ tools/session.py              ← NUEVO: session_list, session_load, session_search
   └─ skills/loader.py
 ```
 
@@ -102,6 +116,37 @@ Documentación adicional:
 | `TELEGRAM_BOT_TOKEN` | Token del bot | vacío |
 | `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
 
+## Sesiones Persistentes
+
+Las sesiones se almacenan en `~/.bytia-kode/sessions.db` (SQLite WAL mode). Tanto la TUI como el bot de Telegram comparten la misma base de datos.
+
+### Características
+
+- **Auto-save** — Cada mensaje y tool result se guarda automáticamente. No hay que hacer nada.
+- **O(1) por mensaje** — Solo INSERT, nunca reescribe el historial completo.
+- **Concurrencia segura** — SQLite WAL permite múltiples lectores y un escritor simultáneo.
+- **Acceso cruzado** — TUI y Telegram pueden acceder a las sesiones de la otra interfaz.
+- **Sin límite** — Todas las sesiones se guardan indefinidamente.
+
+### Comandos TUI
+
+| Comando | Descripción |
+| --- | --- |
+| `/sessions` | Listar sesiones guardadas (tabla con ID, source, título, msgs, fecha) |
+| `/load <session_id>` | Cargar una sesión específica |
+| `/new` | Crear nueva sesión (limpia historial, habilita auto-save) |
+| `/reset` | Limpiar conversación en memoria (no borra la sesión del disco) |
+
+### Session Tools (para el modelo)
+
+El modelo puede acceder a sesiones pasadas durante la conversación:
+
+| Tool | Descripción |
+| --- | --- |
+| `session_list` | Listar sesiones (filtro por source opcional) |
+| `session_load` | Cargar contexto de una sesión pasada |
+| `session_search` | Buscar sesiones por título |
+
 ## TUI
 
 ### Comandos
@@ -110,7 +155,10 @@ Documentación adicional:
 | --- | --- |
 | `/help` | Ayuda integrada |
 | `/quit`, `/exit`, `/q` | Salida |
-| `/reset` | Reinicia conversación |
+| `/reset` | Reinicia conversación (en memoria) |
+| `/new` | Nueva sesión con auto-save |
+| `/sessions` | Listar sesiones guardadas |
+| `/load <id>` | Cargar sesión |
 | `/clear` | Limpia chat |
 | `/model`, `/provider` | Proveedor y modelo activos |
 | `/tools` | Tools registradas |
@@ -156,6 +204,9 @@ Pulsa `F2` para cambiar entre los 19 temas disponibles (12 oscuros + 7 claros, p
 | `file_write` | Escribir archivos | Path traversal bloqueado |
 | `file_edit` | Editar archivos (search/replace + create) | Backup automático, sandbox CWD |
 | `web_fetch` | Fetch URLs (HTTP GET) | Solo http/https, content type validation |
+| `session_list` | Listar sesiones guardadas | Solo lectura |
+| `session_load` | Cargar contexto de sesión pasada | Solo lectura |
+| `session_search` | Buscar sesiones por título | Solo lectura |
 
 Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.
 
@@ -163,7 +214,7 @@ Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.
 
 BytIA KODE incluye un sistema de skills persistente inspirado en [Hermes Agent](https://github.com/hermes-agent/hermes) y el paper [_Terminal Agents Suffice for Enterprise Automation_](https://arxiv.org/abs/2604.00073). Las skills son procedimientos reutilizables que el agente carga en su system prompt.
 
-### Visión (v0.5.0)
+### Visión (v0.6.0)
 
 Las skills evolucionarán de instrucciones estáticas a **unidades autónomas** con capacidad de ejecutar tools y scripts propios, e incluso actuar como sub-agentes con system prompt independiente:
 
@@ -175,45 +226,17 @@ Las skills evolucionarán de instrucciones estáticas a **unidades autónomas** 
 ### Estructura
 
 ```
-~/.bytia-kode/skills/
-├── skill-creator/
-│   └── SKILL.md          # Instrucciones principales (requerido)
-├── my-procedure/
-│   ├── SKILL.md
-│   ├── references/       # Docs adicionales (opcional)
-│   └── scripts/          # Scripts ejecutables (opcional)
-└── ...
+~/.bytia-kode/
+├── sessions.db           # SQLite WAL — sesiones persistentes
+├── theme.json            # Tema seleccionado
+└── skills/
+    ├── skill-creator/
+    │   └── SKILL.md
+    └── my-procedure/
+        ├── SKILL.md
+        ├── references/
+        └── scripts/
 ```
-
-### Formato SKILL.md
-
-```yaml
----
-name: my-skill               # Requerido, kebab-case
-description: Brief desc      # Requerido
-trigger: keywords, for, search  # Opcional, búsqueda por relevance
-verified: false              # Opcional, marca de validación
----
-
-## Procedure
-[Instrucciones paso a paso]
-
-## Pitfalls
-[Errores comunes y soluciones]
-```
-
-### Comandos
-
-| Comando | Descripción |
-| --- | --- |
-| `/skills` | Listar skills con estado |
-| `/skills save <name>` | Crear skill (escribir contenido, línea vacía para terminar) |
-| `/skills show <name>` | Mostrar contenido completo |
-| `/skills verify <name>` | Marcar como verificada |
-
-### Skill incluida
-
-- **skill-creator** — Guía para crear nuevas skills (meta-skill de bootstrap)
 
 ## Validación y release
 
@@ -247,16 +270,6 @@ Para adaptar BytIA KODE a tu propio contexto, edita `src/bytia_kode/prompts/core
 | `contexto` | Perfil del usuario, ubicación, infraestructura | Tu perfil y entorno |
 | `runtime_profile` | Variables del motor (se rellenan en tiempo de ejecución) | No modificar |
 
-Ejemplo mínimo:
-
-```yaml
-identity:
-  nombre: "Mi Asistente"
-  version: "1.0.0"
-  naturaleza: "asistente de código"
-  creador_socio: "Tu Nombre"
-```
-
 Después de editar, reconstruye el wheel para que los cambios se empaqueten:
 
 ```bash
@@ -276,6 +289,7 @@ BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCH
 | [PyYAML](https://pyyaml.org/) | Parseo de identidad y skills |
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | Variables de entorno |
 | [python-telegram-bot](https://docs.python-telegram-bot.org/) | Bot de Telegram |
+| [sqlite3](https://docs.python.org/3/library/sqlite3.html) | Persistencia de sesiones (stdlib) |
 
 ## Seguridad
 
@@ -286,15 +300,17 @@ Hardening de seguridad verificado con auditoría profesional:
 | SEC-001 — Command injection | Allowlist de binarios + `shell=False` + `shlex.split()` |
 | SEC-002/003 — Path traversal | `_resolve_workspace_path()` con sandbox a `cwd` |
 | SEC-005 — Telegram abierto | Fail-secure por defecto (denegar sin allowlist) |
+| SEC-006 — Sesiones compartidas | Aislamiento por `chat_id` (v0.5.0) |
 
 Motor I/O asíncrono validado con benchmark: **4.90x speedup** (80% mejora) frente a ejecución secuencial.
 
 ## Limitaciones conocidas
 
 - `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
-- Las skills no registran tools dinámicas todavía (previsto para v0.5.0).
+- Las skills no registran tools dinámicas todavía (previsto para v0.6.0).
 - El estimador de tokens es una heurística (chars/3), no un tokenizer real.
 - No hay auto-fallback de providers (circuit breaker pendiente).
+- PromptTextArea no soporta Shift+Enter para newline (limitación de Textual).
 
 ## Contribuir
 
