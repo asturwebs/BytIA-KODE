@@ -340,3 +340,86 @@ Auditoría completa del codebase para identificar código/peso muerto:
 - 15 tests pasando.
 - Pre-commit hook: metadata OK + secret scan OK + pytest OK.
 - Commit `c361f1c` push a GitHub.
+
+---
+
+## 2026-04-06 - Sesión 12: Sesiones Persistentes (SQLite WAL)
+
+### Objetivo
+
+Implementar persistencia de sesiones en tiempo real para BytIA-KODE:
+1. Las sesiones se guardan automáticamente (no se pierden al reiniciar)
+2. TUI y Telegram pueden acceder a las sesiones entre sí
+3. El modelo puede acceder a sesiones pasadas cuando se le indica
+
+### Diseño
+
+Revisión de alternativas (JSON + file locking vs SQLite WAL) por BytIA Gemini (Socia) y Gemma 4B:
+
+| Criterio | JSON + File Locking | SQLite WAL |
+|----------|---------------------|------------|
+| Concurrencia | ❌ Bloqueante | ✅ Múltiples lectores + 1 escritor |
+| I/O por mensaje | ❌ O(N) - reescribe todo | ✅ O(1) - solo INSERT |
+| Durabilidad | ⚠️ Requiere fsync manual | ✅ ACID nativo |
+| Búsqueda | ❌ Parsear archivos | ✅ Índices SQL |
+| Complejidad | ❌ Alta (locks, retries) | ✅ Baja (sqlite3 nativo) |
+
+**Veredicto:** SQLite WAL — sin race conditions, I/O O(1), transacciones ACID, código simple.
+
+### Implementación
+
+**`session.py` (nuevo)** — SessionStore con SQLite WAL:
+- `SessionMetadata` dataclass con `__slots__` para metadata ligera
+- `SessionStore` con connection-per-method (no thread sharing)
+- `PRAGMA journal_mode=WAL`, `PRAGMA busy_timeout=5000`, `PRAGMA foreign_keys=ON`
+- Append-only INSERT para O(1) por mensaje
+- Atomic INSERT + UPDATE metadata en transacción
+- Safe JSON parse para tool_calls con try/except
+- Índices: `idx_sessions_source`, `idx_sessions_updated`, `idx_sessions_source_ref`, `idx_messages_session`
+
+**`agent.py` (modificado)**:
+- `__init__` acepta `session_store: SessionStore | None`
+- Auto-save en `chat()`: append user + assistant después de cada intercambio
+- Auto-save en `_handle_tool_calls()`: append tool results
+- Auto-title: `update_title()` desde primer mensaje del usuario (truncado a 80 chars)
+- Session tools registradas automáticamente: `session_list`, `session_load`, `session_search`
+- `MAX_CONTEXT_TOKENS` subido de 16k a 128k (para modelos GGUF con 256k)
+- Métodos: `set_session()`, `load_session_by_id()`, `save_current_session()`, `list_sessions()`, `get_session_context()`, `_load_messages_from_store()`
+
+**`telegram/bot.py` (reescrito)**:
+- **FIX CRÍTICO:** `_agents: dict[str, Agent]` — antes compartía un solo Agent entre todos los usuarios (violación de privacidad)
+- `session_store = SessionStore(config.data_dir / "sessions.db")` compartido entre todos los agentes
+- `_get_agent(chat_id)` crea o recupera sesión por chat_id
+- Comando `/sessions` para listar sesiones del usuario
+- Bug fix: `config` → `self.config` en `_get_agent()` (líneas 30, 34)
+
+**`tui.py` (modificado)**:
+- `on_mount`: sesión auto-creada con `agent.set_session(source="tui")`
+- `/sessions` — tabla con ID, source, título, msgs, fecha
+- `/load <id>` — cargar sesión por ID
+- `/new` — nueva sesión con auto-save
+- Tabla de ayuda actualizada con los 3 comandos nuevos
+
+**`tools/session.py` (nuevo)** — 3 tools para el modelo:
+- `SessionListTool` — listar sesiones (filtro source opcional)
+- `SessionLoadTool` — cargar contexto de sesión pasada
+- `SessionSearchTool` — buscar sesiones por título
+
+**`tests/test_session.py` (nuevo)** — 19 tests:
+- TestSessionLifecycle: create, create with ref, metadata not found
+- TestMessageOperations: append/load, message count, tool_calls JSON, tool result, seq_num ordering
+- TestListAndSearch: list all, list by source, search by title, limit
+- TestDelete: delete session, delete nonexistent
+- TestTitle: update, truncate to 80 chars, no overwrite existing
+- TestGetContext: formatted context, not found
+
+### Bugs encontrados y corregidos
+
+1. **SQLite INSERT** — `create_session()` tenía 4 columnas pero solo 3 placeholders. `OperationalError: 3 values for 4 columns`.
+2. **Telegram NameError** — `config` usado en vez de `self.config` en `_get_agent()` (líneas 30, 34 de bot.py).
+
+### Verificación
+
+- 46 tests pasando (19 session + 14 file_edit + 13 context_management).
+- Pre-commit hook: metadata OK + secret scan OK + pytest OK.
+- Documentación actualizada: CHANGELOG, README, ROADMAP, ARCHITECTURE, TUI, DEVELOPMENT, CONTEXT, DEVLOG.

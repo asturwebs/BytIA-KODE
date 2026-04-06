@@ -6,6 +6,84 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-06
+
+### Added
+
+- **Persistencia de sesiones (SQLite WAL)** — Sistema completo de sesiones persistentes con almacenamiento SQLite en modo WAL (Write-Ahead Logging). Todas las conversaciones se guardan automáticamente en tiempo real. O(1) por mensaje (append-only INSERT). Transacciones ACID. Concurrencia segura entre TUI y Telegram.
+- **`session.py`** — `SessionStore` con métodos: `create_session()`, `append_message()`, `load_messages()`, `get_metadata()`, `list_sessions()`, `search_sessions()`, `delete_session()`, `get_session_context()`, `update_title()`. `SessionMetadata` dataclass con slots para metadata ligera.
+- **Auto-save en `Agent.chat()`** — Después de cada intercambio user→assistant, los mensajes se persisten automáticamente. Tool results también se auto-guardan. Título auto-generado desde el primer mensaje del usuario.
+- **Auto-save en `Agent._handle_tool_calls()`** — Resultados de tools persistidos automáticamente con tool_call_id y nombre.
+- **Session tools para el modelo** — Tres nuevas tools que permiten al agente acceder a sesiones pasadas:
+  - `session_list` — listar sesiones (filtro por source opcional)
+  - `session_load` — cargar contexto de una sesión pasada
+  - `session_search` — buscar sesiones por título
+- **Comandos de sesión en TUI** — `/sessions` (lista sesiones en tabla), `/load <id>` (cambia a otra sesión), `/new` (crea sesión nueva con auto-save)
+- **Sesión auto-creada en TUI** — Al arrancar, la TUI crea automáticamente una sesión TUI con auto-save habilitado.
+- **Aislamiento por usuario en Telegram** — Cada `chat_id` tiene su propia instancia de `Agent` con su propia sesión. Antes, todos los usuarios compartían el mismo historial (bug crítico de privacidad).
+- **Comando `/sessions` en Telegram** — Lista las sesiones del usuario.
+- **19 tests de SessionStore** — Cubren lifecycle, messages, list/search, delete, title, context y edge cases.
+
+### Changed
+
+- **`MAX_CONTEXT_TOKENS`** — Subido de 16k a 128k. Los modelos GGUF locales como Gemma 4 26B soportan 256k tokens. El valor se sobreescribe dinámicamente vía router info si está disponible.
+- **Telegram bot** — Reescrito con `_agents: dict[str, Agent]` para aislamiento por `chat_id`. `_get_agent()` crea o recupera la sesión del usuario.
+- **`Agent.__init__`** — Acepta `session_store: SessionStore | None`. Registra session tools automáticamente.
+- **Tabla de ayuda TUI** — Añadidos `/sessions`, `/load`, `/new` con descripciones.
+
+### Fixed
+
+- **BUG CRÍTICO Telegram** — `config` usado en vez de `self.config` en `_get_agent()` (líneas 30, 34). Causaba `NameError` al crear agentes para usuarios de Telegram.
+- **BUG SQLite** — `create_session()` tenía 4 columnas pero solo 3 placeholders en INSERT. Causaba `OperationalError: 3 values for 4 columns`.
+
+### Security
+
+- **Telegram: aislamiento por chat_id** — Antes del fix, todos los usuarios de Telegram compartían un solo Agent y un solo historial. Violación de privacidad corregida con instancias separadas por chat_id.
+
+### Schema de base de datos
+
+```sql
+-- Sesiones: metadata con índices por source y fecha
+CREATE TABLE sessions (
+    session_id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,           -- 'tui' | 'telegram'
+    source_ref TEXT,                -- chat_id para telegram
+    title TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    message_count INTEGER DEFAULT 0,
+    token_count INTEGER DEFAULT 0,
+    model TEXT,
+    is_active INTEGER DEFAULT 1
+);
+
+-- Mensajes: append-only, O(1) por INSERT
+CREATE TABLE messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    seq_num INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT,
+    tool_calls TEXT,                -- JSON serializado
+    tool_call_id TEXT,
+    name TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+);
+```
+
+### Almacenamiento
+
+```
+~/.bytia-kode/
+├── sessions.db           # SQLite con WAL mode
+├── sessions.db-wal       # Write-Ahead Log (auto)
+├── sessions.db-shm       # Shared memory (auto)
+└── skills/               # Skills existentes
+```
+
+### Total tests: 46 (19 session + 14 file_edit + 13 context_management)
+
 ## [0.4.1] - 2026-04-05
 
 ### Added
@@ -98,7 +176,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 - Skills System persistente: directorio `~/.bytia-kode/skills/` con auto-creación vía `AppConfig`.
 - `SkillLoader.save_skill()` — crea SKILL.md con frontmatter YAML (agentskills.io compatible).
-- `SkillLoader.list_skill_names()`, `get_skill()`, `verify_skill()` — gestión CRUD de skills.
+- `SkillLoader.list_skill_names()`, `get()`, `verify_skill()` — gestión CRUD de skills.
 - `SkillLoader.get_relevant()` mejorado con scoring (trigger +3, description +2, content +1).
 - Campo `verified` en `Skill` dataclass, parseado del frontmatter en `_parse_skill()`.
 - Comando `/skills save <name> [desc]` — captura multiline de contenido de skill.

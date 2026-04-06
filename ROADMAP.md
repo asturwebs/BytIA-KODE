@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.4.1 (Alpha estable)
+## Estado actual: v0.5.0 (Alpha estable)
 
 ### Completado
 
@@ -60,66 +60,56 @@
 - [x] Router polling: logging en `_poll_router_info` con alertas progresivas (BytIA Claude Code)
 - [x] 27 tests pasando (14 file_edit + 13 context_management)
 
+**v0.5.0 — Sesiones Persistentes**
+- [x] SessionStore con SQLite WAL (create, append, load, list, search, delete, context)
+- [x] Auto-save en tiempo real en `Agent.chat()` y `_handle_tool_calls()`
+- [x] Session tools para el modelo: `session_list`, `session_load`, `session_search`
+- [x] Comandos TUI: `/sessions`, `/load <id>`, `/new`
+- [x] Sesión auto-creada al arrancar TUI
+- [x] **FIX CRÍTICO Telegram**: aislamiento por chat_id (antes compartía historial entre todos los usuarios)
+- [x] Comando `/sessions` en Telegram
+- [x] `MAX_CONTEXT_TOKENS` subido a 128k (para modelos GGUF con 256k context)
+- [x] 46 tests pasando (19 session + 14 file_edit + 13 context_management)
+
 ---
 
-## v0.4.1 — Herramientas y estabilidad (completado)
+## v0.5.1 — Pulido y estabilidad
 
-**Objetivo:** Robustez del agente y herramientas de desarrollo.
-
-**Reparto por instancia (zero merge conflicts — cada una en archivos distintos):**
-
-| Instancia | Plataforma | Archivos | Branch |
-|-----------|-----------|----------|--------|
-| **BytIA OpenClaw** | GLM-5.1 · VPS Hetzner | `tools/registry.py` | `feature/file-edit-claw` |
-| **BytIA (Claude Code)** | GLM-5-Turbo · WSL2 local | `agent.py`, `tui.py` | `feature/context-bytia` |
-
-(Ver sección "Completado" arriba para el detalle de tareas)
-
-### Reubicado a v0.5.0 (no completado en v0.4.1)
+**Objetivo:** Resolver issues menores pendientes y mejorar UX.
 
 - [ ] PromptTextArea: Shift+Enter/Ctrl+Enter = newline (Textual Key no expone modifiers de forma fiable)
 - [ ] Bash allowlist diferenciada por safe_mode
 - [ ] Safe mode backend real (confirmación de comandos destructivos)
 - [ ] Tools de exploración: `grep`, `tree`, `glob` nativos en Python
+- [ ] Auto-fallback de providers (circuit breaker)
 
-## v0.5.0 — Contexto, Skills inteligentes y memoria
+## v0.6.0 — Skills Inteligentes y Multi-agente
 
-**Objetivo:** Context management real, auto-selección de skills y persistencia.
+**Objetivo:** Skills autónomas y equipo de desarrollo virtual.
 
-### P1 — Critical
-
-- [x] → Promovido a v0.4.1 (BytIA Claude Code)
-
-### P2 — High
-
+### Skills avanzadas
 - [ ] Auto-selección de skills (cargar solo relevantes al query actual)
   - `get_relevant()` existe en SkillLoader pero NO se invoca en `_build_system_prompt()`
   - Scoring: trigger 3pt, description 2pt, content 1pt (ya diseñado)
-  - Archivo: `agent.py:120-122` → **BytIA (Claude Code)**
-- [ ] Persistencia de sesiones (`/save`, `/load`, `/sessions`)
-  - Almacenamiento: `~/.bytia-kode/sessions/` con timestamp
-  - Actual: `/reset` pierde todo sin opción de recuperar
-  - **Sin asignar** — nuevo módulo, no pisa archivos existentes
-
-### P3 — Features
-
 - [ ] Tools dinámicas en skills (scripts en `skills/<name>/scripts/` auto-registrados)
 - [ ] `write_skill` tool para que el agente cree skills programáticamente
-- [ ] Memoria vectorial con FAISS/ChromaDB (búsqueda semántica)
-- [ ] Skills Hub: instalar skills desde GitHub repos
 - [ ] Skill como sub-agente (SP propio dentro de la skill)
-- [ ] System prompt caching optimizado
-- [ ] Telegram multi-user con aislamiento por sesión
+- [ ] Skills Hub: instalar skills desde GitHub repos
 
-## v0.6.0 — Multi-agente
-
-**Objetivo:** Escalar a equipo de desarrollo virtual.
-
+### Multi-agente
 - [ ] Architect Agent → desglosa tareas complejas
 - [ ] Coder Agent → implementa archivo por archivo
 - [ ] Reviewer Agent → revisa calidad y seguridad
 - [ ] Ejecución asíncrona de tareas largas
 - [ ] Generación automática de Pull Requests
+
+## v0.7.0 — Memoria y Conocimiento
+
+**Objetivo:** Memoria semántica y base de conocimiento.
+
+- [ ] Memoria vectorial con FAISS/ChromaDB (búsqueda semántica)
+- [ ] System prompt caching optimizado
+- [ ] Memoria entre sesiones (recordar decisiones previas)
 
 ## v1.0.0 — Producción
 
