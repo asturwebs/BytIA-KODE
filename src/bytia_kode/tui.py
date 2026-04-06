@@ -442,6 +442,8 @@ class BytIAKODEApp(App):
         self.query_one("#input-field", TextArea).focus()
         self.watch(self, "active_provider", self._on_provider_changed)
 
+        self.agent.set_session(source="tui")
+
         self.run_worker(self._auto_detect_model, exclusive=True, group="model_detect")
         self.run_worker(self._poll_router_info, exclusive=True, group="router_poll")
         self._poll_timer = self.set_interval(5.0, self._poll_router_info)
@@ -685,6 +687,13 @@ class BytIAKODEApp(App):
                 self._add_system_message(f"Skill verified: {name}")
             else:
                 self._add_system_message(f"Skill not found: {name}")
+        elif cmd == "/sessions":
+            self._show_sessions()
+        elif cmd.startswith("/load "):
+            sid = cmd_raw[6:].strip()
+            self._load_session(sid)
+        elif cmd == "/new":
+            self._new_session()
         elif cmd == "/history":
             lines = self._history[-20:]
             self._add_system_message(
@@ -713,6 +722,9 @@ class BytIAKODEApp(App):
             ("/help", "Show this help", ""),
             ("/quit", "Exit", "Ctrl+Q"),
             ("/reset", "Reset conversation", "Ctrl+R"),
+            ("/new", "New session", ""),
+            ("/sessions", "List saved sessions", ""),
+            ("/load <id>", "Load session", ""),
             ("/clear", "Clear screen", "Ctrl+L"),
             ("/model", "Show model info", "Ctrl+M"),
             ("/tools", "List tools", "Ctrl+T"),
@@ -750,6 +762,46 @@ class BytIAKODEApp(App):
     def _show_tools(self):
         tools = self.agent.tools.list_tools()
         self._add_system_message(f"Tools: {', '.join(tools)}")
+
+    def _show_sessions(self):
+        sessions = self.agent.list_sessions()
+        if not sessions:
+            self._add_system_message("No saved sessions.")
+            return
+        table = Table(title="Sessions", box=box.SIMPLE_HEAVY,
+                      padding=(0, 1), collapse_padding=True)
+        table.add_column("ID", style="bold cyan", min_width=14)
+        table.add_column("Source", min_width=8)
+        table.add_column("Title", min_width=20)
+        table.add_column("Msgs", style="dim", min_width=4)
+        table.add_column("Updated", style="dim", min_width=16)
+        for s in sessions[:15]:
+            table.add_row(
+                s.get("session_id", "?"),
+                s.get("source", "?"),
+                (s.get("title", "") or "Untitled")[:40],
+                str(s.get("message_count", 0)),
+                (s.get("updated_at", "") or "")[:16],
+            )
+        chat = self.query_one("#chat-area", VerticalScroll)
+        chat.mount(Static(table))
+        chat.scroll_end(animate=False)
+        self._add_system_message("Use /load <session_id> to switch.")
+
+    def _load_session(self, session_id: str):
+        if not session_id:
+            self._add_system_message("Usage: /load <session_id>")
+            return
+        if self.agent.load_session_by_id(session_id):
+            self._add_system_message(f"Session loaded: {session_id}")
+            self.query_one(ActivityIndicator)._refresh()
+        else:
+            self._add_system_message(f"Session not found: {session_id}")
+
+    def _new_session(self):
+        self.agent.reset()
+        self.agent.set_session(source="tui")
+        self._add_system_message("New session started. Auto-save enabled.")
 
     def _show_skills(self):
         names = self.agent.skills.list_skill_names()
