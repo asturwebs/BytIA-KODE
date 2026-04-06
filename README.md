@@ -3,12 +3,12 @@
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Release](https://img.shields.io/badge/release-0.5.0-success.svg)
-![Tests](https://img.shields.io/badge/tests-46%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-61%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
 
-BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.5.0 añade persistencia de sesiones en tiempo real con SQLite WAL, aislamiento por usuario en Telegram, session tools para el modelo y 46 tests.
+BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.5.0 añade persistencia de sesiones en tiempo real con SQLite WAL, aislamiento por usuario en Telegram, session tools para el modelo y 61 tests.
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
@@ -33,6 +33,8 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
   <img src="docs/img/bytia-kode-5-benchmark.png" width="350"><br>
   <em>Benchmark: 4.90x speedup async</em>
 </p>
+
+> **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
 > Release actual: `0.5.0`
 >
@@ -74,6 +76,33 @@ bytia-kode
 uv run bytia-kode          # TUI (por defecto)
 uv run python -m bytia_kode --bot  # Telegram bot
 ```
+
+## Bot de Telegram
+
+El bot de Telegram comparte la misma base de datos de sesiones que la TUI (`~/.bytia-kode/sessions.db`), lo que permite:
+
+- **Continuar conversaciones** entre interfaces — empieza un chat en Telegram y résumelo en la TUI (y viceversa).
+- **Aislamiento por usuario** — cada `chat_id` tiene su propia sesión e historial privado. No hay filtrado de contenido.
+- **Acceso del modelo** — el agente puede usar `session_list(source="telegram")` para acceder a sesiones de Telegram desde la TUI.
+
+### Configuración
+
+| Variable | Descripción |
+| --- | --- |
+| `TELEGRAM_BOT_TOKEN` | Token del bot (obtener de @BotFather) |
+| `TELEGRAM_ALLOWED_USERS` | User IDs permitidos (comma-separated), ej: `123456,789012` |
+
+Sin `TELEGRAM_ALLOWED_USERS` configurado, el bot deniega todos los mensajes (fail-secure).
+
+### Comandos del bot
+
+| Comando | Descripción |
+| --- | --- |
+| `/start` | Info del bot y modelo activo |
+| `/help` | Lista comandos disponibles |
+| `/reset` | Limpiar conversación del usuario |
+| `/model` | Mostrar provider y modelo activos |
+| `/sessions` | Listar sesiones del usuario |
 
 ## Arquitectura resumida
 
