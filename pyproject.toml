@@ -36,6 +36,11 @@ Issues = "https://github.com/asturwebs/BytIA-KODE/issues"
 Changelog = "https://github.com/asturwebs/BytIA-KODE/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "textual-dev>=1.8.0",
+]
 local = ["llama-cpp-python>=0.3"]
 memory = ["sentence-transformers>=4.0", "faiss-cpu>=1.11"]
 
