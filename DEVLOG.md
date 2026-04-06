@@ -423,3 +423,45 @@ Revisión de alternativas (JSON + file locking vs SQLite WAL) por BytIA Gemini (
 - 46 tests pasando (19 session + 14 file_edit + 13 context_management).
 - Pre-commit hook: metadata OK + secret scan OK + pytest OK.
 - Documentación actualizada: CHANGELOG, README, ROADMAP, ARCHITECTURE, TUI, DEVELOPMENT, CONTEXT, DEVLOG.
+
+---
+
+## 2026-04-06 - Sesión 13: Session Awareness + Prompt Enhancement
+
+### Problema detectado
+
+El agente (ejecutándose sobre Gemma 4 26B) declaró que NO tenía acceso autónomo a las sesiones guardadas. Las session tools (`session_list`, `session_load`, `session_search`) estaban registradas en el código y enviadas al LLM, pero el modelo no las usaba por:
+
+1. **El system prompt no mencionaba las session tools** en su lista de capacidades
+2. **La directiva "Usar herramientas solo cuando sean verificación"** inhibía el uso proactivo
+3. **No había instrucción conductual** sobre cuándo usar session tools
+4. **No se inyectaba contexto de sesiones anteriores** al arrancar
+
+### Cambios implementados
+
+**`core_identity.yaml`:**
+- Session tools añadidas a `runtime.capacidades`: `session_list`, `session_search`, `session_load`
+- Comandos `/sessions`, `/load <id>`, `/new` añadidos a `runtime.comandos`
+- Directiva de tools reemplazada: de "solo verificación" a "proactivamente cuando aporten valor"
+- Nuevas directivas: usar `session_search` cuando el usuario pregunte sobre trabajo anterior, revisar resumen de sesión anterior inyectado
+
+**`agent.py` — `_get_previous_session_summary()`:**
+- Método nuevo que obtiene la última sesión del mismo source (TUI o Telegram)
+- Genera resumen compacto: título, fecha, nº mensajes, últimos 3 mensajes truncados
+- Se inyecta automáticamente en `_build_system_prompt()` si hay sesión anterior
+- Diseño determinista (sin llamada al LLM) — el modelo decide si necesita más contexto vía `session_load`
+
+### Tests
+
+5 nuevos tests en `TestPreviousSessionSummary`:
+- Sin sesiones previas → empty string
+- Con sesión anterior → resumen con título, ID, mensajes
+- Exclusión de sesión actual
+- Filtro por source (TUI vs Telegram)
+- Límite de 3 mensajes (no muestra más)
+
+### Verificación
+
+- 66 tests pasando (24 session + 14 file_edit + 13 context_management + 15 basics).
+- Versión: 0.5.0 → 0.5.1.
+- SP identity: v12.0.0 → v12.1.0.

@@ -326,6 +326,34 @@ class ToolBlock(Static):
         ))
 
 
+class InputScreen(ModalScreen):
+    """Simple modal that prompts for a single line of text."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel", show=False),
+    ]
+
+    def __init__(self, title: str, placeholder: str = "") -> None:
+        super().__init__()
+        self._title = title
+        self._placeholder = placeholder
+
+    def compose(self) -> ComposeResult:
+        from textual.widgets import Input
+        yield Label(self._title, id="prompt-label")
+        yield Input(placeholder=self._placeholder, id="prompt-input")
+
+    def on_mount(self) -> None:
+        self.query_one("#prompt-input", Input).focus()
+
+    @on(Input.Submitted, "#prompt-input")
+    def _on_submit(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value.strip())
+
+    def action_cancel(self) -> None:
+        self.dismiss("")
+
+
 class CommandMenuScreen(ModalScreen):
     """Ctrl+P popup with available commands."""
 
@@ -339,15 +367,21 @@ class CommandMenuScreen(ModalScreen):
     COMMANDS = [
         ("\u2630  Quit", "quit"),
         ("\u21ba  Reset conversation", "reset_conversation"),
+        ("\U0001f4dd  New session", "new_session"),
+        ("\U0001f4c3  List sessions", "list_sessions"),
+        ("\U0001f4c2  Load session", "load_session"),
         ("\u2715  Clear screen", "clear_screen"),
         ("\U0001f527  List tools", "show_tools"),
         ("\U0001f4da  List skills", "show_skills"),
+        ("\U0001f504  Select model", "select_model"),
+        ("\U0001f4c1  List available models", "show_models"),
+        ("\U0001f4ac  Show input history", "show_history"),
         ("\u26a1  Toggle safe mode", "toggle_safe_mode"),
+        ("\U0001f9e0  Toggle reasoning", "toggle_reasoning"),
         ("\U0001f3a8  Change theme", "change_theme"),
         ("\u21c4  Switch provider", "switch_provider"),
         ("\U0001f4cb  Copy last code block", "copy_last_code"),
         ("\u2139  Show model info", "show_model"),
-        ("\U0001f4c2  List available models", "show_models"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -949,6 +983,37 @@ class BytIAKODEApp(App):
         blocks = self.query(ThinkingBlock)
         if blocks:
             blocks.last().toggle()
+
+    def action_new_session(self):
+        self._new_session()
+
+    def action_list_sessions(self):
+        self._show_sessions()
+
+    def action_load_session(self):
+        self._prompt_session_id()
+
+    def action_select_model(self):
+        self._prompt_model_name()
+
+    def action_show_history(self):
+        lines = self._history[-20:]
+        self._add_system_message(
+            "\n".join(f"  {i+1}. {h}" for i, h in enumerate(lines))
+            or "No history."
+        )
+
+    def _prompt_session_id(self) -> None:
+        def on_dismiss(value: str | None):
+            if value:
+                self._load_session(value)
+        self.push_screen(InputScreen("Session ID:", "tui_abc12345"), on_dismiss)
+
+    def _prompt_model_name(self) -> None:
+        def on_dismiss(value: str | None):
+            if value:
+                self._use_model(value)
+        self.push_screen(InputScreen("Model name:", "gemma-4-26b"), on_dismiss)
 
     def action_copy_last_code(self):
         if not self.agent.messages:

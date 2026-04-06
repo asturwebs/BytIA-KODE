@@ -1,6 +1,6 @@
 [project]
 name = "bytia-kode"
-version = "0.5.0"
+version = "0.5.1"
 description = "B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI."
 authors = [{ name = "Pedro Luis Cuevas Villarrubia", email = "pedro@asturwebs.es" }]
 maintainers = [{ name = "BytIA" }]
