@@ -84,9 +84,41 @@
 
 ---
 
-## v0.5.2 — Tests de TUI y pulido
+## v0.5.2 — Botón del Pánico, Context Multi-Workspace y Tests de TUI
 
-**Objetivo:** Tests de integración para la TUI, el punto ciego actual.
+**Objetivo:** Cancelación/interrupción del agente, contexto por workspace y tests de integración TUI.
+
+### Logging a archivo
+
+- [x] **RotatingFileHandler** — `~/.bytia-kode/logs/bytia-kode.log` (1MB, 3 backups)
+- [x] **LOG_LEVEL** en `.env` (default: INFO)
+- [x] **LOG_FILE** en `.env` para custom path
+- [x] 8 módulos con logging estructurado
+
+### Multi-Workspace Context
+
+- [x] **`context.py`** — detección automática de workspace (lenguaje, git, estructura, B-KODE.md)
+- [x] **`read_context` tool** — lectura bajo demanda del contexto del workspace
+- [x] **`/context` command** — regeneración forzada (TUI + Telegram)
+- [x] **Storage** — `~/.bytia-kode/contexts/<sha256[:8]>.md` (hash determinista del path)
+- [x] **CONTEXT.md** — eliminado del tracking git, ahora local-only
+- [x] **B-KODE.md nudge** — instrucción para usar `read_context`
+
+### Panic Buttons (Interrupt + Kill)
+
+- [ ] **Interrupt** — Para generación/tool actual, agente sigue vivo
+  - TUI: `Escape` (estándar: Claude Code, VS Code)
+  - Telegram: `/stop`
+  - Requiere: `asyncio.Event` en Agent, cancelación de stream LLM, kill subprocess BashTool
+- [ ] **Kill** — Nuclear: cancela procesamiento + reset + cleanup total
+  - TUI: `Ctrl+K`
+  - Telegram: `/kill`
+  - Requiere: referencia al Worker de Textual, tracking de subprocesses, cleanup completo
+- [ ] Guard de Telegram: no apilar mensajes mientras se procesa (race condition actual)
+- [ ] `AgentCancelledError` con cleanup parcial (respuestas streaming, ToolBlock state)
+- [ ] Tests de cancelación: interrupt mid-stream, interrupt mid-tool, kill durante bash
+
+### Tests de TUI
 
 - [ ] Tests de TUI con `pytest-textual` o `app_test` (pilot, screen mounting, key simulation)
 - [ ] Test: CommandMenuScreen muestra 17 items y dispara acciones correctas
@@ -97,7 +129,7 @@
 - [ ] Test: ToolBlock muestra output de tools
 - [ ] Test: on_mount crea sesión y detecta modelo
 
-## v0.6.0 — Pulido avanzado y Skills Inteligentes
+## v0.6.0 — Skills Inteligentes y Multi-agente
 
 **Objetivo:** Resolver issues menores pendientes y mejorar UX.
 
