@@ -54,4 +54,4 @@ BytIA KODE is an agentic TUI for assisted development with terminal and Telegram
 
 ## Version
 
-Current release: 0.5.2-dev
+Current release: 0.5.2

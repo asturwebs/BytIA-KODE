@@ -208,7 +208,7 @@ wheels = [
 
 [[package]]
 name = "bytia-kode"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -221,6 +221,11 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "textual-dev" },
+]
 local = [
     { name = "llama-cpp-python" },
 ]
@@ -244,14 +249,17 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
     { name = "llama-cpp-python", marker = "extra == 'local'", specifier = ">=0.3" },
     { name = "pydantic", specifier = ">=2.11" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.3.0" },
     { name = "python-dotenv", specifier = ">=1.1" },
     { name = "python-telegram-bot", specifier = ">=22.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=14.0" },
     { name = "sentence-transformers", marker = "extra == 'memory'", specifier = ">=4.0" },
     { name = "textual", specifier = ">=8.2.1" },
+    { name = "textual-dev", marker = "extra == 'dev'", specifier = ">=1.8.0" },
 ]
-provides-extras = ["local", "memory"]
+provides-extras = ["dev", "local", "memory"]
 
 [package.metadata.requires-dev]
 dev = [

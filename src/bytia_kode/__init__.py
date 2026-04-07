@@ -1,7 +1,9 @@
 """BytIA KODE - Agentic coding CLI & Telegram bot"""
 from __future__ import annotations
 
+import logging
 from importlib.metadata import PackageNotFoundError, version
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
@@ -20,6 +22,22 @@ try:
     __version__ = version("bytia-kode")
 except PackageNotFoundError:
     __version__ = _read_pyproject_version()
+
+
+def _setup_logging() -> None:
+    if logging.getLogger().handlers:
+        return
+    log_dir = Path.home() / ".bytia-kode" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    target = str(log_dir / "bytia-kode.log")
+    handler = RotatingFileHandler(target, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)-7s [%(name)s] %(message)s", datefmt="%H:%M:%S",
+    ))
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
+
+
+_setup_logging()
 
 from bytia_kode import context
 from bytia_kode import session
