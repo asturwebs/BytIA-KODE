@@ -1,8 +1,8 @@
-# BytIA KODE v0.5.2-dev
+# BytIA KODE v0.5.2
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.5.2--dev-yellow.svg)
+![Release](https://img.shields.io/badge/release-0.5.2-yellow.svg)
 ![Tests](https://img.shields.io/badge/tests-77%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
@@ -36,7 +36,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.5.2-dev`
+> Release actual: `0.5.2`
 >
 > Formato de identidad del sistema: `YAML`
 >
@@ -46,6 +46,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 - **Multi-workspace context** — CONTEXT.md auto-generado por proyecto. El agente detecta lenguaje, estructura, git y herramientas del workspace actual.
 - **Logging a archivo** — Logs rotativos en `~/.bytia-kode/logs/bytia-kode.log` (1MB, 3 backups).
+- **Copiar respuestas** — `Ctrl+X` copia último bloque de código, `Ctrl+Shift+C` copia respuesta completa.
 - **Panic Buttons** (pendiente) — `Escape` para interrumpir, `Ctrl+K` para kill. Ver [issue #1](https://github.com/asturwebs/BytIA-KODE/issues/1).
 
 ## Novedades en v0.5.1
@@ -230,6 +231,7 @@ El modelo puede acceder a sesiones pasadas durante la conversación:
 | `Ctrl+D` | Toggle reasoning |
 | `Ctrl+E` | Alternar safe mode |
 | `Ctrl+X` | Copiar último bloque de código |
+| `Ctrl+Shift+C` | Copiar respuesta completa del agente |
 | `F2` | Cambiar tema cíclicamente |
 | `F3` | Cambiar provider (primary/fallback/local) |
 | `↑` / `↓` | Historial de entrada |

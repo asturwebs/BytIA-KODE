@@ -538,3 +538,34 @@ Añadido al ROADMAP v0.5.2. Implementación pendiente.
 - CONTEXT.md: sección Logging
 - `.env.example`: `LOG_FILE=`
 - `.gitignore`: `CONTEXT.md`
+
+## 2026-04-07 - Sesión 15: Debug, fixes y copiado
+
+### Contexto
+
+Sesión de validación y corrección post-v0.5.2. Verificación de todas las features implementadas, corrección de bugs encontrados durante testing, y mejora de UX (copiado de respuestas).
+
+### Issues resueltos
+
+- **CI failure** — Tests que mockean el provider fallaban porque `auto_detect_model()` se ejecutaba antes y cortaba con "No hay ningún modelo". Fix: `agent._initialized = True` en tests para saltar la detección.
+- **Logging no se creaba** — `_setup_logging()` estaba en `__main__.py` pero el entry point de `uv tool` (`bytia_kode.tui:run_tui`) lo saltaba. Movido a `__init__.py` (se ejecuta en cualquier punto de entrada).
+- **Versión desincronizada** — `pyproject.toml` decía `0.5.1`, `B-KODE.md` decía `0.5.2-dev`. Sincronizado a `0.5.2`.
+
+### Nuevas features
+
+- **Copy last response (`Ctrl+Shift+C`)** — Copia la respuesta completa del último mensaje del agente al portapapeles del sistema.
+- **Banner actualizado** — Muestra comandos disponibles en el inicio.
+- **Modo editable** — `uv tool install --editable .` para desarrollo: cambios se reflejan sin reinstalar.
+
+### Commits
+
+- `fix: move logging setup to __init__.py so all entry points get logs`
+- `fix: skip auto_detect_model in tests that mock the provider`
+- `feat: update banner with available commands reference`
+- `feat: add copy last full response (Ctrl+Shift+C)`
+
+### Documentación actualizada
+
+- CHANGELOG.md: sección [0.5.2] completa
+- README.md: versión 0.5.2, Ctrl+Shift+C en atajos, copiar respuestas en novedades
+- DEVLOG.md: esta entrada
