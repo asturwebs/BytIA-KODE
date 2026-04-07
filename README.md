@@ -1,14 +1,14 @@
-# BytIA KODE v0.5.1
+# BytIA KODE v0.5.2-dev
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.5.1-success.svg)
-![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.5.2--dev-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-75%2B%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
 
-BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. La versión 0.5.1 añade session awareness automática, resumen de sesión anterior inyectado en el prompt, y 66 tests.
+BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. Agente multi-workspace con contexto automático, sesiones persistentes, skills y logging estructurado.
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
@@ -36,11 +36,22 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.5.0`
+> Release actual: `0.5.2-dev`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+## Novedades en v0.5.2
+
+- **Multi-workspace context** — CONTEXT.md auto-generado por proyecto. El agente detecta lenguaje, estructura, git y herramientas del workspace actual.
+- **Logging a archivo** — Logs rotativos en `~/.bytia-kode/logs/bytia-kode.log` (1MB, 3 backups).
+- **Panic Buttons** (pendiente) — `Escape` para interrumpir, `Ctrl+K` para kill. Ver [issue #1](https://github.com/asturwebs/BytIA-KODE/issues/1).
+
+## Novedades en v0.5.1
+
+- **Session awareness** — Resumen de sesión anterior inyectado en el prompt. El modelo sabe qué hizo antes.
+- **Directivas proactivas** — Session tools disponibles para uso autónomo del modelo.
 
 ## Novedades en v0.5.0
 
@@ -103,6 +114,7 @@ Sin `TELEGRAM_ALLOWED_USERS` configurado, el bot deniega todos los mensajes (fai
 | `/reset` | Limpiar conversación del usuario |
 | `/model` | Mostrar provider y modelo activos |
 | `/sessions` | Listar sesiones del usuario |
+| `/context` | Regenerar contexto del workspace |
 
 ## Arquitectura resumida
 
@@ -144,6 +156,8 @@ Documentación adicional:
 | `LOCAL_MODEL` | Modelo local | `gemma4:26b` |
 | `TELEGRAM_BOT_TOKEN` | Token del bot | vacío |
 | `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
+| `LOG_LEVEL` | Nivel de logging (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
+| `LOG_FILE` | Path custom para logs (vacío = `~/.bytia-kode/logs/bytia-kode.log`) | vacío |
 
 ## Sesiones Persistentes
 
@@ -200,6 +214,7 @@ El modelo puede acceder a sesiones pasadas durante la conversación:
 | `/history` | Historial reciente |
 | `/cwd` | Directorio actual |
 | `/safe` | Estado visual de safe mode |
+| `/context` | Regenerar contexto del workspace |
 
 ### Atajos
 
@@ -233,6 +248,7 @@ Pulsa `F2` para cambiar entre los 19 temas disponibles (12 oscuros + 7 claros, p
 | `file_write` | Escribir archivos | Path traversal bloqueado |
 | `file_edit` | Editar archivos (search/replace + create) | Backup automático, sandbox CWD |
 | `web_fetch` | Fetch URLs (HTTP GET) | Solo http/https, content type validation |
+| `read_context` | Contexto del workspace actual | Solo lectura, auto-genera si no existe |
 | `session_list` | Listar sesiones guardadas | Solo lectura |
 | `session_load` | Cargar contexto de sesión pasada | Solo lectura |
 | `session_search` | Buscar sesiones por título | Solo lectura |
@@ -258,6 +274,10 @@ Las skills evolucionarán de instrucciones estáticas a **unidades autónomas** 
 ~/.bytia-kode/
 ├── sessions.db           # SQLite WAL — sesiones persistentes
 ├── theme.json            # Tema seleccionado
+├── logs/
+│   └── bytia-kode.log   # Logs rotativos (1MB, 3 backups)
+├── contexts/
+│   └── <hash>.md        # CONTEXT.md por workspace
 └── skills/
     ├── skill-creator/
     │   └── SKILL.md
