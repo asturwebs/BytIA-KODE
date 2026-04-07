@@ -6,6 +6,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 ## [Unreleased]
 
+### Added
+
+- **Logging a archivo** — Sistema de logging con `RotatingFileHandler` en `~/.bytia-kode/logs/bytia-kode.log`. Rotación 1MB, 3 backups. Nivel configurable vía `LOG_LEVEL` en `.env`. Custom path vía `LOG_FILE`.
+- **`read_context` tool** — Tool que lee el contexto del workspace actual (lenguaje, estructura, git, B-KODE.md). Auto-genera el archivo si no existe. Storage: `~/.bytia-kode/contexts/<hash>.md`.
+- **`/context` command** — Regenera el CONTEXT.md del workspace actual (TUI + Telegram).
+- **`context.py` module** — Detección automática de workspace: lenguaje, framework, estructura de directorios, git info, B-KODE.md.
+- **B-KODE.md: Context nudge** — Instruye al agente a usar `read_context` para estado operativo del workspace.
+
+### Changed
+
+- **CONTEXT.md** — Eliminado del tracking git. Ahora es local-only (`.gitignore`). Auto-generado por workspace.
+- **`.gitignore`** — Añadido `CONTEXT.md`.
+- **`.env.example`** — Añadido `LOG_FILE=`.
+- **`config.py`** — Nuevo campo `log_file` en `AppConfig`.
+
+### Issues
+
+- **#1** — feat: Panic Buttons — Interrupt (Escape) + Kill (Ctrl+K) — Roadmap v0.5.2
+- **#2** — bug: Provider errors not shown to user after reasoning + stuck conversation state
+
 ## [0.5.1] - 2026-04-06
 
 ### Added
