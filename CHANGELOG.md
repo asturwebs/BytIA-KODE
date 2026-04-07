@@ -4,7 +4,7 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
-## [Unreleased]
+## [0.5.2] - 2026-04-07
 
 ### Added
 
@@ -14,12 +14,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - **`context.py` module** — Detección automática de workspace: lenguaje, framework, estructura de directorios, git info, B-KODE.md.
 - **B-KODE.md: Context nudge** — Instruye al agente a usar `read_context` para estado operativo del workspace.
 
+### Fixed
+
+- **Logging no se activaba** — `_setup_logging()` estaba en `__main__.py` pero el entry point de `uv tool` (`bytia_kode.tui:run_tui`) lo saltaba. Movido a `__init__.py` para ejecutarse en cualquier punto de entrada.
+- **Provider errors no visibles (Issue #2)** — Errores del proveedor ahora se muestran inmediatamente en la TUI con estilo de error, y el historial se mantiene balanceado.
+- **CI test compatibility** — Tests adaptados para funcionar sin modelo cargado en el router.
+
 ### Changed
 
 - **CONTEXT.md** — Eliminado del tracking git. Ahora es local-only (`.gitignore`). Auto-generado por workspace.
 - **`.gitignore`** — Añadido `CONTEXT.md`.
 - **`.env.example`** — Añadido `LOG_FILE=`.
 - **`config.py`** — Nuevo campo `log_file` en `AppConfig`.
+- **Versión** — `0.5.1` → `0.5.2`.
 
 ### Issues
 
