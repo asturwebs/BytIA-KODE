@@ -942,6 +942,10 @@ class BytIAKODEApp(App):
                         await chat.mount(stream_widget)
                     stream_widget.update(Markdown(response_text))
                     chat.scroll_end(animate=False)
+                elif isinstance(chunk, tuple) and chunk[0] == "error":
+                    if stream_widget and stream_widget.is_mounted:
+                        stream_widget.remove()
+                    self._add_message("error", chunk[1])
 
             # Finalize: remove streaming widget, add formatted message
             if stream_widget and stream_widget.is_mounted:
