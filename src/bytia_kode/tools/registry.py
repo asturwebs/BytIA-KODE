@@ -450,6 +450,29 @@ def _make_unified_diff(old: str, new: str, path: str, context: int = 3) -> str:
     return result
 
 
+class ReadContextTool(Tool):
+    """Read workspace context file (project structure, language, git info)."""
+
+    name = "read_context"
+    description = (
+        "Read the workspace context file containing project structure, "
+        "language, framework, git info, and B-KODE.md status. "
+        "Use when you need to understand the current project before working on it."
+    )
+    parameters = {"type": "object", "properties": {}, "required": []}
+
+    async def execute(self, **kwargs) -> ToolResult:
+        from bytia_kode.context import ensure_context
+
+        try:
+            path = ensure_context(Path.cwd())
+            content = path.read_text(encoding="utf-8")
+            return ToolResult(output=content)
+        except Exception as exc:
+            logger.error("read_context error: %s", exc)
+            return ToolResult(output=f"Failed to read context: {exc}", error=True)
+
+
 class ToolRegistry:
     """Registry of available tools."""
 
@@ -458,7 +481,7 @@ class ToolRegistry:
         self._register_defaults()
 
     def _register_defaults(self):
-        for tool_cls in [BashTool, FileReadTool, FileWriteTool, FileEditTool, WebFetchTool]:
+        for tool_cls in [BashTool, FileReadTool, FileWriteTool, FileEditTool, WebFetchTool, ReadContextTool]:
             self.register(tool_cls())
 
     def register(self, tool: Tool):
