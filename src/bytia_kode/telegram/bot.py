@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
@@ -42,6 +43,7 @@ class TelegramBot:
         self.app.add_handler(CommandHandler("help", self._help))
         self.app.add_handler(CommandHandler("model", self._model))
         self.app.add_handler(CommandHandler("sessions", self._sessions))
+        self.app.add_handler(CommandHandler("context", self._context))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._chat))
 
     def _is_allowed(self, user_id: int) -> bool:
@@ -87,7 +89,8 @@ class TelegramBot:
             "/reset - Clear conversation\n"
             "/model - Current model\n"
             "/help - This message\n"
-            "/sessions - List available sessions\n\n"
+            "/sessions - List available sessions\n"
+            "/context - Regenerate workspace context\n\n"
             "Just send a message to chat!"
         )
 
@@ -121,6 +124,20 @@ class TelegramBot:
             sid = s.get("session_id", "")
             text += f"  {sid} ({source}) {title} - {count} msgs ({updated})\n"
         await update.message.reply_text(text)
+
+    async def _context(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not update.message or not update.effective_user:
+            return
+        if not self._is_allowed(update.effective_user.id):
+            await self._deny(update)
+            return
+        from bytia_kode.context import CONTEXTS_DIR, context_path, generate_context
+
+        CONTEXTS_DIR.mkdir(parents=True, exist_ok=True)
+        path = context_path(".")
+        content = generate_context(Path.cwd())
+        path.write_text(content, encoding="utf-8")
+        await update.message.reply_text(f"Context regenerated: {path.name}")
 
     async def _chat(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not update.message or not update.message.text or not update.effective_user:
