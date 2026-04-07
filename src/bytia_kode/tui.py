@@ -381,6 +381,7 @@ class CommandMenuScreen(ModalScreen):
         ("\u21c4  Switch provider", "switch_provider"),
         ("\U0001f4cb  Copy last code block", "copy_last_code"),
         ("\u2139  Show model info", "show_model"),
+        ("\U0001f4c4  Regenerate context", "regenerate_context"),
     ]
 
     def compose(self) -> ComposeResult:
