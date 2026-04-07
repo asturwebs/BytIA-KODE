@@ -381,6 +381,7 @@ class CommandMenuScreen(ModalScreen):
         ("\U0001f3a8  Change theme", "change_theme"),
         ("\u21c4  Switch provider", "switch_provider"),
         ("\U0001f4cb  Copy last code block", "copy_last_code"),
+        ("\U0001f4cc  Copy last full response", "copy_last_response"),
         ("\u2139  Show model info", "show_model"),
         ("\U0001f4c4  Regenerate context", "regenerate_context"),
     ]
@@ -418,6 +419,7 @@ class BytIAKODEApp(App):
         Binding("ctrl+d", "toggle_reasoning", "Reasoning", show=False),
         Binding("ctrl+e", "toggle_safe_mode", "Safe mode", show=False),
         Binding("ctrl+x", "copy_last_code", "Copy code", show=False),
+        Binding("ctrl+shift+c", "copy_last_response", "Copy response", show=False),
         Binding("f2", "change_theme", "Theme", show=False, priority=True),
         Binding("f3", "switch_provider", "Provider", show=False, priority=True),
         Binding("up", "history_up", "History prev", show=False),
@@ -784,6 +786,8 @@ class BytIAKODEApp(App):
             ("/history", "Show history", ""),
             ("/cwd", "Show current directory", ""),
             ("/context", "Regenerate workspace context", ""),
+            ("", "Copy last code block", "Ctrl+X"),
+            ("", "Copy last full response", "Ctrl+Shift+C"),
         ]:
             table.add_row(cmd, desc, key)
         chat = self.query_one("#chat-area", VerticalScroll)
@@ -1050,6 +1054,20 @@ class BytIAKODEApp(App):
             else:
                 self.copy_to_clipboard(last_msg.content.strip())
                 self.notify("Message copied to clipboard!")
+
+    def action_copy_last_response(self):
+        if not self.agent.messages:
+            return
+        last_msg = None
+        for msg in reversed(self.agent.messages):
+            if msg.role == "assistant" and msg.content:
+                last_msg = msg
+                break
+        if last_msg:
+            self.copy_to_clipboard(last_msg.content.strip())
+            self.notify("Last response copied to clipboard!")
+        else:
+            self.notify("No response to copy", severity="warning")
 
     def action_history_up(self):
         if self._history and self._history_pos > 0:
