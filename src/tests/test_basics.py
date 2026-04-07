@@ -133,13 +133,13 @@ def test_agent_discards_empty_or_non_printable_input():
     from bytia_kode.config import load_config
 
     agent = Agent(load_config())
+    agent._initialized = True
 
     async def run_chat():
         return [chunk async for chunk in agent.chat("\x00\x01   \n")]
 
     result = asyncio.run(run_chat())
-    # Either input is discarded or no model is loaded (CI env)
-    assert result[0] in ("Input discarded: empty or non-printable message.", "No hay ningún modelo")
+    assert result == ["Input discarded: empty or non-printable message."]
     assert agent.messages == []
 
 
@@ -156,6 +156,7 @@ def test_agent_preserves_history_on_provider_runtime_error():
             yield  # make it an async generator
 
     agent = Agent(load_config())
+    agent._initialized = True
     agent.providers.get = lambda provider: FailingProvider()
 
     async def run_chat():
