@@ -13,12 +13,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - **`/context` command** — Regenera el CONTEXT.md del workspace actual (TUI + Telegram).
 - **`context.py` module** — Detección automática de workspace: lenguaje, framework, estructura de directorios, git info, B-KODE.md.
 - **B-KODE.md: Context nudge** — Instruye al agente a usar `read_context` para estado operativo del workspace.
+- **Copy last response (`Ctrl+Shift+C`)** — Copia la respuesta completa del último mensaje del agente al portapapeles.
+- **Banner actualizado** — Muestra comandos disponibles: `/reset · /model · /context · /help | Ctrl+P menu`.
+- **Info-line con `/context`** — Referencia visual al comando de contexto en la barra de estado.
 
 ### Fixed
 
 - **Logging no se activaba** — `_setup_logging()` estaba en `__main__.py` pero el entry point de `uv tool` (`bytia_kode.tui:run_tui`) lo saltaba. Movido a `__init__.py` para ejecutarse en cualquier punto de entrada.
 - **Provider errors no visibles (Issue #2)** — Errores del proveedor ahora se muestran inmediatamente en la TUI con estilo de error, y el historial se mantiene balanceado.
-- **CI test compatibility** — Tests adaptados para funcionar sin modelo cargado en el router.
+- **CI test compatibility** — Tests adaptados para funcionar sin modelo cargado en el router (`_initialized = True` para saltar `auto_detect_model`).
 
 ### Changed
 
