@@ -10,26 +10,30 @@ logger = logging.getLogger(__name__)
 
 CONTEXTS_DIR = Path.home() / ".bytia-kode" / "contexts"
 
+_MAX_STRUCTURE_ENTRIES = 50
+
 
 def workspace_hash(cwd: str | Path) -> str:
-    """Deterministic 8-char hash of workspace path."""
-    return hashlib.sha256(str(cwd).encode()).hexdigest()[:8]
+    return hashlib.sha256(str(Path(cwd).resolve()).encode()).hexdigest()[:8]
 
 
 def context_path(cwd: str | Path) -> Path:
-    """Return the path where this workspace's context file should live."""
     return CONTEXTS_DIR / f"{workspace_hash(cwd)}.md"
 
 
 def _detect_project(workspace: Path) -> dict:
-    """Detect project language from config files."""
     info: dict[str, str] = {}
     project_files = {
         "pyproject.toml": "Python",
         "setup.py": "Python",
+        "setup.cfg": "Python",
+        "requirements.txt": "Python (pip)",
+        "Pipfile": "Python (pipenv)",
         "package.json": "Node.js",
         "Cargo.toml": "Rust",
         "go.mod": "Go",
+        "Cargo.lock": "Rust",
+        "go.sum": "Go",
     }
     for fname, lang in project_files.items():
         if (workspace / fname).is_file():
@@ -46,7 +50,6 @@ def _detect_project(workspace: Path) -> dict:
 
 
 def _detect_git(workspace: Path) -> dict:
-    """Detect git branch and recent commits."""
     info: dict[str, str] = {}
     try:
         result = subprocess.run(
@@ -61,13 +64,16 @@ def _detect_git(workspace: Path) -> dict:
         )
         if result.returncode == 0 and result.stdout.strip():
             info["recent_commits"] = result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
+    except FileNotFoundError:
+        logger.debug("Git not found in workspace: %s", workspace)
+    except subprocess.TimeoutExpired:
+        logger.warning("Git command timed out in workspace: %s", workspace)
+    except OSError as exc:
+        logger.warning("Git error in workspace %s: %s", workspace, exc)
     return info
 
 
 def _detect_structure(workspace: Path) -> str:
-    """List top-level directory entries, skipping common noise."""
     entries = []
     skip = {".git", "__pycache__", ".venv", "node_modules", ".pytest_cache", "build", "dist", ".egg-info"}
     for p in sorted(workspace.iterdir()):
@@ -77,13 +83,15 @@ def _detect_structure(workspace: Path) -> str:
             entries.append(f"{p.name}/")
         else:
             entries.append(p.name)
+        if len(entries) >= _MAX_STRUCTURE_ENTRIES:
+            entries.append(f"... (+{len(entries) - _MAX_STRUCTURE_ENTRIES} more)")
+            break
     if not entries:
         return "(empty)"
     return "\n".join(entries)
 
 
 def _find_bkode_md(workspace: Path) -> dict:
-    """Search for B-KODE.md in workspace and parent dirs."""
     for candidate in [workspace, *workspace.parents]:
         bk = candidate / "B-KODE.md"
         if bk.is_file():
@@ -92,7 +100,6 @@ def _find_bkode_md(workspace: Path) -> dict:
 
 
 def generate_context(workspace: Path) -> str:
-    """Generate a markdown CONTEXT.md content for the workspace."""
     project = _detect_project(workspace)
     git = _detect_git(workspace)
     structure = _detect_structure(workspace)
@@ -136,7 +143,6 @@ def generate_context(workspace: Path) -> str:
 
 
 def ensure_context(workspace: Path) -> Path:
-    """Generate context file if it doesn't exist, return its path."""
     CONTEXTS_DIR.mkdir(parents=True, exist_ok=True)
     path = context_path(workspace)
     if not path.exists():
