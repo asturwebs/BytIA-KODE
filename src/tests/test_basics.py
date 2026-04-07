@@ -161,8 +161,8 @@ def test_agent_preserves_history_on_provider_runtime_error():
         return [chunk async for chunk in agent.chat("hola")]
 
     result = asyncio.run(run_chat())
-    assert result == ["Provider runtime error: provider exploded"]
-    assert len(agent.messages) == 1
+    assert result == [("error", "Provider runtime error: provider exploded")]
+    assert len(agent.messages) == 2
     assert agent.messages[0].role == "user"
     assert agent.messages[0].content == "hola"
 
