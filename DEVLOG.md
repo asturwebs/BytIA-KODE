@@ -465,3 +465,76 @@ El agente (ejecutándose sobre Gemma 4 26B) declaró que NO tenía acceso autón
 - 66 tests pasando (24 session + 14 file_edit + 13 context_management + 15 basics).
 - Versión: 0.5.0 → 0.5.1.
 - SP identity: v12.0.0 → v12.1.0.
+
+---
+
+## 2026-04-07 - Sesión 14: Infraestructura de Debug, Bugs y Multi-Workspace Context
+
+### Logging a archivo
+
+B-KODE tenía `logging.getLogger(__name__)` en 8 módulos pero **sin configuración de output** — los logs iban a stderr, que Textual tragaba. Sin archivo de log, imposible debug a posteriori.
+
+- `__main__.py`: configuración de logging con `RotatingFileHandler`
+  - Ubicación: `~/.bytia-kode/logs/bytia-kode.log`
+  - Rotación: 1MB por archivo, 3 backups
+  - Formato: `14:23:05 ERROR  [bytia_kode.agent] mensaje`
+  - Nivel: `LOG_LEVEL` en `.env` (default: `INFO`)
+  - Custom path: `LOG_FILE` en `.env`
+- `config.py`: añadido campo `log_file` a `AppConfig`
+- `.env.example`: añadido `LOG_FILE=`
+
+### Bug: Provider errors no mostrados al usuario
+
+**Issue:** asturwebs/BytIA-KODE#2
+
+Cuando el LLM devuelve un error (400 Bad Request) durante o después de reasoning, el usuario no recibe feedback. El error se yield como string plano, se renderiza como texto del asistente, y en algunos casos no se muestra en absoluto.
+
+**Root cause doble:**
+1. `agent.py:370-373` — errores yield como string, no como tipo diferenciado
+2. `agent.py:341-345` — tras un error, el mensaje del asistente nunca se append a `self.messages`, dejando la conversación en estado roto. Los mensajes siguientes fallan con el mismo 400 en loop hasta `/reset`
+
+**Fix pendiente (issue #2):**
+- Yield errores como `("error", str)` en vez de string plano
+- Appendear error como mensaje del asistente en `self.messages` para mantener historial balanceado
+- TUI/Telegram: manejar `("error", ...)` con estilo diferenciado
+
+### Feature: Panic Buttons (diseño)
+
+**Issue:** asturwebs/BytIA-KODE#1
+
+Diseño de dos niveles de cancelación para el agente:
+
+| Nivel | TUI | Telegram | Comportamiento |
+|-------|-----|----------|----------------|
+| Interrupt | `Escape` | `/stop` | Para generación/tool actual |
+| Kill | `Ctrl+K` | `/kill` | Cancela + reset + cleanup |
+
+Añadido al ROADMAP v0.5.2. Implementación pendiente.
+
+### Feature: Multi-Workspace CONTEXT.md
+
+**Problema:** CONTEXT.md solo existía en el repo de B-KODE, trackeado en git con datos locales del usuario. Si B-KODE se ejecuta en otro proyecto, no tiene contexto operativo de ese workspace.
+
+**Solución:** Sistema de CONTEXT.md auto-generado por workspace:
+
+- `src/bytia_kode/context.py` (nuevo) — detección de workspace:
+  - Lenguaje (pyproject.toml, package.json, Cargo.toml, go.mod)
+  - Estructura (directorio top-level)
+  - Git (branch, últimos 3 commits)
+  - B-KODE.md (búsqueda walk-up)
+- Storage: `~/.bytia-kode/contexts/<sha256[:8]>.md` (hash determinista del path)
+- `read_context` tool — el agente lee contexto bajo demanda (no auto-inyectado)
+- `/context` command — regeneración forzada (TUI + Telegram)
+- B-KODE.md nudge: "usa la tool `read_context`"
+- CONTEXT.md eliminado del tracking git, añadido a `.gitignore`
+
+**Design spec:** `docs/superpowers/specs/2026-04-07-multi-workspace-context-design.md`
+**Implementation plan:** `docs/superpowers/plans/2026-04-07-multi-workspace-context.md`
+
+### Documentación actualizada
+
+- ROADMAP.md: v0.5.2 reestructurada (Panic Buttons + Tests TUI)
+- B-KODE.md: sección Logging, sección Context
+- CONTEXT.md: sección Logging
+- `.env.example`: `LOG_FILE=`
+- `.gitignore`: `CONTEXT.md`
