@@ -370,7 +370,12 @@ class Agent:
         except (TimeoutError, ConnectionError, RuntimeError, httpx.HTTPError) as exc:
             error_message = _format_chat_error(exc)
             logger.error("Agent chat failure: %s", error_message)
-            yield error_message
+            self.messages.append(Message(role="assistant", content=f"[Error: {error_message}]"))
+            if self._current_session_id:
+                self._session_store.append_message(
+                    self._current_session_id, role="assistant", content=f"[Error: {error_message}]",
+                )
+            yield ("error", error_message)
 
     def set_session(self, source: str = "tui", source_ref: str = "") -> str:
         """Set the current session. Creates or resumes if exists."""

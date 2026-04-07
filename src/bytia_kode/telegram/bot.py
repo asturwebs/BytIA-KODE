@@ -154,6 +154,9 @@ class TelegramBot:
             response_text = ""
             agent = self._get_agent(chat_id)
             async for chunk in agent.chat(user_text, provider="primary"):
+                if isinstance(chunk, tuple) and chunk[0] == "error":
+                    await update.message.reply_text(f"⚠️ {chunk[1]}")
+                    return
                 if isinstance(chunk, tuple):
                     continue
                 response_text += chunk
