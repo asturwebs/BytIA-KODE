@@ -737,6 +737,8 @@ class BytIAKODEApp(App):
             self.action_toggle_safe_mode()
         elif cmd == "/cwd":
             self._add_system_message(f"CWD: {os.getcwd()}")
+        elif cmd == "/context":
+            self._regenerate_context()
         elif cmd == "/models":
             self._show_models()
         elif cmd.lower().startswith("/use "):
@@ -744,6 +746,14 @@ class BytIAKODEApp(App):
             self._use_model(model_name)
         else:
             self._add_system_message(f"Unknown command: {cmd_raw}  |  /help for list")
+
+    def _regenerate_context(self):
+        from bytia_kode.context import context_path, generate_context, CONTEXTS_DIR
+        CONTEXTS_DIR.mkdir(parents=True, exist_ok=True)
+        path = context_path(os.getcwd())
+        content = generate_context(Path(os.getcwd()))
+        path.write_text(content, encoding="utf-8")
+        self._add_system_message(f"Context regenerated: {path.name}")
 
     def _show_help(self):
         table = Table(title="BytIA KODE Commands", box=box.SIMPLE_HEAVY,
@@ -771,6 +781,7 @@ class BytIAKODEApp(App):
             ("/use <model>", "Select local model", ""),
             ("/history", "Show history", ""),
             ("/cwd", "Show current directory", ""),
+            ("/context", "Regenerate workspace context", ""),
         ]:
             table.add_row(cmd, desc, key)
         chat = self.query_one("#chat-area", VerticalScroll)
