@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Release](https://img.shields.io/badge/release-0.5.2--dev-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-75%2B%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-77%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)

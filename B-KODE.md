@@ -45,6 +45,13 @@ BytIA KODE is an agentic TUI for assisted development with terminal and Telegram
 - Files: path traversal blocked, workspace sandbox
 - No secrets in code (pre-commit hook scans)
 
+## Logging
+
+- `~/.bytia-kode/logs/bytia-kode.log` — rotating file (1MB, 3 backups)
+- Level via `LOG_LEVEL` in `.env` (default: `INFO`)
+- Custom path via `LOG_FILE` in `.env`
+- All modules: `agent`, `tui`, `providers/`, `tools/`, `session`, `skills/`, `telegram/`
+
 ## Version
 
-Current release: 0.5.1
+Current release: 0.5.2-dev
