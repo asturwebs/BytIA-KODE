@@ -67,3 +67,31 @@ class TestGenerateContext:
         project.mkdir()
         content = generate_context(project)
         assert "# Workspace Context" in content
+
+
+class TestReadContextTool:
+    def test_tool_registered(self):
+        from bytia_kode.tools.registry import ToolRegistry
+
+        registry = ToolRegistry()
+        assert registry.get("read_context") is not None
+
+    def test_tool_returns_content(self, tmp_path):
+        import asyncio
+
+        from bytia_kode.tools.registry import ReadContextTool
+
+        project = tmp_path / "testproject"
+        project.mkdir()
+        (project / "pyproject.toml").write_text("[project]\nname='testproject'\n")
+
+        async def run_test():
+            with patch("bytia_kode.context.CONTEXTS_DIR", tmp_path / "contexts"):
+                with patch("pathlib.Path.cwd", return_value=project):
+                    tool = ReadContextTool()
+                    result = await tool.execute()
+                    assert not result.error
+                    assert "Workspace Context" in result.output
+                    assert "testproject" in result.output
+
+        asyncio.run(run_test())
