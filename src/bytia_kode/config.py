@@ -48,6 +48,7 @@ class AppConfig:
     provider: ProviderConfig = field(default_factory=ProviderConfig)
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     log_level: str = field(default_factory=lambda: _env("LOG_LEVEL", "INFO"))
+    log_file: str = field(default_factory=lambda: _env("LOG_FILE", ""))
     data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", "~/.bytia-kode")).expanduser())
 
     skills_dir: Path = field(init=False)
