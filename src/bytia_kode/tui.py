@@ -35,8 +35,7 @@ BANNER_TEMPLATE = """[bold {accent}]██████╗      ██╗  ██
 [bold {accent}]██╔══██╗      ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]
 [bold {accent}]██████╔╝      ██║  ██╗╚██████╔╝██████╔╝███████╗[/]
 [bold {accent}]╚═════╝       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]
-[dim italic]Agente + Skills + Terminal = Enterprise Automation[/]
-[dim]Commands: /reset · /model · /context · /help | Ctrl+P menu[/dim]"""
+[dim italic]Agente + Skills + Terminal = Enterprise Automation[/]"""
 
 _THEME_FILE = Path.home() / ".bytia-kode" / "theme.json"
 ALL_THEMES = [
