@@ -35,7 +35,8 @@ BANNER_TEMPLATE = """[bold {accent}]██████╗      ██╗  ██
 [bold {accent}]██╔══██╗      ██╔═██╗ ██║   ██║██║  ██║██╔══╝  [/]
 [bold {accent}]██████╔╝      ██║  ██╗╚██████╔╝██████╔╝███████╗[/]
 [bold {accent}]╚═════╝       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝[/]
-[dim italic]Agente + Skills + Terminal = Enterprise Automation[/]"""
+[dim italic]Agente + Skills + Terminal = Enterprise Automation[/]
+[dim]Commands: /reset · /model · /context · /help | Ctrl+P menu[/dim]"""
 
 _THEME_FILE = Path.home() / ".bytia-kode" / "theme.json"
 ALL_THEMES = [
@@ -497,7 +498,7 @@ class BytIAKODEApp(App):
         bk_status = f"[green]B-KODE.md[/]" if self.agent._bkode_path else "[dim]no B-KODE.md[/]"
         chat.mount(Static(
             Text.from_markup(
-                f"  {bk_status} | v{__version__} | Ctrl+P menu | Shift+Drag select"
+                f"  {bk_status} | v{__version__} | Ctrl+P menu | /context | Shift+Drag select"
             ),
             id="info-line",
         ))
