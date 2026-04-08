@@ -10,6 +10,7 @@ Documento actualizado para la release 0.5.0.
 
 - `src/bytia_kode/tui.py` — interfaz Textual TUI (19 temas, streaming, reasoning, sesiones)
 - `src/bytia_kode/telegram/bot.py` — bot con fail-secure, aislamiento por chat_id, sesiones
+- `src/bytia_kode/audio.py` — TTS con edge-tts + mpv (toggle play/stop, limpieza de Markdown)
 
 ## Núcleo del agente
 
@@ -320,6 +321,13 @@ Librerías y frameworks que usamos, no creamos. Versión mínima según `pyproje
 | --- | --- | --- |
 | `local` | llama-cpp-python>=0.3 | Inferencia local con GGUF |
 | `memory` | sentence-transformers>=4.0, faiss-cpu>=1.11 | Búsqueda semántica en memoria |
+
+### External CLI tools
+
+| Herramienta | Instalación | Uso |
+| --- | --- | --- |
+| `edge-tts` | `uv tool install edge-tts` | TTS: generación de voz neuronal |
+| `mpv` | `sudo apt install mpv` | Reproductor de audio para TTS |
 
 ---
 

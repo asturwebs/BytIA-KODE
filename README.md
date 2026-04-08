@@ -1,8 +1,8 @@
-# BytIA KODE v0.5.2
+# BytIA KODE v0.5.3
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.5.2-yellow.svg)
+![Release](https://img.shields.io/badge/release-0.5.3-yellow.svg)
 ![Tests](https://img.shields.io/badge/tests-77%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
@@ -36,11 +36,16 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.5.2`
+> Release actual: `0.5.3`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+## Novedades en v0.5.3
+
+- **TTS (Text-to-Speech)** — Botón 🔊 Escuchar en cada respuesta del asistente. Voz femenina mexicana (`es-MX-DaliaNeural`), reproducción con mpv, toggle play/stop.
+- **Logging de provider** — Errores HTTP (400/500) loggeados antes de `raise_for_status` en `client.py`.
 
 ## Novedades en v0.5.2
 
@@ -126,12 +131,14 @@ __main__.py
 
 agent.py
   ├─ prompts/core_identity.yaml
-  ├─ session.py                    ← NUEVO: SQLite WAL persistence
+  ├─ session.py                    ← SQLite WAL persistence
   ├─ providers/manager.py
   ├─ providers/client.py
   ├─ tools/registry.py
-  ├─ tools/session.py              ← NUEVO: session_list, session_load, session_search
+  ├─ tools/session.py              ← session_list, session_load, session_search
   └─ skills/loader.py
+
+audio.py                             ← TTS: edge-tts + mpv
 ```
 
 Documentación adicional:
@@ -341,6 +348,8 @@ BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCH
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | Variables de entorno |
 | [python-telegram-bot](https://docs.python-telegram-bot.org/) | Bot de Telegram |
 | [sqlite3](https://docs.python.org/3/library/sqlite3.html) | Persistencia de sesiones (stdlib) |
+| [edge-tts](https://pypi.org/project/edge-tts/) | TTS: voz neuronal (CLI, no Python dep) |
+| [mpv](https://mpv.io/) | Reproductor de audio (sistema) |
 
 ## Seguridad
 
