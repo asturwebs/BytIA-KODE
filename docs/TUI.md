@@ -97,6 +97,30 @@ Interacción:
 - **Enter** cuando el ThinkingBlock tiene foco
 - **Ctrl+D** togglea el último ThinkingBlock
 
+## Audio TTS
+
+Cada respuesta del asistente incluye un botón **🔊 Escuchar** que convierte el texto a voz.
+
+### Requisitos
+
+| Herramienta | Instalación | Propósito |
+| --- | --- | --- |
+| `edge-tts` | `uv tool install edge-tts` | Generación de voz neuronal (Microsoft Edge) |
+| `mpv` | `sudo apt install mpv` | Reproductor de audio CLI |
+
+### Uso
+
+- **Click en 🔊 Escuchar** — Genera audio y lo reproduce. El botón cambia a ⏹ Parar.
+- **Click en ⏹ Parar** — Detiene la reproducción. El botón vuelve a 🔊 Escuchar.
+- Solo un audio a la vez. Al reproducir uno nuevo, el anterior se detiene automáticamente.
+
+### Detalles técnicos
+
+- Voz: `es-MX-DaliaNeural` (femenina, mexicana).
+- Limpieza: se eliminan bloques de código, links Markdown, formatting y emojis antes de generar audio.
+- Archivos temporales: `/tmp/bytia_audio/` (auto-limpieza por el SO).
+- Módulo: `src/bytia_kode/audio.py`.
+
 ## Tool Execution (ToolBlock)
 
 Cuando el agente ejecuta una tool (bash, file_read, file_write, session_*), se muestra un bloque colapsable con el resultado:
