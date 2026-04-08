@@ -569,3 +569,62 @@ Sesión de validación y corrección post-v0.5.2. Verificación de todas las fea
 - CHANGELOG.md: sección [0.5.2] completa
 - README.md: versión 0.5.2, Ctrl+Shift+C en atajos, copiar respuestas en novedades
 - DEVLOG.md: esta entrada
+
+---
+
+## 2026-04-07 - Sesión 16: TTS (Text-to-Speech) + Infra
+
+### Contexto
+
+Sesión de implementación de TTS en la TUI, debugging de errores Textual y arreglos de infraestructura (claude-mem, router 400).
+
+### TTS — Audio en respuestas del asistente
+
+**Diseño:** Botón 🔊 Escuchar montado como widget sibling debajo de cada respuesta del asistente. Toggle play/stop con label dinámico.
+
+**Stack:** edge-tts (generación) + mpv (reproducción). Zero VRAM, zero API keys.
+
+**Módulo:** `src/bytia_kode/audio.py`
+- `TextCleaner.clean()` — elimina bloques de código, Markdown, URLs y emojis
+- `play_speech(text)` — genera MP3 en `/tmp/bytia_audio/` y reproduce con mpv
+- `stop()` / `is_playing()` — control del proceso mpv (terminate → kill con timeout)
+- Voz: `es-MX-DaliaNeural` (femenina, mexicana)
+- mpv con `--af=adelay=0.3` para compensar latencia de inicialización de PulseAudio
+
+**Integración TUI (`tui.py`):**
+- `_add_message()` monta un `Button` como sibling del `ChatMessage` en el chat area
+- `_audio_content: dict[str, str]` mapea button_id → texto de la respuesta
+- `on_button_pressed()` único handler que dispatcha por `event.button.id` (send-button vs audio_btn_*)
+- `_play_and_update()` async: await play_speech + actualiza label
+
+**Problemas resueltos durante implementación:**
+1. `Vertical(Markdown, Button)` dentro de Rich `Panel` — Rich renderables y Textual widgets no se mezclan. Fix: botón como widget sibling
+2. `rich.markdown.Markdown` vs `textual.widgets.Markdown` — la primera es renderable, la segunda es Widget. Fix: importar ambos con alias `RichMarkdown`
+3. `Button.on("click", ...)` — Textual no tiene ese método. Fix: `on_button_pressed()` handler en la App
+4. Dos `on_button_pressed` en la misma clase — Python conserva solo el último, el primero era invisible. Fix: mergear en un solo handler
+5. `asyncio` no importado — Kode lo borró en una edición. Fix: re-añadir import
+6. `encode('ascii', 'ignore')` eliminaba tildes — "dirección" → "direccin". Fix: regex que preserva Unicode español
+7. Directorio `temp_audio` relativo — cwd diferente al correr como uv tool. Fix: `/tmp/bytia_audio/` absoluto
+
+### Infra: claude-mem plugin
+
+- Plugin restaurado desde `plugins.bak/` a `marketplaces/thedotmack/plugin/`
+- Limpiadas versiones viejas del cache (10.6.3, 11.0.0, 11.0.1)
+
+### Infra: Router 400 error
+
+- Root cause: `"Assistant message must contain either 'content' or 'tool_calls'"` — gemma-4-26b devuelve `reasoning_content` sin `content`, llama.cpp lo rechaza
+- Fix: logging HTTP 400 en `client.py` (chat y chat_stream) antes de `raise_for_status()`
+
+### Infra: Sandbox bypass (documentado)
+
+- `file_read` de Kode bloquea paths fuera del workspace, pero `cat` en bash allowlist lo salta
+- Documentado en memory: `project_bkode_sandbox_bypass.md`
+- Pendiente de fix
+
+### Documentación actualizada
+
+- CHANGELOG.md: entrada [0.5.3]
+- docs/TUI.md: sección Audio TTS
+- docs/ARCHITECTURE.md: audio.py en interfaces, edge-tts/mpv en dependencias externas
+- DEVLOG.md: esta entrada
