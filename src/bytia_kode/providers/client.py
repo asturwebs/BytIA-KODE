@@ -89,6 +89,8 @@ class ProviderClient:
         logger.debug(f"-> {self.model} | {len(messages)} msgs | tools={len(tools) if tools else 0}")
 
         resp = await client.post("/chat/completions", json=payload)
+        if resp.status_code >= 400:
+            logger.error(f"Provider HTTP {resp.status_code}: model={self.model} body={resp.text[:500]}")
         resp.raise_for_status()
 
         data = resp.json()
@@ -146,6 +148,9 @@ class ProviderClient:
         tool_calls_acc: dict[int, dict] = {}
 
         async with client.stream("POST", "/chat/completions", json=payload) as resp:
+            if resp.status_code >= 400:
+                body = await resp.aread() if not resp.is_closed else ""
+                logger.error(f"Provider HTTP {resp.status_code}: model={self.model} body={body[:500]}")
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 if not line.startswith("data: "):
