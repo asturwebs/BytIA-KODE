@@ -340,7 +340,7 @@ class Agent:
                 msg_count_before = len(self.messages)
                 self.messages.append(Message(
                     role="assistant",
-                    content=response_text or None,
+                    content=response_text or "[razonamiento sin respuesta de texto]",
                     tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
                 ))
 
