@@ -1,6 +1,7 @@
 """BytIA KODE TUI - Theme-aware CLI interface with Textual. v4"""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -15,17 +16,20 @@ from textual.widgets import Header, Footer, Static, TextArea, Button, ListView, 
 from textual.screen import ModalScreen
 from textual.reactive import reactive
 from textual.message import Message as TextualMessage
-from rich.markdown import Markdown
+from rich.markdown import Markdown as RichMarkdown
+from textual.widgets import Markdown
 from rich.panel import Panel
 from rich.text import Text
 from rich.syntax import Syntax
 from rich.table import Table
+from bytia_kode import __version__
 from rich import box
 
 from bytia_kode.config import load_config
 from bytia_kode.agent import Agent
 from bytia_kode.providers.client import Message
-from bytia_kode import __version__
+from bytia_kode.audio import play_speech, is_playing, stop
+
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +79,9 @@ class ChatMessage(Static):
 
     def on_mount(self) -> None:
         self._update_content()
-        self.watch(self.app, "theme", self._on_theme_changed)
+        self.watch(self.app, "theme", self._on_theme_many)
 
-    def _on_theme_changed(self, old_theme: str, new_theme: str) -> None:
+    def _on_theme_many(self, old_theme: str, new_theme: str) -> None:
         self._update_content()
 
     def _update_content(self):
@@ -93,7 +97,7 @@ class ChatMessage(Static):
             ))
         elif self.role == "assistant":
             self.update(Panel(
-                Markdown(self.msg_content),
+                RichMarkdown(self.msg_content),
                 title=f"[bold {c['accent']}]KODE[/]",
                 title_align="left",
                 border_style=c["accent"],
@@ -440,6 +444,7 @@ class BytIAKODEApp(App):
         self._history: list[str] = []
         self._history_pos = -1
         self._spinner_timer = None
+        self._audio_content: dict[str, str] = {}
 
     def _on_agent_tool_call(self, tool_name: str):
         self.query_one(ActivityIndicator).set_status("tool", detail=f"tool:{tool_name}")
@@ -449,6 +454,11 @@ class BytIAKODEApp(App):
         chat.mount(ToolBlock(tool_name, output, error=error))
         chat.scroll_end(animate=False)
         self.set_timer(0.5, lambda: self.query_one(ActivityIndicator).set_status("thinking"))
+
+    async def _play_and_update(self, btn_id: str, button: Button) -> None:
+        await play_speech(self._audio_content[btn_id])
+        if not is_playing():
+            button.label = "🔊 Escuchar"
 
     def _get_theme_colors(self) -> dict[str, str]:
         t = self.current_theme
@@ -611,7 +621,14 @@ class BytIAKODEApp(App):
 
     def _add_message(self, role: str, content: str):
         chat = self.query_one("#chat-area", VerticalScroll)
-        chat.mount(ChatMessage(role, content))
+        msg_widget = ChatMessage(role, content)
+        chat.mount(msg_widget)
+        if role == "assistant":
+            btn_id = f"audio_btn_{id(msg_widget)}"
+            self._audio_content[btn_id] = content
+            audio_btn = Button("🔊 Escuchar", id=btn_id)
+            audio_btn.styles.margin = (0, 0, 1, 0)
+            chat.mount(audio_btn)
         chat.scroll_end(animate=False)
         if role in ("user", "assistant"):
             self.msg_count += 1
@@ -649,6 +666,13 @@ class BytIAKODEApp(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "send-button":
             self._submit_prompt(self.query_one("#input-field", TextArea).text)
+        elif event.button.id and event.button.id in self._audio_content:
+            if is_playing():
+                stop()
+                event.button.label = "🔊 Escuchar"
+            else:
+                event.button.label = "⏹ Parar"
+                asyncio.create_task(self._play_and_update(event.button.id, event.button))
 
     def _submit_prompt(self, raw_text: str) -> None:
         if self.is_processing:
@@ -944,7 +968,7 @@ class BytIAKODEApp(App):
                     if stream_widget is None:
                         stream_widget = Static("", id="streaming-output")
                         await chat.mount(stream_widget)
-                    stream_widget.update(Markdown(response_text))
+                    stream_widget.update(RichMarkdown(response_text))
                     chat.scroll_end(animate=False)
                 elif isinstance(chunk, tuple) and chunk[0] == "error":
                     if stream_widget and stream_widget.is_mounted:
