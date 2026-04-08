@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.5.1 (Alpha estable)
+## Estado actual: v0.5.3 (Alpha estable)
 
 ### Completado
 
@@ -81,6 +81,15 @@
 - [x] Menú Ctrl+P expandido: 11 → 17 items (sessions, model select, history, reasoning)
 - [x] InputScreen modal para prompts de texto (session ID, model name)
 - [x] 66 tests pasando (24 session + 14 file_edit + 13 context_management + 15 basics)
+
+---
+
+## v0.5.3 — TTS, Debug y Estabilidad
+
+- [x] **TTS (Text-to-Speech)** — edge-tts + mpv, botón 🔊/⏹ en respuestas del asistente, toggle play/stop
+- [x] **Logging HTTP en provider** — errores 400/500 loggeados antes de raise_for_status (chat + chat_stream)
+- [x] **Voz mexicana** — `es-MX-DaliaNeural` (femenina, friendly)
+- [x] **Limpieza TTS** — elimina código, Markdown, URLs, emojis; preserva tildes y puntuación española
 
 ---
 

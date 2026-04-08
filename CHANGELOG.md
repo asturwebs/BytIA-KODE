@@ -4,6 +4,21 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.5.3] - 2026-04-07
+
+### Added
+
+- **TTS (Text-to-Speech)** — Botón 🔊 Escuchar en cada respuesta del asistente. Genera audio con edge-tts (voz `es-MX-DaliaNeural`) y lo reproduce con mpv.
+  - Toggle play/stop: click para reproducir, click de nuevo para parar.
+  - Limpieza automática de Markdown, código, URLs y emojis antes de TTS.
+  - Audio temporal en `/tmp/bytia_audio/`.
+  - Módulo: `src/bytia_kode/audio.py`.
+
+### Dependencies
+
+- **edge-tts** (CLI) — Generación de voz neuronal (Microsoft Edge). Instalar: `uv tool install edge-tts`
+- **mpv** — Reproductor de audio CLI. Instalar: `sudo apt install mpv`
+
 ## [0.5.2] - 2026-04-07
 
 ### Added
