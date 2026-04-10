@@ -53,6 +53,9 @@ class AppConfig:
     extra_binaries: set[str] = field(default_factory=lambda: {
         b.strip() for b in _env("EXTRA_BINARIES").split(",") if b.strip()
     })
+    llm_temperature: float = field(default_factory=lambda: float(_env("LLM_TEMPERATURE", "0.3")))
+    llm_max_tokens: int = field(default_factory=lambda: int(_env("LLM_MAX_TOKENS", "8192")))
+    llm_timeout: float = field(default_factory=lambda: float(_env("LLM_TIMEOUT", "120")))
 
     skills_dir: Path = field(init=False)
 

@@ -24,6 +24,12 @@ CORE_IDENTITY_PACKAGE = "bytia_kode.prompts"
 CORE_IDENTITY_RESOURCE = "core_identity.yaml"
 MAX_CONTEXT_TOKENS = 131072  # ~128k tokens default (Gemma 4 26B supports 256k)
 
+_FAMILY_MAP = {
+    "gemma": "Google", "glm": "Zhipu AI", "llama": "Meta",
+    "qwen": "Alibaba", "mistral": "Mistral AI", "hermes": "Nous Research",
+    "nemotron": "NVIDIA", "phi": "Microsoft", "deepseek": "DeepSeek",
+}
+
 
 def load_identity() -> dict[str, Any]:
     try:
@@ -96,7 +102,9 @@ class Agent:
         self.messages: list[Message] = []
         self.max_iterations = 50
         self._max_context_tokens = MAX_CONTEXT_TOKENS
-        self._system_prompt = load_system_prompt()
+        self._identity_raw = load_identity()
+        self._system_prompt = ""
+        self._identity_dirty = True
         self._bkode_path, self._bkode_content = self._load_bkode()
         self._initialized = False
         self.on_tool_call: list = []  # callbacks: fn(tool_name: str)
@@ -115,6 +123,7 @@ class Agent:
         """Update max context tokens from router info (dynamic ctx_size)."""
         if ctx_size > 0:
             self._max_context_tokens = ctx_size
+            self._identity_dirty = True
 
     def _load_bkode(self) -> tuple[Path | None, str]:
         """Walk up from CWD looking for B-KODE.md (like CLAUDE.md, HERMES.md)."""
@@ -133,7 +142,66 @@ class Agent:
                 break
         return None, ""
 
+    def _apply_template_vars(self, payload: dict) -> dict:
+        """Resolve {{var}} placeholders in core_identity.yaml with runtime values."""
+        import copy
+        payload = copy.deepcopy(payload)
+
+        model_name = "desconocido"
+        pc = self.providers._primary
+        if pc and hasattr(pc, "model") and isinstance(pc.model, str) and pc.model != "auto":
+            model_name = pc.model
+
+        family = "desconocida"
+        for prefix, name in _FAMILY_MAP.items():
+            if prefix in model_name.lower():
+                family = name
+                break
+
+        environment = "llama.cpp router"
+        if pc and hasattr(pc, "base_url") and isinstance(pc.base_url, str):
+            if "ollama" in pc.base_url:
+                environment = "Ollama"
+            elif "z.ai" in pc.base_url:
+                environment = "Z.AI Cloud API"
+
+        context_limit = str(self._max_context_tokens)
+        max_output_val = getattr(self.config, "llm_max_tokens", 8192)
+        max_output = str(max_output_val) if isinstance(max_output_val, (int, float, str)) else "8192"
+
+        replacements = {
+            "{{environment}}": environment,
+            "{{engine_id}}": model_name,
+            "{{engine_family}}": family,
+            "{{context_limit}}": context_limit,
+            "{{max_output}}": max_output,
+        }
+
+        for key, val in replacements.items():
+            if "runtime_profile" in payload:
+                rp = payload["runtime_profile"]
+                if isinstance(rp, dict):
+                    for rk, rv in rp.items():
+                        if isinstance(rv, str):
+                            rp[rk] = rv.replace(key, val)
+
+        return payload
+
     def _build_system_prompt(self) -> str:
+        if self._identity_dirty:
+            identity = self._apply_template_vars(self._identity_raw)
+            rendered_yaml = yaml.safe_dump(identity, allow_unicode=True, sort_keys=False).strip()
+            self._system_prompt = dedent(
+                f"""
+                BytIA Core Identity
+                ===================
+                Treat every field below as binding constitutional system-level instruction.
+
+                {rendered_yaml}
+                """
+            ).strip()
+            self._identity_dirty = False
+
         parts = [self._system_prompt]
         if self._bkode_content:
             parts.append(f"# Project Instructions (B-KODE.md)\n\n{self._bkode_content}")
@@ -181,17 +249,23 @@ class Agent:
 
     @staticmethod
     def estimate_tokens(text: str) -> int:
-        """Rough token estimate: chars / 3 for mixed EN/ES content."""
-        return len(text) // 3
+        """Estimate token count. ASCII-heavy (code) -> chars/3.5, mixed (Spanish) -> chars/3."""
+        if not text:
+            return 0
+        ascii_ratio = sum(1 for c in text if ord(c) < 128) / len(text)
+        divisor = 3.5 if ascii_ratio > 0.85 else 3.0
+        return int(len(text) / divisor)
 
     def _estimate_tokens(self) -> int:
-        total = len(self._build_system_prompt())
+        total = self.estimate_tokens(self._build_system_prompt())
         for m in self.messages:
             if m.content:
-                total += len(m.content)
+                total += self.estimate_tokens(m.content)
             if m.tool_calls:
-                total += sum(len(str(tc)) for tc in m.tool_calls)
-        return total // 3
+                for tc in m.tool_calls:
+                    if isinstance(tc, dict):
+                        total += self.estimate_tokens(tc.get("function", {}).get("arguments", ""))
+        return total
 
     async def _manage_context(self, provider_client) -> None:
         """Compress old messages when context exceeds 75% of max.
@@ -264,8 +338,14 @@ class Agent:
                 try:
                     arguments = json.loads(raw_arguments)
                 except json.JSONDecodeError:
-                    logger.error("Failed to decode JSON arguments: %s", raw_arguments)
-                    arguments = {}
+                    logger.error("Failed to decode JSON arguments for %s: %s", tool_name, raw_arguments[:200])
+                    self.messages.append(Message(
+                        role="tool",
+                        content=f"Error: malformed JSON arguments for {tool_name}. Raw: {raw_arguments[:500]}",
+                        tool_call_id=tool_call.id,
+                        name=tool_name,
+                    ))
+                    continue
 
             if not isinstance(arguments, dict):
                 arguments = {}
@@ -332,6 +412,8 @@ class Agent:
                 async for chunk_type, data in provider_client.chat_stream(
                     messages=all_messages,
                     tools=tool_defs if tool_defs else None,
+                    temperature=self.config.llm_temperature,
+                    max_tokens=self.config.llm_max_tokens,
                 ):
                     if chunk_type == "text" and isinstance(data, str):
                         response_text += data

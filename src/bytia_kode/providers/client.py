@@ -4,6 +4,7 @@ Works with: Z.AI, OpenRouter, MiniMax, Ollama, llama.cpp server, vLLM, anything 
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import AsyncIterator
@@ -59,8 +60,31 @@ class ProviderClient:
                     "Content-Type": "application/json",
                 },
                 timeout=httpx.Timeout(self.timeout, connect=10.0),
+                limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
             )
         return self._client
+
+    async def _request_with_retry(self, request_fn, max_retries: int = 2):
+        """Retry on 5xx, timeout, and connection errors with exponential backoff."""
+        for attempt in range(max_retries + 1):
+            try:
+                return await request_fn()
+            except (httpx.TimeoutException, httpx.ConnectError) as exc:
+                if attempt < max_retries:
+                    wait = 1.0 * (2 ** attempt)
+                    logger.warning("Request failed (attempt %d/%d): %s. Retrying in %.1fs",
+                                   attempt + 1, max_retries + 1, exc, wait)
+                    await asyncio.sleep(wait)
+                else:
+                    raise
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code >= 500 and attempt < max_retries:
+                    wait = 1.0 * (2 ** attempt)
+                    logger.warning("HTTP %d (attempt %d/%d). Retrying in %.1fs",
+                                   exc.response.status_code, attempt + 1, max_retries + 1, wait)
+                    await asyncio.sleep(wait)
+                else:
+                    raise
 
     async def chat(
         self,
@@ -88,10 +112,12 @@ class ProviderClient:
 
         logger.debug(f"-> {self.model} | {len(messages)} msgs | tools={len(tools) if tools else 0}")
 
-        resp = await client.post("/chat/completions", json=payload)
-        if resp.status_code >= 400:
-            logger.error(f"Provider HTTP {resp.status_code}: model={self.model} body={resp.text[:500]}")
-        resp.raise_for_status()
+        async def _do_post():
+            r = await client.post("/chat/completions", json=payload)
+            r.raise_for_status()
+            return r
+
+        resp = await self._request_with_retry(_do_post)
 
         data = resp.json()
         choices = data.get("choices") if isinstance(data, dict) else None
@@ -203,9 +229,20 @@ class ProviderClient:
             await self._client.aclose()
 
     async def list_models(self) -> list[str]:
-        """List available models from Ollama or OpenAI-compatible endpoint."""
+        """List available models from OpenAI-compatible or Ollama endpoint."""
         base = self.base_url.removesuffix("/v1")
         client = await self._get_client()
+        # Try OpenAI-compatible format first (llama.cpp, vLLM, etc.)
+        try:
+            resp = await client.get(f"{base}/v1/models", timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                models = [m["id"] for m in data.get("data", [])]
+                if models:
+                    return models
+        except Exception:
+            pass
+        # Fall back to Ollama format
         try:
             resp = await client.get(f"{base}/api/tags", timeout=5.0)
             if resp.status_code == 200:
@@ -213,19 +250,11 @@ class ProviderClient:
                 return [m["name"] for m in data.get("models", [])]
         except Exception:
             pass
-        try:
-            resp = await client.get(f"{base}/v1/models", timeout=5.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                return [m["id"] for m in data.get("data", [])]
-        except Exception:
-            pass
         return []
 
     async def detect_loaded_model(self) -> str | None:
         """Query router API to find which model is currently loaded."""
         try:
-            models = await self.list_models()
             base = self.base_url.removesuffix("/v1")
             client = await self._get_client()
             resp = await client.get(f"{base}/v1/models", timeout=5.0)
@@ -235,9 +264,13 @@ class ProviderClient:
                     status = m.get("status", {}).get("value", "")
                     if status == "loaded":
                         return m["id"]
-        except Exception:
-            pass
-        return None
+            return None
+        except httpx.ConnectError:
+            logger.warning("Router not reachable for model detection")
+            return None
+        except Exception as exc:
+            logger.error("Error in detect_loaded_model: %s", exc)
+            return None
 
     async def get_router_info(self) -> dict:
         """Get loaded model info from router: name, ctx-size, prompt tokens."""
