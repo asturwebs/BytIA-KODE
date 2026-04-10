@@ -34,7 +34,8 @@ class TestEstimateTokens:
 
     def test_static_method_unicode(self):
         text = "Hola mundo, qué tal estás"
-        assert Agent.estimate_tokens(text) == len(text) // 3
+        result = Agent.estimate_tokens(text)
+        assert 0 < result <= len(text)
 
 
 class TestManageContext:

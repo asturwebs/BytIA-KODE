@@ -537,9 +537,11 @@ class BytIAKODEApp(App):
             logger.debug("Auto-detect model failed: %s", exc)
 
     _poll_failures: reactive[int] = reactive(0)
+    _min_poll_interval: float = 5.0
+    _max_poll_interval: float = 60.0
 
     async def _poll_router_info(self) -> None:
-        """Poll router every 5s for model changes and real ctx metrics."""
+        """Poll router every 5s for model changes and real ctx metrics. Backoff on failures."""
         try:
             client = self.agent.providers.get(self.active_provider)
             info = await client.get_router_info()
@@ -554,9 +556,18 @@ class BytIAKODEApp(App):
             )
             activity._refresh()
             self._poll_failures = 0
+            if self._poll_timer.interval > self._min_poll_interval:
+                self._poll_timer.interval = self._min_poll_interval
         except Exception as exc:
             self._poll_failures += 1
             logger.debug("Router poll failed (%d): %s", self._poll_failures, exc)
+            new_interval = min(
+                self._min_poll_interval * (2 ** (self._poll_failures - 1)),
+                self._max_poll_interval,
+            )
+            if self._poll_timer.interval < new_interval:
+                self._poll_timer.interval = new_interval
+                logger.info("Router poll backoff: %.0fs (failures: %d)", new_interval, self._poll_failures)
             if self._poll_failures == 3:
                 activity = self.query_one(ActivityIndicator)
                 activity.set_status("error")
