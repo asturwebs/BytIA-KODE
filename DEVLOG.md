@@ -1,5 +1,59 @@
 # BytIA KODE - Development Log
 
+## 2026-04-10 - Sesión 5: Constitución, Comunicación y Optimización
+
+### Contexto
+
+B-KODE.md fue eliminado con `git-filter-repo` por contener un token de Telegram expuesto. Kode operaba sin instrucciones de proyecto, causando problemas recurrentes: no encontraba skills, memoria ni intercom. Además, la capa de comunicación con llama.cpp tenía bugs y hardcodes que afectaban la operatividad.
+
+### Cambios realizados
+
+**B-KODE.md (nuevo, 70 líneas):**
+- Rutas absolutas a skills, memoria, intercom, logs y sesiones
+- Protocolo de intercom con inbox isolation
+- Sistema de memoria con categorías y formato YAML frontmatter
+- Constraints de runtime y reglas de seguridad (repo público)
+- Se carga automáticamente via `_load_bkode()` en `agent.py`
+
+**Template variable interpolation:**
+- `core_identity.yaml` tenía `{{environment}}`, `{{engine_id}}`, etc. que NUNCA se interpolaban
+- El modelo recibía literales como `{{engine_id}}` desde que Kode existe
+- Fix: `_apply_template_vars()` resuelve variables en runtime con lazy evaluation
+- Se ejecuta después de `auto_detect_model()`, dentro de `_build_system_prompt()`
+- Dirty flag para re-interpolar cuando cambia el context window
+
+**Provider client optimizations:**
+- Retry con backoff para 5xx/timeout (no-streaming only)
+- `list_models()` invertido: OpenAI primero, Ollama fallback
+- Error handling diferenciado en `detect_loaded_model()`
+- Connection pool limits en httpx
+- Temperature y max_tokens configurables via `.env`
+
+**Token estimation:**
+- Heurística ASCII-aware (3.5x para código, 3.0x para español)
+- Tool calls cuentan arguments, no el Pydantic model dump
+
+**Router polling:**
+- Exponential backoff: 5s→60s cap tras fallos consecutivos
+
+### Lecciones aprendidas
+
+- Kode reportó éxito en `file_write` pero el archivo no se creó — diferencia entre "la tool dijo OK" y "el archivo está en disco". Kode se impuso un protocolo de verificación post-escritura.
+- Los tests expusieron que `_apply_template_vars()` recibía MagicMock objects en `pc.model` y `pc.base_url` — añadido `isinstance()` guards.
+- El retry para streaming es problemático porque `client.stream()` retorna un context manager y el error de conexión ocurre al entrar, no al llamar. Solo se aplica retry a `chat()` no-streaming.
+
+### Archivos modificados
+
+| Archivo | Líneas |
+|---------|--------|
+| `B-KODE.md` | +70 (nuevo) |
+| `src/bytia_kode/agent.py` | +99, -23 |
+| `src/bytia_kode/config.py` | +3 |
+| `src/bytia_kode/providers/client.py` | +59, -16 |
+| `src/bytia_kode/tui.py` | +13, -7 |
+| `tests/test_context_management.py` | +1, -1 |
+| `CHANGELOG.md` | +42 |
+
 ## 2026-04-01 - Sesión 1: Nacimiento
 
 ### Contexto
