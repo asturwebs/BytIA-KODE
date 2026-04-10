@@ -50,6 +50,9 @@ class AppConfig:
     log_level: str = field(default_factory=lambda: _env("LOG_LEVEL", "INFO"))
     log_file: str = field(default_factory=lambda: _env("LOG_FILE", ""))
     data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", "~/.bytia-kode")).expanduser())
+    extra_binaries: set[str] = field(default_factory=lambda: {
+        b.strip() for b in _env("EXTRA_BINARIES").split(",") if b.strip()
+    })
 
     skills_dir: Path = field(init=False)
 

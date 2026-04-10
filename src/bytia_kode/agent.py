@@ -87,6 +87,10 @@ class Agent:
         self.config = config
         self.providers = ProviderManager(config.provider)
         self.tools = ToolRegistry()
+
+        from bytia_kode.tools.registry import set_trusted_paths
+        set_trusted_paths([config.data_dir])
+
         self.skills = SkillLoader(skill_dirs=[config.skills_dir])
         self.skills.load_all()
         self.messages: list[Message] = []

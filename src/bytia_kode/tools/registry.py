@@ -17,7 +17,38 @@ from pydantic import BaseModel
 from bytia_kode.providers.client import ToolDef
 
 logger = logging.getLogger(__name__)
-_ALLOWED_BINARIES = {"ls", "pwd", "cat", "echo", "git", "grep", "find", "mkdir", "touch", "uv", "python", "python3", "wsl"}
+
+_TRUSTED_PATHS: list[Path] = []
+
+
+def set_trusted_paths(paths: list[Path]) -> None:
+    """Add trusted directories that file tools can access beyond the workspace.
+
+    Used to allow the agent to write to its own data directory (e.g. ~/.bytia-kode/)
+    regardless of the current working directory.
+    """
+    _TRUSTED_PATHS.extend(p.resolve() for p in paths)
+
+_DEFAULT_BINARIES = {
+    "ls", "pwd", "cat", "echo", "git", "grep", "find", "mkdir", "touch",
+    "mv", "cp", "rm", "head", "tail", "wc", "date", "chmod",
+    "curl", "wget", "scp", "ssh",
+    "uv", "python", "python3", "pip", "pip3",
+    "wsl",
+}
+
+
+def _load_allowed_binaries() -> set[str]:
+    try:
+        from bytia_kode.config import load_config
+        config = load_config()
+        return _DEFAULT_BINARIES | config.extra_binaries
+    except Exception:
+        logger.warning("Failed to load EXTRA_BINARIES from config, using defaults only")
+        return _DEFAULT_BINARIES
+
+
+_ALLOWED_BINARIES = _load_allowed_binaries()
 
 
 class ToolResult(BaseModel):
@@ -56,6 +87,9 @@ def _resolve_workspace_path(path: str) -> Path:
     workspace = Path.cwd().resolve()
     if workspace == resolved or workspace in resolved.parents:
         return resolved
+    for trusted in _TRUSTED_PATHS:
+        if trusted in resolved.parents:
+            return resolved
     raise PermissionError(f"Security violation: path escapes workspace: {path}")
 
 

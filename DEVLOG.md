@@ -628,3 +628,104 @@ Sesión de implementación de TTS en la TUI, debugging de errores Textual y arre
 - docs/TUI.md: sección Audio TTS
 - docs/ARCHITECTURE.md: audio.py en interfaces, edge-tts/mpv en dependencias externas
 - DEVLOG.md: esta entrada
+
+---
+
+## 2026-04-10 - Sesión 17: Memoria Persistente, Trusted Paths y Sandbox Expandida
+
+### Contexto
+
+Kode propuso crear un sistema de memoria persistente para almacenar conocimiento entre sesiones. La propuesta conceptual era sólida pero había problemas de implementación: la sandbox bloqueaba escritura fuera del CWD, y Kode tenía un bug de respuesta duplicada en streaming. Claude tomó la implementación.
+
+### Cambios principales
+
+**1. Trusted Paths (registry.py + agent.py)**
+
+`_resolve_workspace_path()` sandboxea contra `Path.cwd()`. Si Kode ejecuta desde `/home/asturwebs/proyectos/mi-proyecto/`, escribir en `~/.bytia-kode/` fallaba con `PermissionError`.
+
+Solución: añadir `_TRUSTED_PATHS` como lista de directorios confiados. `Agent.__init__()` registra `config.data_dir` como trusted path. El workspace sigue siendo la primera comprobación; trusted paths es fallback controlado.
+
+```python
+_TRUSTED_PATHS: list[Path] = []
+
+def set_trusted_paths(paths: list[Path]) -> None:
+    _TRUSTED_PATHS.extend(p.resolve() for p in paths)
+
+def _resolve_workspace_path(path: str) -> Path:
+    # ... workspace check primero ...
+    for trusted in _TRUSTED_PATHS:
+        if trusted in resolved.parents:
+            return resolved
+    raise PermissionError(...)
+```
+
+Verificación: `/etc/` bloqueado, `/var/` bloqueado, `~/.bytia-kode/memoria/` permitido — desde cualquier CWD.
+
+**2. Sistema de Memoria (`~/.bytia-kode/memoria/`)**
+
+Estructura de 4 categorías + index:
+```
+memoria/
+├── procedimientos/     # How-tos, workflows
+├── contexto/           # Decisiones, hitos
+├── tecnologia/         # Stacks, arquitecturas
+├── decisiones/         # ADRs
+└── index.md            # Auto-generado
+```
+
+Formato estándar con frontmatter YAML (created, category, tags).
+
+**3. Skill `memory-manager`**
+
+Procedimientos concretos usando las tools existentes (file_write, grep, find):
+- `memory_store` — escribir archivo con frontmatter
+- `memory_search` — grep recursivo en memoria/
+- `memory_index` — regenerar index.md
+- `memory_read` — file_read de archivo específico
+
+Trigger: memory, recordar, guardar conocimiento, memoria, aprendido, lección.
+
+**4. Allowlist expandida (registry.py)**
+
+De 13 a 27 binarios. Nuevos: mv, cp, rm, head, tail, wc, date, chmod, curl, wget, scp, ssh, pip, pip3.
+
+Patrón `_DEFAULT_BINARIES` (inmutable) + `EXTRA_BINARIES` (.env, configurable). Set union: solo puede expandir, nunca reducir.
+
+**5. Skill graphify**
+
+Instalación: `uv tool install graphifyy` (doble y). Requiere `EXTRA_BINARIES=graphify` en `.env`.
+
+### Problemas resueltos
+
+1. **Sandbox bloqueaba memoria** — `_resolve_workspace_path()` solo chequeaba CWD. Fix: trusted paths.
+2. **Trusted paths podían abrir la sandbox** — Si se añade `/` como trusted, se bypassa todo. Mitigación: solo `data_dir` se registra, no paths arbitrarios.
+3. **Tests de trusted paths** — Primer test falló porque `mkdir` iba después de `chdir`. Fix: crear directorio antes de cambiar.
+4. **Assertion mal escrito** — `"memoria" in result.output` pero output era `"Wrote 7 chars to..."`. Fix: `"Wrote" in result.output`.
+5. **`_TRUSTED_PATHS` es estado global** — Tests pueden contaminarse. Mitigación: cada test usa `tmp_path` aislado, las rutas no colisionan. No es ideal pero funcional.
+6. **DEVLOG.md no estaba en local** — Solo existía en el remote. Fix: `git checkout origin/main -- DEVLOG.md`.
+
+### Observaciones sobre Kode
+
+- Kode propuso la memoria con buena estructura conceptual (4 categorías + protocolo de uso)
+- Bug activo: respuesta duplicada en streaming (dos bloques de reasoning colados en output)
+- Kode propuso "tools internas" con firmas de función, pero las skills son markdown, no código
+- Propuso emojis en nombres de directorio (mala práctica para scripts y filesystems)
+- Aceptó el feedback con madurez y se puso en modo evaluadora
+
+### Tests
+
+5 nuevos (82 total):
+- `test_trusted_paths_allow_write_outside_workspace`
+- `test_trusted_paths_do_not_bypass_arbitrary_paths`
+- `test_memory_manager_skill_loads`
+- `test_extra_binaries_merged_from_env`
+- `test_extra_binaries_empty_env_uses_defaults`
+
+### Documentación actualizada
+
+- CHANGELOG.md: entrada [0.5.4]
+- README.md: versión 0.5.4, novedades, badge 82 tests, estructura de directorios, EXTRA_BINARIES
+- ROADMAP.md: sección v0.5.4 completada
+- B-KODE.md: Memory System, trusted paths, skills actualizadas, versión 0.5.4
+- CONTEXT.md: allowlist 27 binarios, trusted paths, versión 0.5.4
+- DEVLOG.md: esta entrada

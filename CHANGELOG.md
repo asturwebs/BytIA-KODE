@@ -4,6 +4,33 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.5.4] - 2026-04-10
+
+### Added
+
+- **Sistema de memoria persistente** — Directorio `~/.bytia-kode/memoria/` con 4 categorías (`procedimientos/`, `contexto/`, `tecnologia/`, `decisiones/`) + `index.md` auto-generable. Permite al agente almacenar conocimiento entre sesiones.
+- **Skill `memory-manager`** — Procedimientos para almacenar (`memory_store`), buscar (`memory_search`), indexar (`memory_index`) y leer (`memory_read`) memoria. Trigger: memory, recordar, guardar conocimiento, memoria, aprendido, lección.
+- **Trusted paths en sandbox** — `_resolve_workspace_path()` acepta directorios confiados además del workspace. `set_trusted_paths(paths)` en `registry.py`. `Agent.__init__()` registra `data_dir` como trusted path. Permite al agente escribir en `~/.bytia-kode/` desde cualquier proyecto.
+- **Allowlist expandida** — BashTool: 27 binarios permitidos (antes 13). Nuevos: `mv`, `cp`, `rm`, `head`, `tail`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `pip`, `pip3`.
+- **`EXTRA_BINARIES` configurable** — Campo `extra_binaries` en `AppConfig` (`.env`). Merge con `_DEFAULT_BINARIES` vía set union. Solo puede expandir, nunca reducir la sandbox.
+- **Skill `graphify`** — Análisis de código con knowledge graphs via tree-sitter. Instalación: `uv tool install graphifyy`. Requiere `EXTRA_BINARIES=graphify` en `.env`.
+
+### Changed
+
+- **`_resolve_workspace_path()`** — Añadido fallback a trusted paths cuando el path no está dentro del workspace.
+- **`Agent.__init__()`** — Registra `config.data_dir` como trusted path al inicializar.
+- **B-KODE.md** — Sección Memory System, trusted paths en Security, tabla de skills actualizada, versión 0.5.3→0.5.4.
+- **CONTEXT.md** — Allowlist actualizada a 27 binarios, trusted paths documentados.
+
+### Tests
+
+- 5 nuevos tests (82 total):
+  - `test_trusted_paths_allow_write_outside_workspace` — Verifica escritura en trusted path desde workspace remoto.
+  - `test_trusted_paths_do_not_bypass_arbitrary_paths` — Verifica que paths arbitrarios siguen bloqueados.
+  - `test_memory_manager_skill_loads` — Verifica carga de la skill memory-manager.
+  - `test_extra_binaries_merged_from_env` — Verifica merge de EXTRA_BINARIES con defaults.
+  - `test_extra_binaries_empty_env_uses_defaults` — Verifica defaults sin EXTRA_BINARIES.
+
 ## [0.5.3] - 2026-04-07
 
 ### Added
