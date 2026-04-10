@@ -4,6 +4,36 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.5.5] - 2026-04-10
+
+### Added
+
+- **B-KODE.md** — Instrucciones de proyecto con rutas a skills, memoria, intercom, logs y sesiones. Protocolo de comunicación inter-agente, sistema de memoria y reglas de seguridad (sin secrets). Se carga automáticamente al iniciar.
+- **Template variable interpolation** — `{{engine_id}}`, `{{context_limit}}`, `{{max_output}}`, `{{environment}}`, `{{engine_family}}` en `core_identity.yaml` se resuelven en runtime con info del provider (lazy, después de auto-detect model).
+- **`_FAMILY_MAP`** — Mapeo de prefijos de modelo a fabricante (gemma→Google, glm→Zhipu AI, llama→Meta, etc.) para el Hard Identity Override.
+- **Configurable LLM params** — `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, `LLM_TIMEOUT` en `.env`.
+- **Retry con backoff** — `_request_with_retry()` reintenta 5xx y timeout/connection errors hasta 2 veces con exponential backoff (1s, 2s). Solo en `chat()` no-streaming.
+- **Connection pool limits** — httpx client con `max_connections=10`, `max_keepalive_connections=5`.
+
+### Changed
+
+- **`list_models()`** — Invertido el orden: `/v1/models` (OpenAI/llama.cpp) primero, `/api/tags` (Ollama) como fallback. Early return si el primer intento tiene resultados.
+- **`detect_loaded_model()`** — Error handling diferenciado: `ConnectError` (warning) vs otros (error). Antes silenciaba todas las excepciones.
+- **Tool call argument parsing** — Cuando JSON decode falla, se envía error al modelo con los primeros 500 chars del raw input. Antes se silently fallback a `{}`.
+- **Token estimation** — Heurística ASCII-aware: `chars/3.5` para texto mayoritariamente ASCII (código), `chars/3.0` para texto mixto (español). Reemplaza `chars/3` fijo.
+- **`_estimate_tokens()`** — Cuenta argumentos de tool calls en vez de `str(tc)` del modelo Pydantic completo.
+- **Router polling** — Exponential backoff en `_poll_router_info()`: 5s→10s→20s→40s→60s (cap) tras fallos consecutivos. Reset a 5s en éxito.
+- **`update_context_limit()`** — Marca `_identity_dirty=True` para re-interpolar template vars cuando cambia el context window.
+- **Test actualizado** — `test_static_method_unicode` usa rango en vez de valor exacto para la nueva heurística.
+
+### Security
+
+- **`~/.bytia-kode/skills/agent-intercom/SKILL.md`** — Token de Telegram hardcoded reemplazado por `$TELEGRAM_BOT_TOKEN` env var. Añadido `TELEGRAM_CHAT_ID` a `.env`.
+
+### Tests
+
+- 82 passed (1 actualizado por nueva heurística de tokens).
+
 ## [0.5.4] - 2026-04-10
 
 ### Added
