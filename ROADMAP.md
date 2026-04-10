@@ -93,6 +93,18 @@
 
 ---
 
+## v0.5.4 — Memoria Persistente, Trusted Paths y Sandbox Expandida
+
+- [x] **Sistema de memoria persistente** — `~/.bytia-kode/memoria/` con 4 categorías + index.md
+- [x] **Skill `memory-manager`** — store, search, index, read procedimientos
+- [x] **Trusted paths en sandbox** — `_resolve_workspace_path()` acepta directorios confiados (`data_dir`)
+- [x] **Allowlist expandida** — 27 binarios (antes 13): mv, cp, rm, curl, wget, scp, ssh, pip...
+- [x] **EXTRA_BINARIES configurable** — `.env` expande allowlist sin modificar código
+- [x] **Skill `graphify`** — knowledge graphs de código (tree-sitter)
+- [x] **5 tests nuevos** — trusted paths (2), skill load (1), extra binaries (2) — 82 total
+
+---
+
 ## v0.5.2 — Botón del Pánico, Context Multi-Workspace y Tests de TUI
 
 **Objetivo:** Cancelación/interrupción del agente, contexto por workspace y tests de integración TUI.

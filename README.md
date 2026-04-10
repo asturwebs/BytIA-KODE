@@ -1,9 +1,9 @@
-# BytIA KODE v0.5.3
+# BytIA KODE v0.5.4
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.5.3-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-77%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.5.4-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-82%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -36,11 +36,19 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.5.3`
+> Release actual: `0.5.4`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+## Novedades en v0.5.4
+
+- **Sistema de memoria persistente** — Directorio `~/.bytia-kode/memoria/` con 4 categorías (procedimientos, contexto, tecnología, decisiones) + index auto-generable. Skill `memory-manager` para almacenar, buscar, indexar y recuperar conocimiento entre sesiones.
+- **Trusted paths** — `_resolve_workspace_path()` ahora acepta directorios confiados además del workspace. `~/.bytia-kode/` es trusted por defecto, permitiendo al agente gestionar su memoria desde cualquier proyecto sin comprometer la sandbox del código del usuario.
+- **Allowlist expandida** — BashTool: 27 binarios permitidos (antes 13). Nuevos: `mv`, `cp`, `rm`, `head`, `tail`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `pip`, `pip3`.
+- **EXTRA_BINARIES configurable** — Variables de entorno para expandir la allowlist sin modificar código. `EXTRA_BINARIES=graphify` en `.env`.
+- **Skill graphify** — Análisis de código con knowledge graphs (tree-sitter). Requiere `uv tool install graphifyy`.
 
 ## Novedades en v0.5.3
 
@@ -166,6 +174,7 @@ Documentación adicional:
 | `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
 | `LOG_LEVEL` | Nivel de logging (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `LOG_FILE` | Path custom para logs (vacío = `~/.bytia-kode/logs/bytia-kode.log`) | vacío |
+| `EXTRA_BINARIES` | Binarios adicionales para BashTool (comma-separated) | vacío |
 
 ## Sesiones Persistentes
 
@@ -287,8 +296,18 @@ Las skills evolucionarán de instrucciones estáticas a **unidades autónomas** 
 │   └── bytia-kode.log   # Logs rotativos (1MB, 3 backups)
 ├── contexts/
 │   └── <hash>.md        # CONTEXT.md por workspace
+├── memoria/
+│   ├── procedimientos/   # How-tos, workflows
+│   ├── contexto/         # Decisiones, hitos
+│   ├── tecnologia/       # Stacks, arquitecturas
+│   ├── decisiones/       # ADRs
+│   └── index.md          # Índice auto-generado
 └── skills/
     ├── skill-creator/
+    │   └── SKILL.md
+    ├── memory-manager/
+    │   └── SKILL.md
+    ├── graphify/
     │   └── SKILL.md
     └── my-procedure/
         ├── SKILL.md
@@ -358,7 +377,7 @@ Hardening de seguridad verificado con auditoría profesional:
 | Issue | Mitigación |
 | --- | --- |
 | SEC-001 — Command injection | Allowlist de binarios + `shell=False` + `shlex.split()` |
-| SEC-002/003 — Path traversal | `_resolve_workspace_path()` con sandbox a `cwd` |
+| SEC-002/003 — Path traversal | `_resolve_workspace_path()` con sandbox a `cwd` + trusted paths controlados |
 | SEC-005 — Telegram abierto | Fail-secure por defecto (denegar sin allowlist) |
 | SEC-006 — Sesiones compartidas | Aislamiento por `chat_id` (v0.5.0) |
 

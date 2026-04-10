@@ -90,7 +90,7 @@ def test_load_identity_missing_resource_raises_runtime_error(monkeypatch):
 def test_bash_tool_blocks_disallowed_command():
     from bytia_kode.tools.registry import BashTool
 
-    result = asyncio.run(BashTool().execute(command="rm -rf /"))
+    result = asyncio.run(BashTool().execute(command="sudo rm -rf /"))
     assert result.error
     assert "not allowed" in result.output
 
@@ -101,6 +101,78 @@ def test_bash_tool_runs_allowed_command_async():
     result = asyncio.run(BashTool().execute(command="echo hello"))
     assert not result.error
     assert "hello" in result.output
+
+
+def test_trusted_paths_allow_write_outside_workspace(tmp_path, monkeypatch):
+    from bytia_kode.tools.registry import FileWriteTool, _resolve_workspace_path, set_trusted_paths
+
+    trusted = tmp_path / "trusted_data"
+    trusted.mkdir()
+    set_trusted_paths([trusted])
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+
+    resolved = _resolve_workspace_path(str(trusted / "subdir" / "file.md"))
+    assert not resolved.is_relative_to(tmp_path / "workspace")
+    assert resolved.is_relative_to(trusted)
+
+    tool = FileWriteTool()
+    result = asyncio.run(tool.execute(path=str(trusted / "subdir" / "file.md"), content="memoria"))
+    assert not result.error
+    assert "Wrote" in result.output
+
+
+def test_trusted_paths_do_not_bypass_arbitrary_paths(tmp_path, monkeypatch):
+    from bytia_kode.tools.registry import FileWriteTool, _resolve_workspace_path, set_trusted_paths
+
+    trusted = tmp_path / "trusted_data"
+    trusted.mkdir()
+    set_trusted_paths([trusted])
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+
+    result = asyncio.run(FileWriteTool().execute(path="/etc/evil.txt", content="nope"))
+    assert result.error
+    assert "Security violation" in result.output
+
+
+def test_memory_manager_skill_loads(tmp_path, monkeypatch):
+    from bytia_kode.skills.loader import SkillLoader
+
+    skill_dir = tmp_path / "skills"
+    skill_dir.mkdir()
+    (skill_dir / "memory-manager").mkdir()
+    (skill_dir / "memory-manager" / "SKILL.md").write_text(
+        "---\nname: memory-manager\ndescription: Test memory skill\ntrigger: memory\nverified: false\n---\n\n## Procedure\nDo stuff.\n",
+        encoding="utf-8",
+    )
+
+    loader = SkillLoader(skill_dirs=[skill_dir])
+    skills = loader.load_all()
+    assert "memory-manager" in skills
+    assert skills["memory-manager"].description == "Test memory skill"
+
+
+def test_extra_binaries_merged_from_env(monkeypatch):
+    monkeypatch.setenv("EXTRA_BINARIES", "mytool,another")
+    from bytia_kode.tools.registry import _DEFAULT_BINARIES, _load_allowed_binaries
+
+    allowed = _load_allowed_binaries()
+    assert "mytool" in allowed
+    assert "another" in allowed
+    assert _DEFAULT_BINARIES.issubset(allowed)
+
+
+def test_extra_binaries_empty_env_uses_defaults(monkeypatch):
+    monkeypatch.delenv("EXTRA_BINARIES", raising=False)
+    from bytia_kode.tools.registry import _DEFAULT_BINARIES, _load_allowed_binaries
+
+    allowed = _load_allowed_binaries()
+    assert allowed == _DEFAULT_BINARIES
 
 
 def test_file_tools_block_path_traversal(tmp_path, monkeypatch):
