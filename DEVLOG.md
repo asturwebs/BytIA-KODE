@@ -1,5 +1,40 @@
 # BytIA KODE - Development Log
 
+## 2026-04-12 - Sesión 19: file_read Sandbox Fix + Legacy Cleanup
+
+### Contexto
+
+Pedro encontró que Kode (TUI) no podía leer los YAML del Kernel/Runtime con `file_read`. El error era "Security violation: path escapes workspace" a pesar de que los archivos están dentro del workspace.
+
+### Root Cause
+
+Doble causa:
+1. **Symlinks:** `bytia.kernel.yaml` y `bytia.runtime.kode.yaml` son symlinks a `~/bytia/`. `Path.resolve()` sigue el symlink y el path resultante queda fuera del workspace de Kode (`~/bytia/proyectos/BytIA-KODE/`).
+2. **CWD dependency:** `_resolve_workspace_path()` usaba `Path.cwd()` para resolver paths relativos y como boundary del workspace. Si CWD cambiaba durante la sesión, paths legítimos fallaban.
+
+### Fix
+
+- `registry.py`: `_WORKSPACE_ROOT` + `set_workspace_root()` — workspace fijo al inicio, invariante a cambios de CWD. Paths relativos se resuelven contra este root.
+- `agent.py`: `~/bytia/` añadido como trusted path — permite a `file_read` seguir symlinks legítimos al repo padre.
+- Sandbox sigue protegiendo contra escapes reales (`/etc/passwd`, `../../../../`).
+
+### Legacy Cleanup
+
+- `core_identity.yaml` (v12.1.0) seguía presente en `prompts/` pero **no se usaba** desde RFC-001 — `load_identity()` solo carga kernel + runtime.
+- Contradecía al Kernel: 7 anclas (C01-C07) vs 4 consolidadas (C01-C04), protocolos con naming diferente.
+- Archivado a `prompts/legacy/core_identity.yaml.v12.1.0.yaml`.
+
+### Archivos modificados
+
+- `src/bytia_kode/tools/registry.py` — `_WORKSPACE_ROOT`, `set_workspace_root()`, path resolution mejorado
+- `src/bytia_kode/agent.py` — trusted path `~/bytia/`, `set_workspace_root()` call, docstring
+- `src/bytia_kode/prompts/core_identity.yaml` → `prompts/legacy/core_identity.yaml.v12.1.0.yaml`
+- `CHANGELOG.md` — entrada [0.5.6]
+- `CONTEXT.md` — referencia SP actualizada
+- `docs/DEVELOPMENT.md` — estructura de prompts actualizada
+
+---
+
 ## 2026-04-11 - Sesión 18: BashTool Shell Operator Validation (Hotfix)
 
 ### Contexto

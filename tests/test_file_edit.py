@@ -1,7 +1,7 @@
 """Tests for FileEditTool — search/replace and create strategies."""
 import pytest
 from pathlib import Path
-from bytia_kode.tools.registry import FileEditTool
+from bytia_kode.tools.registry import FileEditTool, set_workspace_root
 
 
 @pytest.fixture
@@ -11,8 +11,9 @@ def tool():
 
 @pytest.fixture
 def tmp_workspace(tmp_path, monkeypatch):
-    """Set tmp_path as CWD so _resolve_workspace_path works."""
+    """Set tmp_path as CWD and workspace root so _resolve_workspace_path works."""
     monkeypatch.chdir(tmp_path)
+    set_workspace_root(tmp_path)
     return tmp_path
 
 

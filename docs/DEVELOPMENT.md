@@ -18,7 +18,10 @@ src/bytia_kode/
 ├── skills/
 │   └── loader.py            # Carga, búsqueda, scoring y persistencia de skills
 ├── prompts/
-│   └── core_identity.yaml   # Identidad constitucional (empaquetada en el wheel)
+│   ├── bytia.kernel.yaml          # Kernel v12.3.0 (symlink → ~/bytia/)
+│   ├── bytia.runtime.kode.yaml    # Runtime KODE v1.0.0 (symlink → ~/bytia/)
+│   └── legacy/                    # Archived SPs
+│       └── core_identity.yaml.v12.1.0.yaml
 └── telegram/
     └── bot.py               # Bot Telegram con fail-secure, aislamiento por chat_id
 

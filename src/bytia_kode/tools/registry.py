@@ -19,6 +19,7 @@ from bytia_kode.providers.client import ToolDef
 logger = logging.getLogger(__name__)
 
 _TRUSTED_PATHS: list[Path] = []
+_WORKSPACE_ROOT: Path | None = None
 
 
 def set_trusted_paths(paths: list[Path]) -> None:
@@ -28,6 +29,16 @@ def set_trusted_paths(paths: list[Path]) -> None:
     regardless of the current working directory.
     """
     _TRUSTED_PATHS.extend(p.resolve() for p in paths)
+
+
+def set_workspace_root(root: Path) -> None:
+    """Set the project workspace root for path validation.
+
+    Called once at startup with the resolved project directory.
+    Falls back to Path.cwd() if never called.
+    """
+    global _WORKSPACE_ROOT
+    _WORKSPACE_ROOT = root.resolve()
 
 _DEFAULT_BINARIES = {
     "ls", "pwd", "cat", "echo", "git", "grep", "find", "mkdir", "touch",
@@ -85,11 +96,11 @@ class Tool:
 
 
 def _resolve_workspace_path(path: str) -> Path:
+    workspace = _WORKSPACE_ROOT or Path.cwd().resolve()
     candidate = Path(path).expanduser()
     if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
+        candidate = workspace / candidate
     resolved = candidate.resolve()
-    workspace = Path.cwd().resolve()
     if workspace == resolved or workspace in resolved.parents:
         return resolved
     for trusted in _TRUSTED_PATHS:
