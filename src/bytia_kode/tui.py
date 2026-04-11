@@ -492,7 +492,8 @@ class BytIAKODEApp(App):
 
         self.run_worker(self._auto_detect_model, exclusive=True, group="model_detect")
         self.run_worker(self._poll_router_info, exclusive=True, group="router_poll")
-        self._poll_timer = self.set_interval(5.0, self._poll_router_info)
+        self._poll_interval = 5.0
+        self._poll_timer = self.set_interval(self._poll_interval, self._poll_router_info)
 
         activity = self.query_one(ActivityIndicator)
         activity.set_status("ready")
@@ -556,8 +557,10 @@ class BytIAKODEApp(App):
             )
             activity._refresh()
             self._poll_failures = 0
-            if self._poll_timer.interval > self._min_poll_interval:
-                self._poll_timer.interval = self._min_poll_interval
+            if self._poll_interval > self._min_poll_interval:
+                self._poll_timer.stop()
+                self._poll_interval = self._min_poll_interval
+                self._poll_timer = self.set_interval(self._poll_interval, self._poll_router_info)
         except Exception as exc:
             self._poll_failures += 1
             logger.debug("Router poll failed (%d): %s", self._poll_failures, exc)
@@ -565,8 +568,10 @@ class BytIAKODEApp(App):
                 self._min_poll_interval * (2 ** (self._poll_failures - 1)),
                 self._max_poll_interval,
             )
-            if self._poll_timer.interval < new_interval:
-                self._poll_timer.interval = new_interval
+            if self._poll_interval < new_interval:
+                self._poll_timer.stop()
+                self._poll_interval = new_interval
+                self._poll_timer = self.set_interval(self._poll_interval, self._poll_router_info)
                 logger.info("Router poll backoff: %.0fs (failures: %d)", new_interval, self._poll_failures)
             if self._poll_failures == 3:
                 activity = self.query_one(ActivityIndicator)
