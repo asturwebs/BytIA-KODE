@@ -60,6 +60,17 @@ Resultado: `bytia-kode` siempre usa el código fuente actual. Sin reinstalar, si
 
 **NUNCA hacer:** `uv tool install bytia-kode` o `uv tool upgrade bytia-kode` — sobreescribe el wrapper y crea copia aislada de nuevo.
 
+### Fixes adicionales (misma sesión)
+
+- **Timer.interval AttributeError:** Textual 8.x `Timer` no tiene propiedad `interval` mutable. Fix: stop + recreate timer con nuevo intervalo.
+- **Alias `~/.zshrc`:** `bkode-update` hacía `uv tool install --force` que sobreescribía el wrapper. Actualizado a `git pull` solo.
+- **`bkode-dev` alias eliminado:** `uv tool install --editable .` también sobreescribe el wrapper.
+- **Version bump:** 0.5.4 → 0.5.6 (pyproject.toml)
+
+### Nota: modelo no puede inspeccionar su propio SP
+
+El system prompt se inyecta como `role="system"` en la llamada al provider — NO se almacena en la tabla `messages`. El modelo dentro de Kode no puede "verse a sí mismo". La verificación del SP correcto se hace programáticamente (`load_system_prompt()`), no preguntando al modelo.
+
 ---
 
 ## 2026-04-11 - Sesión 18: BashTool Shell Operator Validation (Hotfix)
