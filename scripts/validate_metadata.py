@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = ROOT / "pyproject.toml"
 README = ROOT / "README.md"
 CHANGELOG = ROOT / "CHANGELOG.md"
-PROMPT = ROOT / "src" / "bytia_kode" / "prompts" / "core_identity.yaml"
+PROMPT = ROOT / "src" / "bytia_kode" / "prompts" / "bytia.kernel.yaml"
 TEMP_PATTERNS = ["*.bak", "*.backup.*", "fix_*.py", "patch_*.py"]
 
 with PYPROJECT.open("rb") as fh:

@@ -297,7 +297,7 @@ Librerías y frameworks que usamos, no creamos. Versión mínima según `pyproje
 | Paquete | Versión | Uso |
 | --- | --- | --- |
 | [Pydantic](https://docs.pydantic.dev/) | >=2.11 | Validación y serialización. `Message`, `ToolDef`, `ToolCall`, `ToolResult`. |
-| [PyYAML](https://pyyaml.org/) | >=6.0 | Parseo de `core_identity.yaml` y frontmatter de skills. |
+| [PyYAML](https://pyyaml.org/) | >=6.0 | Parseo de `bytia.kernel.yaml` y frontmatter de skills. |
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | >=1.1 | Carga de `.env` (CWD + `~/.bytia-kode/.env`). |
 
 ### Telegram

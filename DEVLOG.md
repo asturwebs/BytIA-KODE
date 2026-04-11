@@ -810,3 +810,26 @@ Instalación: `uv tool install graphifyy` (doble y). Requiere `EXTRA_BINARIES=gr
 - B-KODE.md: Memory System, trusted paths, skills actualizadas, versión 0.5.4
 - CONTEXT.md: allowlist 27 binarios, trusted paths, versión 0.5.4
 - DEVLOG.md: esta entrada
+
+---
+
+## Session 6 — 2026-04-11: RFC-001 BytIA OS Migration
+
+### Context
+Pedro + BytIA (Claude Code) + Grok collaborated on a constitutional audit that identified naming incoherence, verbosity, and missing directives in the v12.1.0 SP. Pedro authored RFC-001 defining the Kernel/Runtime architecture.
+
+### Changes
+- Created `bytia.kernel.yaml` (v12.3.0) — 4 anchors, Truth-First with per-type thresholds, O16 anti-sycophancy, O17 anti-bureaucracy
+- Created `bytia.runtime.kode.yaml` (v1.0.0) — TUI capabilities, tools, commands, model config
+- Migrated `agent.py`: `load_identity()` now merges kernel + runtime via `_load_yaml_resource()`
+- Fixed P25 jailbreak patterns: `/` separators → `|` for YAML `safe_load` compatibility
+- Archived legacy `core_identity.yaml` (v12.0.0 concisa)
+- Main repo: ~40 files, ~300 references updated from old naming
+
+### Key Insight
+The Kernel is like `vmlinux` — portable, hardware-agnostic. The Runtime is like a device driver — adapts to the specific environment. `compatible_kernel: ">=12.3.0"` is the `vermagic` equivalent.
+
+### Commits
+- `1df5552` — Main repo: full RFC-001 migration
+- `6409b8d` — KODE: agent.py + symlinks
+- `1f46990` — Kernel YAML fix + legacy archive

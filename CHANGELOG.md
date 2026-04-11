@@ -6,6 +6,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 
 ## [0.5.6] - 2026-04-11
 
+
+## v0.5.4 — RFC-001: BytIA OS Migration
+*11 Abril 2026*
+
+### Architecture
+- **RFC-001**: Migrated from monolithic `core_identity.yaml` to BytIA OS Kernel + Runtime
+- Kernel `bytia.kernel.yaml` v12.3.0: 4 anchors, Truth-First thresholds, O16/O17 directives
+- Runtime `bytia.runtime.kode.yaml` v1.0.0: TUI-specific capabilities, tools, session system
+- `agent.py`: new `_load_yaml_resource()` + dual-file merge via `importlib.resources`
+- Legacy `core_identity.yaml` archived
+
+### Naming
+- `core_identity.yaml` → `bytia.kernel.yaml` + `bytia.runtime.kode.yaml` (symlinks)
+
 ### Security
 
 - **BashTool: shell operator validation** — `create_subprocess_exec` no interpreta operadores shell (`|`, `&&`, `>`, `<<`, `;`, `$()`, backticks). Un comando como `mkdir -p dir && cat << 'EOF' > file` pasaba cada token como argumento literal a `mkdir`, creando decenas de directorios basura. Nuevo método `_validate_command_safety()` rechaza operadores shell con mensaje claro que redirige al LLM a `file_write`/`file_edit` y múltiples llamadas a `bash`.

@@ -266,11 +266,11 @@ B-KODE soporta cualquier endpoint OpenAI-compatible. Los providers se configuran
 
 `F3` en la TUI alterna entre los tres providers.
 
-## System Prompt
+## BytIA OS (Kernel + Runtime)
 
 El agente construye el system prompt en este orden:
 
-1. `core_identity.yaml` — identidad constitucional (empaquetada en el wheel)
+1. `bytia.kernel.yaml + bytia.runtime.kode.yaml — BytIA OS (empaquetada en el wheel)
 2. `B-KODE.md` — instrucciones de proyecto (walk-up desde CWD)
 3. Skills relevantes — inyectadas según scoring del mensaje del usuario
 4. Resumen de contexto — si el historial supera 75% del límite
