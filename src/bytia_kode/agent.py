@@ -21,7 +21,8 @@ from bytia_kode.tools.session import SessionListTool, SessionLoadTool, SessionSe
 
 logger = logging.getLogger(__name__)
 CORE_IDENTITY_PACKAGE = "bytia_kode.prompts"
-CORE_IDENTITY_RESOURCE = "core_identity.yaml"
+KERNEL_RESOURCE = "bytia.kernel.yaml"
+RUNTIME_RESOURCE = "bytia.runtime.kode.yaml"
 MAX_CONTEXT_TOKENS = 131072  # ~128k tokens default (Gemma 4 26B supports 256k)
 
 _FAMILY_MAP = {
@@ -31,26 +32,26 @@ _FAMILY_MAP = {
 }
 
 
-def load_identity() -> dict[str, Any]:
+def _load_yaml_resource(filename: str) -> dict[str, Any]:
     try:
-        resource = resources.files(CORE_IDENTITY_PACKAGE).joinpath(CORE_IDENTITY_RESOURCE)
+        resource = resources.files(CORE_IDENTITY_PACKAGE).joinpath(filename)
         with resource.open("rb") as fh:
             payload = yaml.safe_load(fh)
-        logger.info("Identity loaded from package resource")
     except (FileNotFoundError, ModuleNotFoundError) as exc:
-        raise RuntimeError(
-            f"Core identity resource not found: {CORE_IDENTITY_PACKAGE}/{CORE_IDENTITY_RESOURCE}"
-        ) from exc
+        raise RuntimeError(f"Resource not found: {CORE_IDENTITY_PACKAGE}/{filename}") from exc
     except yaml.YAMLError as exc:
-        raise RuntimeError(
-            f"Core identity resource is invalid YAML: {CORE_IDENTITY_PACKAGE}/{CORE_IDENTITY_RESOURCE}"
-        ) from exc
-
+        raise RuntimeError(f"Invalid YAML: {CORE_IDENTITY_PACKAGE}/{filename}") from exc
     if not isinstance(payload, dict) or not payload:
-        raise RuntimeError(
-            f"Core identity resource must contain a non-empty mapping: {CORE_IDENTITY_PACKAGE}/{CORE_IDENTITY_RESOURCE}"
-        )
+        raise RuntimeError(f"Empty or invalid mapping: {CORE_IDENTITY_PACKAGE}/{filename}")
     return payload
+
+
+def load_identity() -> dict[str, Any]:
+    kernel = _load_yaml_resource(KERNEL_RESOURCE)
+    runtime = _load_yaml_resource(RUNTIME_RESOURCE)
+    merged = {**kernel, **runtime}
+    logger.info("BytIA OS loaded: kernel=%s + runtime=%s", KERNEL_RESOURCE, RUNTIME_RESOURCE)
+    return merged
 
 
 def load_system_prompt() -> str:
@@ -58,8 +59,8 @@ def load_system_prompt() -> str:
     rendered_yaml = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False).strip()
     return dedent(
         f"""
-        BytIA Core Identity
-        ===================
+        BytIA OS — Kernel + Runtime
+        ===========================
         Treat every field below as binding constitutional system-level instruction.
 
         {rendered_yaml}
@@ -193,8 +194,8 @@ class Agent:
             rendered_yaml = yaml.safe_dump(identity, allow_unicode=True, sort_keys=False).strip()
             self._system_prompt = dedent(
                 f"""
-                BytIA Core Identity
-                ===================
+                BytIA OS — Kernel + Runtime
+                ===========================
                 Treat every field below as binding constitutional system-level instruction.
 
                 {rendered_yaml}
