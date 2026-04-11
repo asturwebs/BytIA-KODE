@@ -71,6 +71,18 @@ Resultado: `bytia-kode` siempre usa el código fuente actual. Sin reinstalar, si
 
 El system prompt se inyecta como `role="system"` en la llamada al provider — NO se almacena en la tabla `messages`. El modelo dentro de Kode no puede "verse a sí mismo". La verificación del SP correcto se hace programáticamente (`load_system_prompt()`), no preguntando al modelo.
 
+### Fix: Kernel/Runtime separados en system prompt
+
+**Problema:** `load_identity()` hacía `{**kernel, **runtime}` — merge destructivo donde Runtime sobreescribía keys del Kernel (version, component, etc.). El modelo veía `version: 1.0.0` (Runtime) en vez de `version: 12.3.0` (Kernel). Las anclas se mezclaban con valores.
+
+**Fix:** `load_identity()` ahora devuelve `(kernel, runtime)` como tupla. `_build_system_prompt()` renderiza ambos como secciones separadas con etiquetas claras:
+
+```
+BytIA OS — Kernel v12.3.0 + Runtime v1.0.0
+# KERNEL (inmutable — identity, values, protocols)
+# RUNTIME KODE (adaptación al entorno)
+```
+
 ---
 
 ## 2026-04-11 - Sesión 18: BashTool Shell Operator Validation (Hotfix)
