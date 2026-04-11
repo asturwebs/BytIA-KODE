@@ -46,24 +46,28 @@ def _load_yaml_resource(filename: str) -> dict[str, Any]:
     return payload
 
 
-def load_identity() -> dict[str, Any]:
+def load_identity() -> tuple[dict[str, Any], dict[str, Any]]:
     kernel = _load_yaml_resource(KERNEL_RESOURCE)
     runtime = _load_yaml_resource(RUNTIME_RESOURCE)
-    merged = {**kernel, **runtime}
     logger.info("BytIA OS loaded: kernel=%s + runtime=%s", KERNEL_RESOURCE, RUNTIME_RESOURCE)
-    return merged
+    return kernel, runtime
 
 
 def load_system_prompt() -> str:
-    payload = load_identity()
-    rendered_yaml = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False).strip()
+    kernel, runtime = load_identity()
+    kernel_yaml = yaml.safe_dump(kernel, allow_unicode=True, sort_keys=False).strip()
+    runtime_yaml = yaml.safe_dump(runtime, allow_unicode=True, sort_keys=False).strip()
     return dedent(
         f"""
-        BytIA OS — Kernel + Runtime
-        ===========================
+        BytIA OS — Kernel v{kernel.get('version', '?')} + Runtime v{runtime.get('version', '?')}
+        =========================================================
         Treat every field below as binding constitutional system-level instruction.
 
-        {rendered_yaml}
+        # KERNEL (inmutable — identity, values, protocols)
+        {kernel_yaml}
+
+        # RUNTIME {runtime.get('target', '')} (adaptación al entorno)
+        {runtime_yaml}
         """
     ).strip()
 
@@ -191,15 +195,22 @@ class Agent:
 
     def _build_system_prompt(self) -> str:
         if self._identity_dirty:
-            identity = self._apply_template_vars(self._identity_raw)
-            rendered_yaml = yaml.safe_dump(identity, allow_unicode=True, sort_keys=False).strip()
+            kernel_raw, runtime_raw = self._identity_raw
+            kernel = self._apply_template_vars(kernel_raw)
+            runtime = self._apply_template_vars(runtime_raw)
+            kernel_yaml = yaml.safe_dump(kernel, allow_unicode=True, sort_keys=False).strip()
+            runtime_yaml = yaml.safe_dump(runtime, allow_unicode=True, sort_keys=False).strip()
             self._system_prompt = dedent(
                 f"""
-                BytIA OS — Kernel + Runtime
-                ===========================
+                BytIA OS — Kernel v{kernel.get('version', '?')} + Runtime v{runtime.get('version', '?')}
+                =========================================================
                 Treat every field below as binding constitutional system-level instruction.
 
-                {rendered_yaml}
+                # KERNEL (inmutable — identity, values, protocols)
+                {kernel_yaml}
+
+                # RUNTIME {runtime.get('target', '')} (adaptación al entorno)
+                {runtime_yaml}
                 """
             ).strip()
             self._identity_dirty = False
