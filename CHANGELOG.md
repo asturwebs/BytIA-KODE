@@ -4,6 +4,17 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.5.6] - 2026-04-11
+
+### Security
+
+- **BashTool: shell operator validation** — `create_subprocess_exec` no interpreta operadores shell (`|`, `&&`, `>`, `<<`, `;`, `$()`, backticks). Un comando como `mkdir -p dir && cat << 'EOF' > file` pasaba cada token como argumento literal a `mkdir`, creando decenas de directorios basura. Nuevo método `_validate_command_safety()` rechaza operadores shell con mensaje claro que redirige al LLM a `file_write`/`file_edit` y múltiples llamadas a `bash`.
+- **Descripción de tool actualizada** — `BashTool.description` ahora indica explícitamente "SINGLE shell command, no pipes/chains/redirects/heredocs".
+
+### Fixed
+
+- **BUG CRÍTICO: BashTool heredoc explosion** — El 10 Abr 2026 22:48, BytIA-KODE generó `mkdir -p ~/.bytia-kode/memoria/decisiones && cat << 'EOF' > archivo` para crear un archivo de auditoría. `shlex.split()` rompió el heredoc y `create_subprocess_exec` ejecutó `mkdir` con todo el contenido markdown como argumentos, creando 48 directorios basura en `~/`. Causa raíz: `shlex.split` no entiende operadores shell, y `subprocess.exec` no usa shell. Fix: validación pre-ejecución que bloquea todos los operadores shell.
+
 ## [0.5.5] - 2026-04-10
 
 ### Added

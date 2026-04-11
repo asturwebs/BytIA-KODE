@@ -1,5 +1,32 @@
 # BytIA KODE - Development Log
 
+## 2026-04-11 - Sesión 18: BashTool Shell Operator Validation (Hotfix)
+
+### Contexto
+
+El 10 Abr 2026 a las 22:48, BytIA-KODE ejecutó un comando `mkdir -p path && cat << 'EOF' > archivo` con contenido markdown embebido. `shlex.split()` rompió el heredoc y `create_subprocess_exec` ejecutó `mkdir` con todos los tokens del markdown como argumentos literales, creando 48 directorios basura en `~/`. La limpieza requirió investigación forense (log de KODE línea 2531), verificación de contenido, y eliminación.
+
+### Causa raíz
+
+`BashTool.execute()` usa `shlex.split(command)` + `asyncio.create_subprocess_exec(*argv)`. Este pipeline NO usa shell — los operadores shell (`|`, `&&`, `>`, `<<`, `;`) se pasan como argumentos literales al binary. Un heredoc roto convierte cada token del contenido en un directorio.
+
+### Fix implementado
+
+Nuevo método `_validate_command_safety()` en `BashTool`:
+- 9 patrones peligrosos bloqueados: `<<`, `>>`, `>`, `|`, `&&`, `||`, `;`, `$()`, backticks
+- Mensaje de error con guidance: "usa file_write o file_edit, llama a bash múltiples veces"
+- Descripción de tool actualizada para que el LLM sepa la restricción
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/bytia_kode/tools/registry.py` | +_validate_command_safety(), BashTool.description actualizada |
+| `CHANGELOG.md` | Entrada [0.5.6] |
+| `DEVLOG.md` | Esta entrada |
+
+---
+
 ## 2026-04-10 - Sesión 5: Constitución, Comunicación y Optimización
 
 ### Contexto

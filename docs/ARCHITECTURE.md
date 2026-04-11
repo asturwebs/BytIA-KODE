@@ -222,7 +222,7 @@ class TelegramBot:
 
 ### Seguridad de tools
 
-- **BashTool**: allowlist de binarios (`ls`, `pwd`, `cat`, `echo`, `git`, `grep`, `find`, `mkdir`, `touch`, `uv`, `python`, `python3`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace.
+- **BashTool**: allowlist de binarios (`ls`, `pwd`, `cat`, `echo`, `git`, `grep`, `find`, `mkdir`, `touch`, `uv`, `python`, `python3`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
 - **FileReadTool / FileWriteTool**: `_resolve_workspace_path()` impide path traversal. I/O delegado a `asyncio.to_thread` para no bloquear el event loop.
 - **FileEditTool**: search/replace + create. Backup automático con timestamp. Diff unificado. `_no_match_help` con diagnósticos de partial match.
 - **WebFetchTool**: HTTP GET via httpx. Solo URLs http/https. Validación de content-type (text/*, json, xml). HTML se convierte a texto plano (tag stripping). Truncation a 30k chars. Timeout configurable (15s default).

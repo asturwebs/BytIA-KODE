@@ -37,6 +37,11 @@ _DEFAULT_BINARIES = {
     "wsl",
 }
 
+_DANGEROUS_PATTERNS = [
+    (r"<<", "heredoc"),
+    (r"(?<!<)>(?!>)", "output redirection"),
+]
+
 
 def _load_allowed_binaries() -> set[str]:
     try:
@@ -117,7 +122,11 @@ def _create_backup(path: Path) -> Path:
 
 class BashTool(Tool):
     name = "bash"
-    description = "Execute a shell command and return the output"
+    description = (
+        "Execute a SINGLE shell command (no pipes, chains, redirects, or heredocs). "
+        "For file operations use file_write or file_edit instead. "
+        "Call bash multiple times for sequential commands."
+    )
     parameters = {
         "type": "object",
         "properties": {
@@ -128,8 +137,49 @@ class BashTool(Tool):
         "required": ["command"],
     }
 
+    @staticmethod
+    def _validate_command_safety(command: str) -> ToolResult | None:
+        """Reject shell constructs that shlex.split + create_subprocess_exec cannot handle.
+
+        The bash tool uses create_subprocess_exec which does NOT invoke a shell.
+        This means shell operators (pipes, redirects, heredocs, chains) are NOT
+        interpreted — they are passed as literal arguments to the binary, causing
+        catastrophic results (e.g., 'mkdir -p dir && cat << EOF' creates dozens
+        of garbage directories from the heredoc content).
+
+        Returns None if safe, or a ToolResult(error=True) with guidance.
+        """
+        dangerous = [
+            (r"<<", "heredoc"),
+            (r">>", "append redirection"),
+            (r"(?<!<)>(?!>)", "output redirection"),
+            (r"\|", "pipe"),
+            (r"&&", "command chain"),
+            (r"\|\|", "or-chain"),
+            (r";", "command separator"),
+            (r"\$\(", "command substitution"),
+            (r"`[^`]*`", "backtick substitution"),
+        ]
+        for pattern, name in dangerous:
+            if re.search(pattern, command):
+                return ToolResult(
+                    output=(
+                        f"Security policy: {name} not allowed in bash tool. "
+                        f"This tool uses subprocess.exec (no shell), so operators like "
+                        f"|, &&, >, << are NOT interpreted — they become literal arguments. "
+                        f"Use file_write or file_edit to create/modify files. "
+                        f"Call bash multiple times for sequential commands."
+                    ),
+                    error=True,
+                )
+        return None
+
     async def execute(self, command: str, timeout: int = 60, workdir: str = ".", **_) -> ToolResult:
         try:
+            safety_check = self._validate_command_safety(command)
+            if safety_check is not None:
+                return safety_check
+
             argv = shlex.split(command)
             if not argv:
                 return ToolResult(output="Security policy: empty command is not allowed", error=True)
