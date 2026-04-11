@@ -62,13 +62,16 @@ def test_agent_loads_system_prompt_from_package_resource(caplog):
     from bytia_kode.config import load_config
 
     with caplog.at_level("INFO"):
-        payload = load_identity()
+        kernel, runtime = load_identity()
 
-    assert payload["identity"]["name"] == "BytIA"
+    assert kernel["identity"]["name"] == "BytIA"
+    assert kernel["version"] == "12.3.0"
+    assert runtime["target"] == "KODE (Terminal TUI)"
     assert "BytIA OS loaded" in caplog.text
 
     prompt = load_system_prompt()
     assert "BytIA OS" in prompt
+    assert "Kernel v12.3.0" in prompt
     assert "Pedro Luis Cuevas Villarrubia" in prompt
 
     resource = resources.files("bytia_kode.prompts").joinpath("bytia.kernel.yaml")
