@@ -95,8 +95,9 @@ class Agent:
         self.providers = ProviderManager(config.provider)
         self.tools = ToolRegistry()
 
-        from bytia_kode.tools.registry import set_trusted_paths
-        set_trusted_paths([config.data_dir])
+        from bytia_kode.tools.registry import set_trusted_paths, set_workspace_root
+        set_trusted_paths([config.data_dir, Path.home() / "bytia"])
+        set_workspace_root(Path.cwd())
 
         self.skills = SkillLoader(skill_dirs=[config.skills_dir])
         self.skills.load_all()
@@ -144,7 +145,7 @@ class Agent:
         return None, ""
 
     def _apply_template_vars(self, payload: dict) -> dict:
-        """Resolve {{var}} placeholders in core_identity.yaml with runtime values."""
+        """Resolve {{var}} placeholders in kernel/runtime YAML with runtime values."""
         import copy
         payload = copy.deepcopy(payload)
 

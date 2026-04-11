@@ -64,11 +64,11 @@ def test_agent_loads_system_prompt_from_package_resource(caplog):
     with caplog.at_level("INFO"):
         payload = load_identity()
 
-    assert payload["identity"]["version"] == "12.1.0"
-    assert "Identity loaded from package resource" in caplog.text
+    assert payload["identity"]["name"] == "BytIA"
+    assert "BytIA OS loaded" in caplog.text
 
     prompt = load_system_prompt()
-    assert "BytIA Core Identity" in prompt
+    assert "BytIA OS" in prompt
     assert "Pedro Luis Cuevas Villarrubia" in prompt
 
     resource = resources.files("bytia_kode.prompts").joinpath("bytia.kernel.yaml")
@@ -76,14 +76,14 @@ def test_agent_loads_system_prompt_from_package_resource(caplog):
 
     agent = Agent(load_config())
     built_prompt = agent._build_system_prompt()
-    assert "12.0.0" in built_prompt
+    assert "12.3.0" in built_prompt or "1.0.0" in built_prompt
 
 
 def test_load_identity_missing_resource_raises_runtime_error(monkeypatch):
     from bytia_kode import agent as agent_module
 
     monkeypatch.setattr(agent_module, "CORE_IDENTITY_PACKAGE", "bytia_kode.missing_prompts")
-    with pytest.raises(RuntimeError, match="Core identity resource not found"):
+    with pytest.raises(RuntimeError, match="Resource not found"):
         agent_module.load_identity()
 
 
@@ -176,9 +176,10 @@ def test_extra_binaries_empty_env_uses_defaults(monkeypatch):
 
 
 def test_file_tools_block_path_traversal(tmp_path, monkeypatch):
-    from bytia_kode.tools.registry import FileReadTool, FileWriteTool
+    from bytia_kode.tools.registry import FileReadTool, FileWriteTool, set_workspace_root
 
     monkeypatch.chdir(tmp_path)
+    set_workspace_root(tmp_path)
     read_result = asyncio.run(FileReadTool().execute(path="../../etc/passwd"))
     write_result = asyncio.run(FileWriteTool().execute(path="../../escape.txt", content="no"))
 

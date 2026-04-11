@@ -4,7 +4,17 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
-## [0.5.6] - 2026-04-11
+## [0.5.6] - 2026-04-12
+
+### Fixed
+
+- **file_read sandbox bug** — Symlinked kernel/runtime YAML files resolved outside workspace via `.resolve()`, triggering "path escapes workspace" error. Fix: added `~/bytia/` as trusted path + `_WORKSPACE_ROOT` for stable path resolution regardless of CWD changes.
+- **`core_identity.yaml` removed** — Legacy v12.1.0 monolithic SP was still present but unused since RFC-001. Contradicted Kernel v12.3.0 (7 anchors vs 4, different protocol naming). Archived to `prompts/legacy/`.
+
+### Changed
+
+- `registry.py`: `_resolve_workspace_path()` uses `_WORKSPACE_ROOT` (set at startup) instead of `Path.cwd()` for relative path resolution. New `set_workspace_root()` function.
+- `agent.py`: Added `~/bytia/` as trusted path + calls `set_workspace_root()` at init. Updated docstring.
 
 
 ## v0.5.4 — RFC-001: BytIA OS Migration
