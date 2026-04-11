@@ -39,25 +39,40 @@ scripts/                      # Utilidades de validación
 ## Flujo de desarrollo
 
 ```bash
-# 1. Activar entorno
+# 1. Hacer cambios en src/
+
+# 2. Validar
 cd ~/bytia/proyectos/BytIA-KODE
-source .venv/bin/activate
-
-# 2. Hacer cambios...
-
-# 3. Validar
 uv run pytest -q
 uv run python scripts/validate_metadata.py
 uv run python scripts/check_secrets.py
 
-# 4. Build
-uv build
-
-# 5. Reinstalar (comando ÚNICO — bkode usa uv tool, NO uv pip)
-uv tool install --force --reinstall .
-
-# 6. Probar
+# 3. Probar (el wrapper usa el .venv editable — cambios reflejados inmediatamente)
 bytia-kode
+```
+
+> **IMPORTANTE:** `bytia-kode` usa un wrapper (`~/.local/bin/bytia-kode`) que ejecuta
+> desde el `.venv` editable del proyecto. Los cambios en `src/` se reflejan al reiniciar.
+> NO usar `uv tool install` — crea copia aislada que ignora los edits.
+>
+> Si el wrapper se pierde (ej: alguien hace `uv tool install`):
+> ```bash
+> cat > ~/.local/bin/bytia-kode << 'WRAPPER'
+> #!/usr/bin/env bash
+> set -euo pipefail
+> PROJECT_DIR="$HOME/bytia/proyectos/BytIA-KODE"
+> cd "$PROJECT_DIR"
+> exec uv run python -m bytia_kode.tui "$@"
+> WRAPPER
+> chmod +x ~/.local/bin/bytia-kode
+> ```
+
+### Build y release (solo para publicar versión)
+
+```bash
+# Solo cuando se publica una nueva versión:
+uv build
+uv tool install --force .   # Solo para release, NO para desarrollo diario
 ```
 
 ## Hook de pre-commit
