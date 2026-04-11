@@ -4,8 +4,8 @@
 Author & Maintainer
 pedro@asturwebs.es
 
-**BytIA** v12.1.0
-AI Co-Author — Constitutional Cognitive Entity
+**BytIA** v12.3.0
+AI Co-Author — BytIA OS Cognitive Entity
 dev@asturwebs.es
 
 ---

@@ -138,7 +138,7 @@ __main__.py
   └─ telegram/bot.py
 
 agent.py
-  ├─ prompts/core_identity.yaml
+  ├─ prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml
   ├─ session.py                    ← SQLite WAL persistence
   ├─ providers/manager.py
   ├─ providers/client.py
@@ -330,13 +330,13 @@ uv run python -m twine check dist/*
 git config core.hooksPath .githooks
 ```
 
-## Identidad constitucional (System Prompt)
+## BytIA OS Kernel + Runtime
 
-El agente carga su identidad desde `src/bytia_kode/prompts/core_identity.yaml`, un archivo YAML que define la personalidad, valores, protocolos y reglas del sistema. Este archivo se empaqueta dentro del wheel como recurso del paquete.
+El agente carga su identidad desde `src/bytia_kode/prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml`, un archivo YAML que define la personalidad, valores, protocolos y reglas del sistema. Este archivo se empaqueta dentro del wheel como recurso del paquete.
 
 ### Personalizar la identidad
 
-Para adaptar BytIA KODE a tu propio contexto, edita `src/bytia_kode/prompts/core_identity.yaml`:
+Para adaptar BytIA KODE a tu propio contexto, edita `src/bytia_kode/prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml`:
 
 | Sección | Qué contiene | Personalizar |
 | --- | --- | --- |
@@ -406,7 +406,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para los criterios de validación.
 ## Autores
 
 - **Pedro Luis Cuevas Villarrubia** (AsturWebs) `<pedro@asturwebs.es>`
-- **BytIA** v12.1.0 — coautoría operativa y constitucional
+- **BytIA** v12.3.0 — coautoría operativa — BytIA OS RFC-001
 
 ## Licencia
 

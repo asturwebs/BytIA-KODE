@@ -49,6 +49,7 @@
 - [x] ToolBlock widget (ejecución de tools colapsable)
 - [x] Agent callbacks (on_tool_call / on_tool_done)
 - [x] core_identity runtime section (auto-conocimiento del agente)
+- [x] RFC-001: BytIA OS Kernel + Runtime migration (v12.3.0 kernel, v1.0.0 runtime)
 - [x] Limpieza de peso muerto (3 deps, cli.py, memory/store.py)
 - [x] 15 tests pasando con pre-commit hook
 

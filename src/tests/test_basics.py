@@ -71,7 +71,7 @@ def test_agent_loads_system_prompt_from_package_resource(caplog):
     assert "BytIA Core Identity" in prompt
     assert "Pedro Luis Cuevas Villarrubia" in prompt
 
-    resource = resources.files("bytia_kode.prompts").joinpath("core_identity.yaml")
+    resource = resources.files("bytia_kode.prompts").joinpath("bytia.kernel.yaml")
     assert resource.is_file()
 
     agent = Agent(load_config())
