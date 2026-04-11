@@ -33,6 +33,33 @@ Doble causa:
 - `CONTEXT.md` — referencia SP actualizada
 - `docs/DEVELOPMENT.md` — estructura de prompts actualizada
 
+### Lección: uv tool install vs editable venv (CAUSA RAÍZ REAL)
+
+**Síntoma recurrente:** Cada vez que se edita el código fuente de Kode, los cambios NO se reflejan al arrancar `bytia-kode`. El modelo carga el SP viejo, las tools tienen bugs corregidos.
+
+**Diagnóstico inicial (incorrecto):** Se asumió que era `__pycache__` stale. Limpiar cache NO solucionó el problema.
+
+**Causa raíz real:** `bytia-kode` estaba instalado via `uv tool install`, que crea un entorno AISLADO en `~/.local/share/uv/tools/bytia-kode/` con una COPIA del código (no editable). Los edits en `src/` van al `.venv` del proyecto, que es una instalación completamente separada.
+
+```
+bytia-kode (binario) → ~/.local/share/uv/tools/bytia-kode/ → v0.5.3 COPIA
+nuestros edits        → ~/bytia/proyectos/BytIA-KODE/.venv/  → v0.5.4 EDITABLE
+```
+
+**Solución definitiva:** Wrapper `~/.local/bin/bytia-kode` reescrito para ejecutar desde el `.venv` editable:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+PROJECT_DIR="$HOME/bytia/proyectos/BytIA-KODE"
+cd "$PROJECT_DIR"
+exec uv run python -m bytia_kode.tui "$@"
+```
+
+Resultado: `bytia-kode` siempre usa el código fuente actual. Sin reinstalar, sin cache, sin sorpresas.
+
+**NUNCA hacer:** `uv tool install bytia-kode` o `uv tool upgrade bytia-kode` — sobreescribe el wrapper y crea copia aislada de nuevo.
+
 ---
 
 ## 2026-04-11 - Sesión 18: BashTool Shell Operator Validation (Hotfix)
