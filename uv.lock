@@ -208,7 +208,7 @@ wheels = [
 
 [[package]]
 name = "bytia-kode"
-version = "0.5.4"
+version = "0.5.6"
 source = { editable = "." }
 dependencies = [
     { name = "edge-tts" },
