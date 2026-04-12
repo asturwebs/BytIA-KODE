@@ -228,3 +228,65 @@ class TestPreviousSessionSummary:
         assert "Mensaje 4" in result
         assert "Mensaje 0" not in result
         assert "Mensaje 1" not in result
+
+
+class TestAssistantPersistence:
+    """Verify that assistant responses and reasoning are always persisted."""
+
+    def test_user_and_assistant_both_saved(self, store):
+        sid = store.create_session("tui")
+        store.append_message(sid, "user", "hola")
+        store.append_message(sid, "assistant", "que tal")
+        msgs = store.load_messages(sid)
+        assert len(msgs) == 2
+        assert msgs[0]["role"] == "user"
+        assert msgs[0]["content"] == "hola"
+        assert msgs[1]["role"] == "assistant"
+        assert msgs[1]["content"] == "que tal"
+
+    def test_reasoning_preserved_in_assistant_content(self, store):
+        sid = store.create_session("tui")
+        store.append_message(sid, "user", "explica python")
+        reasoning = "Debo explicar Python de forma concisa y honesta."
+        response = "Python es un lenguaje de programación interpretado."
+        stored = f"<reasoning>\n{reasoning}\n</reasoning>\n{response}"
+        store.append_message(sid, "assistant", stored)
+        msgs = store.load_messages(sid)
+        assert len(msgs) == 2
+        assert "<reasoning>" in msgs[1]["content"]
+        assert reasoning in msgs[1]["content"]
+        assert response in msgs[1]["content"]
+
+    def test_no_reasoning_still_saves(self, store):
+        sid = store.create_session("tui")
+        store.append_message(sid, "user", "hola")
+        store.append_message(sid, "assistant", "hola!")
+        msgs = store.load_messages(sid)
+        assert len(msgs) == 2
+        assert "<reasoning>" not in msgs[1]["content"]
+        assert msgs[1]["content"] == "hola!"
+
+    def test_empty_response_with_reasoning_saves(self, store):
+        sid = store.create_session("tui")
+        store.append_message(sid, "user", "test")
+        reasoning = "Pensando mucho sobre esto..."
+        stored = f"<reasoning>\n{reasoning}\n</reasoning>\n[razonamiento sin respuesta de texto]"
+        store.append_message(sid, "assistant", stored)
+        msgs = store.load_messages(sid)
+        assert reasoning in msgs[1]["content"]
+        assert "[razonamiento sin respuesta de texto]" in msgs[1]["content"]
+
+    def test_full_conversation_roundtrip(self, store):
+        sid = store.create_session("tui")
+        store.append_message(sid, "user", "pregunta 1")
+        store.append_message(sid, "assistant", "<reasoning>\nrazonando\n</reasoning>\nrespuesta 1")
+        store.append_message(sid, "user", "pregunta 2")
+        store.append_message(sid, "assistant", "respuesta 2")
+        store.append_message(sid, "user", "pregunta 3")
+        store.append_message(sid, "assistant", "respuesta 3")
+        msgs = store.load_messages(sid)
+        assert len(msgs) == 6
+        roles = [m["role"] for m in msgs]
+        assert roles == ["user", "assistant", "user", "assistant", "user", "assistant"]
+        meta = store.get_metadata(sid)
+        assert meta.message_count == 6
