@@ -443,6 +443,7 @@ class Agent:
                 self._cancel_event.clear()
                 all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
                 response_text = ""
+                reasoning_text = ""
                 tool_calls_accum: list = []
 
                 async for chunk_type, data in provider_client.chat_stream(
@@ -458,6 +459,7 @@ class Agent:
                         response_text += data
                         yield data
                     elif chunk_type == "reasoning" and isinstance(data, str):
+                        reasoning_text += data
                         yield ("reasoning", data)
                     elif chunk_type == "tool_calls" and isinstance(data, list):
                         tool_calls_accum = data
@@ -465,9 +467,12 @@ class Agent:
                     continue
 
                 msg_count_before = len(self.messages)
+                stored_content = response_text or "[razonamiento sin respuesta de texto]"
+                if reasoning_text:
+                    stored_content = f"<reasoning>\n{reasoning_text}\n</reasoning>\n{stored_content}"
                 self.messages.append(Message(
                     role="assistant",
-                    content=response_text or "[razonamiento sin respuesta de texto]",
+                    content=stored_content,
                     tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
                 ))
 
@@ -475,7 +480,7 @@ class Agent:
                 if self._current_session_id:
                     self._session_store.append_message(
                         self._current_session_id,
-                        role="assistant", content=response_text or "",
+                        role="assistant", content=stored_content,
                         tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
                     )
                     # Auto-title from first user message
