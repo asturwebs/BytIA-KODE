@@ -1,6 +1,6 @@
 # BytIA KODE - Development Log
 
-## 2026-04-12 - Sesión 20: Panic Buttons, Seguridad y Auto-Skills (v0.6.0)
+## 2026-04-12 - Sesión 23: Panic Buttons, Seguridad y Auto-Skills (v0.6.0)
 
 ### Contexto
 
@@ -103,7 +103,7 @@ Las 3 usan `_resolve_workspace_path()` sandbox y `asyncio.to_thread()` para I/O 
 
 ---
 
-## 2026-04-12 - Sesión 19: file_read Sandbox Fix + Legacy Cleanup
+## 2026-04-12 - Sesión 22: file_read Sandbox Fix + Legacy Cleanup
 
 ### Contexto
 
@@ -188,7 +188,7 @@ BytIA OS — Kernel v12.3.0 + Runtime v1.0.0
 
 ---
 
-## 2026-04-11 - Sesión 18: BashTool Shell Operator Validation (Hotfix)
+## 2026-04-11 - Sesión 20: BashTool Shell Operator Validation (Hotfix)
 
 ### Contexto
 
@@ -215,7 +215,7 @@ Nuevo método `_validate_command_safety()` en `BashTool`:
 
 ---
 
-## 2026-04-10 - Sesión 5: Constitución, Comunicación y Optimización
+## 2026-04-10 - Sesión 19: Constitución, Comunicación y Optimización
 
 ### Contexto
 
@@ -530,7 +530,7 @@ Auditoría completa del codebase para identificar código/peso muerto:
 
 ---
 
-## 2026-04-03 - Sesión 10b: Bot Telegram → Router + Guard sin modelo
+## 2026-04-03 - Sesión 11: Bot Telegram → Router + Guard sin modelo
 
 ### Bot migra de Ollama a router
 
@@ -555,7 +555,7 @@ Auditoría completa del codebase para identificar código/peso muerto:
 
 ---
 
-## 2026-04-04 - Sesión 11: Router Polling, ToolBlock, Auto-conocimiento
+## 2026-04-04 - Sesión 12: Router Polling, ToolBlock, Auto-conocimiento
 
 ### Router polling en StatusBar
 
@@ -612,7 +612,7 @@ Auditoría completa del codebase para identificar código/peso muerto:
 
 ---
 
-## 2026-04-06 - Sesión 12: Sesiones Persistentes (SQLite WAL)
+## 2026-04-06 - Sesión 13: Sesiones Persistentes (SQLite WAL)
 
 ### Objetivo
 
@@ -695,7 +695,7 @@ Revisión de alternativas (JSON + file locking vs SQLite WAL) por BytIA Gemini (
 
 ---
 
-## 2026-04-06 - Sesión 13: Session Awareness + Prompt Enhancement
+## 2026-04-06 - Sesión 14: Session Awareness + Prompt Enhancement
 
 ### Problema detectado
 
@@ -737,7 +737,7 @@ El agente (ejecutándose sobre Gemma 4 26B) declaró que NO tenía acceso autón
 
 ---
 
-## 2026-04-07 - Sesión 14: Infraestructura de Debug, Bugs y Multi-Workspace Context
+## 2026-04-07 - Sesión 15: Infraestructura de Debug, Bugs y Multi-Workspace Context
 
 ### Logging a archivo
 
@@ -808,7 +808,7 @@ Añadido al ROADMAP v0.5.2. Implementación pendiente.
 - `.env.example`: `LOG_FILE=`
 - `.gitignore`: `CONTEXT.md`
 
-## 2026-04-07 - Sesión 15: Debug, fixes y copiado
+## 2026-04-07 - Sesión 16: Debug, fixes y copiado
 
 ### Contexto
 
@@ -841,7 +841,7 @@ Sesión de validación y corrección post-v0.5.2. Verificación de todas las fea
 
 ---
 
-## 2026-04-07 - Sesión 16: TTS (Text-to-Speech) + Infra
+## 2026-04-07 - Sesión 17: TTS (Text-to-Speech) + Infra
 
 ### Contexto
 
@@ -900,7 +900,7 @@ Sesión de implementación de TTS en la TUI, debugging de errores Textual y arre
 
 ---
 
-## 2026-04-10 - Sesión 17: Memoria Persistente, Trusted Paths y Sandbox Expandida
+## 2026-04-10 - Sesión 18: Memoria Persistente, Trusted Paths y Sandbox Expandida
 
 ### Contexto
 
@@ -1001,7 +1001,7 @@ Instalación: `uv tool install graphifyy` (doble y). Requiere `EXTRA_BINARIES=gr
 
 ---
 
-## Session 6 — 2026-04-11: RFC-001 BytIA OS Migration
+## Sesión 21 — 2026-04-11: RFC-001 BytIA OS Migration
 
 ### Context
 Pedro + BytIA (Claude Code) + Grok collaborated on a constitutional audit that identified naming incoherence, verbosity, and missing directives in the v12.1.0 SP. Pedro authored RFC-001 defining the Kernel/Runtime architecture.
