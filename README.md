@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Release](https://img.shields.io/badge/release-0.6.0-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-82%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-101%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -49,6 +49,8 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 - **Sandbox hardening** — `cat`, `head`, `tail` eliminados de bash allowlist. Ahora `file_read` es la única vía de lectura de archivos.
 - **Session fixes** — `load_session_by_id` ya no crashea por type mismatch, y `_persisted_count` se actualiza correctamente (sin duplicados en SQLite).
 - **Telegram guard** — No apila mensajes mientras procesa (race condition corregida).
+- **Native exploration tools** — `grep`, `glob`, `tree` implementados en Python puro. El agente ya no necesita bash para explorar el codebase. GrepTool (regex + include filter), GlobTool (pattern matching), TreeTool (directory tree con tamaños).
+- **101 tests** — 19 tests nuevos cubriendo exploration tools y Panic Buttons.
 
 ## Novedades en v0.5.4
 
