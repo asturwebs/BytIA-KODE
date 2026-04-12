@@ -480,7 +480,6 @@ class Agent:
 
     def set_session(self, source: str = "tui", source_ref: str = "") -> str:
         """Set the current session. Creates or resumes if exists."""
-        self._session_store.cleanup_empty_sessions()
         session_id = f"{source}_{source_ref}" if source_ref else self._session_store.create_session(source, source_ref)
         if self._session_store.get_metadata(session_id):
             self.messages = self._load_messages_from_store(session_id)
