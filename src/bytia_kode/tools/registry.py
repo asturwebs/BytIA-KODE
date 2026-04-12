@@ -41,8 +41,8 @@ def set_workspace_root(root: Path) -> None:
     _WORKSPACE_ROOT = root.resolve()
 
 _DEFAULT_BINARIES = {
-    "ls", "pwd", "cat", "echo", "git", "grep", "find", "mkdir", "touch",
-    "mv", "cp", "rm", "head", "tail", "wc", "date", "chmod",
+    "ls", "pwd", "echo", "git", "grep", "find", "mkdir", "touch",
+    "mv", "cp", "rm", "wc", "date", "chmod",
     "curl", "wget", "scp", "ssh",
     "uv", "python", "python3", "pip", "pip3",
     "wsl",
@@ -185,7 +185,7 @@ class BashTool(Tool):
                 )
         return None
 
-    async def execute(self, command: str, timeout: int = 60, workdir: str = ".", **_) -> ToolResult:
+    async def execute(self, command: str, timeout: int = 60, workdir: str = ".", on_subprocess=None, **_) -> ToolResult:
         try:
             safety_check = self._validate_command_safety(command)
             if safety_check is not None:
@@ -208,13 +208,19 @@ class BashTool(Tool):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+            if on_subprocess:
+                on_subprocess(process)
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
             output = stdout.decode("utf-8", errors="replace")
             stderr_text = stderr.decode("utf-8", errors="replace")
             if stderr_text:
                 output += f"\nSTDERR:\n{stderr_text}"
+            if on_subprocess:
+                on_subprocess(None)
             return ToolResult(output=output[:50000], error=process.returncode != 0)
         except asyncio.TimeoutError:
+            if on_subprocess:
+                on_subprocess(None)
             return ToolResult(output=f"Command timed out after {timeout}s", error=True)
         except PermissionError as exc:
             return ToolResult(output=str(exc), error=True)
