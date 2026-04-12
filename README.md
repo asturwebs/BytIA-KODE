@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Release](https://img.shields.io/badge/release-0.6.0-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-101%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-106%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -52,6 +52,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 - **Native exploration tools** — `grep`, `glob`, `tree` implementados en Python puro. El agente ya no necesita bash para explorar el codebase. GrepTool (regex + include filter), GlobTool (pattern matching), TreeTool (directory tree con tamaños).
 - **101 tests** — 19 tests nuevos cubriendo exploration tools y Panic Buttons.
 - **`/session` command** — Muestra la sesión activa (ID + mensajes). También en Ctrl+P.
+- **Reasoning persistence** — El razonamiento del modelo se guarda en la sesión. Al cargar sesiones anteriores, ve su propio thinking previo.
 
 ## Novedades en v0.5.4
 

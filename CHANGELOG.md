@@ -20,6 +20,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - **Panic Buttons en menú Ctrl+P** — Interrupt y Kill añadidos al menú de comandos (22 items).
 - **Banner actualizado** — Muestra atajos de Panic Buttons: `Esc stop | Ctrl+K kill`.
 - **`/session` command** — Muestra sesión activa (ID + nº de mensajes). Disponible como comando y en Ctrl+P.
+- **Reasoning persistence** — El razonamiento/thinking del modelo se guarda en la sesión con tags `<reasoning>`. Al cargar una sesión anterior, el modelo ve su propio razonamiento previo, mejorando coherencia.
+- **106 tests** — 5 tests nuevos de persistencia de respuesta (user+assistant siempre guardados, reasoning preservado, roundtrip completo).
 
 ### Fixed
 
