@@ -374,6 +374,7 @@ class CommandMenuScreen(ModalScreen):
         ("\U0001f6d1  Kill agent", "kill_agent"),
         ("\U0001f4dd  New session", "new_session"),
         ("\U0001f4c3  List sessions", "list_sessions"),
+        ("\U0001f3f7  Current session info", "show_current_session"),
         ("\U0001f4c2  Load session", "load_session"),
         ("\u2715  Clear screen", "clear_screen"),
         ("\U0001f527  List tools", "show_tools"),
@@ -786,6 +787,10 @@ class BytIAKODEApp(App):
             )
         elif cmd == "/safe":
             self.action_toggle_safe_mode()
+        elif cmd == "/session":
+            sid = self.agent._current_session_id or "No active session"
+            n_msgs = len(self.agent.messages)
+            self._add_system_message(f"Session: {sid}\nMessages: {n_msgs}")
         elif cmd == "/cwd":
             self._add_system_message(f"CWD: {os.getcwd()}")
         elif cmd == "/context":
@@ -818,6 +823,7 @@ class BytIAKODEApp(App):
             ("/reset", "Reset conversation", "Ctrl+R"),
             ("/new", "New session", ""),
             ("/sessions", "List saved sessions", ""),
+            ("/session", "Show current session info", ""),
             ("/load <id>", "Load session", ""),
             ("/clear", "Clear screen", "Ctrl+L"),
             ("/model", "Show model info", "Ctrl+M"),
@@ -1073,6 +1079,11 @@ class BytIAKODEApp(App):
 
     def action_list_sessions(self):
         self._show_sessions()
+
+    def action_show_current_session(self):
+        sid = self.agent._current_session_id or "No active session"
+        n_msgs = len(self.agent.messages)
+        self._add_system_message(f"Session: {sid}\nMessages: {n_msgs}")
 
     def action_load_session(self):
         self._prompt_session_id()
