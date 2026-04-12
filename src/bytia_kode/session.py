@@ -147,24 +147,41 @@ class SessionStore:
         O(1) — only INSERT, no history rewrite.
         """
         tc_json = json.dumps(tool_calls) if tool_calls else None
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    """INSERT INTO messages
+                       (session_id, seq_num, role, content, tool_calls, tool_call_id, name)
+                       VALUES (
+                           ?,
+                           COALESCE((SELECT MAX(seq_num) FROM messages WHERE session_id = ?), 0) + 1,
+                           ?, ?, ?, ?, ?
+                       )""",
+                    (session_id, session_id, role, content, tc_json, tool_call_id, name),
+                )
+                conn.execute(
+                    """UPDATE sessions
+                       SET message_count = message_count + 1,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE session_id = ?""",
+                    (session_id,),
+                )
+        except Exception as e:
+            logger.error("Failed to append message to session %s: %s", session_id, e)
+
+    def cleanup_empty_sessions(self, max_age_hours: int = 24) -> int:
+        """Delete sessions with zero messages older than max_age_hours. Returns count deleted."""
         with self._connect() as conn:
-            conn.execute(
-                """INSERT INTO messages
-                   (session_id, seq_num, role, content, tool_calls, tool_call_id, name)
-                   VALUES (
-                       ?,
-                       COALESCE((SELECT MAX(seq_num) FROM messages WHERE session_id = ?), 0) + 1,
-                       ?, ?, ?, ?, ?
-                   )""",
-                (session_id, session_id, role, content, tc_json, tool_call_id, name),
+            cursor = conn.execute(
+                """DELETE FROM sessions
+                   WHERE message_count = 0
+                   AND created_at < datetime('now', ?)""",
+                (f"-{max_age_hours} hours",),
             )
-            conn.execute(
-                """UPDATE sessions
-                   SET message_count = message_count + 1,
-                       updated_at = CURRENT_TIMESTAMP
-                   WHERE session_id = ?""",
-                (session_id,),
-            )
+        deleted = cursor.rowcount
+        if deleted:
+            logger.info("Cleaned up %d empty sessions", deleted)
+        return deleted
 
     def load_messages(self, session_id: str) -> list[dict]:
         """Load all messages from a session, ordered by seq_num."""
