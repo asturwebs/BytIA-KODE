@@ -1084,9 +1084,7 @@ class BytIAKODEApp(App):
                 break
         if last_msg and last_msg.content:
             import re
-            code_blocks = re.findall(r"`[a-zA-Z0-9]*\
-(.*?)\
-`", last_msg.content, re.DOTALL)
+            code_blocks = re.findall(r"```[a-zA-Z0-9_+-]*\n?(.*?)```", last_msg.content, re.DOTALL)
             if code_blocks:
                 self.copy_to_clipboard(code_blocks[-1].strip())
                 self.notify("Code copied to clipboard!")

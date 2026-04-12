@@ -119,6 +119,7 @@ class Agent:
         # Session persistence
         self._session_store = session_store or SessionStore(config.data_dir / "sessions.db")
         self._current_session_id: str | None = None
+        self._persisted_count: int = 0
 
         # Register session tools (need store reference)
         self.tools.register(SessionListTool(self._session_store))
@@ -412,6 +413,11 @@ class Agent:
             return
 
         self.messages.append(Message(role="user", content=sanitized_message))
+        if self._current_session_id:
+            self._session_store.append_message(
+                self._current_session_id,
+                role="user", content=sanitized_message,
+            )
         provider_client = self.providers.get(provider)
         tool_defs = self.tools.get_tool_defs()
         await self._manage_context(provider_client)
@@ -443,12 +449,8 @@ class Agent:
                     tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
                 ))
 
-                # Auto-save: append user message + assistant response
+                # Auto-save: append assistant response (user message already saved before inference)
                 if self._current_session_id:
-                    self._session_store.append_message(
-                        self._current_session_id,
-                        role="user", content=sanitized_message,
-                    )
                     self._session_store.append_message(
                         self._current_session_id,
                         role="assistant", content=response_text or "",
@@ -478,37 +480,42 @@ class Agent:
 
     def set_session(self, source: str = "tui", source_ref: str = "") -> str:
         """Set the current session. Creates or resumes if exists."""
+        self._session_store.cleanup_empty_sessions()
         session_id = f"{source}_{source_ref}" if source_ref else self._session_store.create_session(source, source_ref)
         if self._session_store.get_metadata(session_id):
             self.messages = self._load_messages_from_store(session_id)
         else:
             session_id = self._session_store.create_session(source, source_ref)
         self._current_session_id = session_id
+        self._persisted_count = len(self.messages)
         logger.info("Session set: %s", session_id)
         return session_id
 
     def load_session_by_id(self, session_id: str) -> bool:
         """Load a specific session by ID, replacing current messages."""
-        messages = self._session_store.load_messages(session_id)
+        messages = self._load_messages_from_store(session_id)
         if not messages:
             logger.warning("Session not found: %s", session_id)
             return False
         self._current_session_id = session_id
-        self.messages: list[Message] = messages  # type: ignore[assignment]
+        self.messages = messages
+        self._persisted_count = len(self.messages)
         logger.info("Session loaded: %s (%d messages)", session_id, len(messages))
         return True
 
     def save_current_session(self) -> bool:
-        """Save current messages to the active session."""
+        """Save unsaved messages to the active session. Only appends new messages."""
         if not self._current_session_id:
             return False
-        for msg in self.messages:
+        unsaved = self.messages[self._persisted_count:]
+        for msg in unsaved:
             self._session_store.append_message(
                 self._current_session_id,
                 msg.role, msg.content,
                 msg.tool_calls, msg.tool_call_id, msg.name,
             )
-        logger.debug("Session saved: %s", self._current_session_id)
+        self._persisted_count = len(self.messages)
+        logger.debug("Session saved: %s (%d new messages)", self._current_session_id, len(unsaved))
         return True
 
     def list_sessions(self, source: str | None = None, limit: int = 20) -> list[dict]:
