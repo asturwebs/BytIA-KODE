@@ -51,6 +51,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 - **Telegram guard** — No apila mensajes mientras procesa (race condition corregida).
 - **Native exploration tools** — `grep`, `glob`, `tree` implementados en Python puro. El agente ya no necesita bash para explorar el codebase. GrepTool (regex + include filter), GlobTool (pattern matching), TreeTool (directory tree con tamaños).
 - **101 tests** — 19 tests nuevos cubriendo exploration tools y Panic Buttons.
+- **`/session` command** — Muestra la sesión activa (ID + mensajes). También en Ctrl+P.
 
 ## Novedades en v0.5.4
 

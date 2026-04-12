@@ -71,6 +71,7 @@ Implementación completa de cancelación de dos niveles:
 - `8b20353` feat: v0.6.0 — Telegram panic buttons, auto-skills, docs bump
 - `679a791` feat: native GrepTool, GlobTool, TreeTool + Panic Buttons in Ctrl+P menu
 - `5e2aea7` feat: native exploration tools + 19 tests (101 total)
+- `7f1c2ff` feat: add /session command and current session in Ctrl+P menu
 
 ### Native Exploration Tools (añadido en misma sesión)
 
