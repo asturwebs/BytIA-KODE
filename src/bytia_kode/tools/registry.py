@@ -574,6 +574,153 @@ class ReadContextTool(Tool):
             return ToolResult(output=f"Failed to read context: {exc}", error=True)
 
 
+            return ToolResult(output=f"Failed to read context: {exc}", error=True)
+
+
+class GrepTool(Tool):
+    name = "grep"
+    description = "Search file contents for a pattern. Returns matching lines with file paths and line numbers."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "pattern": {"type": "string", "description": "Regex pattern to search for"},
+            "path": {"type": "string", "description": "File or directory to search in (default: workspace)"},
+            "include": {"type": "string", "description": "Glob pattern for file names (e.g. '*.py', '*.{ts,tsx}')"},
+        },
+        "required": ["pattern"],
+    }
+
+    async def execute(self, pattern: str, path: str = ".", include: str = "", **_) -> ToolResult:
+        try:
+            import re as _re
+            resolved = _resolve_workspace_path(path)
+            if not resolved.is_dir():
+                lines = await asyncio.to_thread(self._search_file, resolved, pattern)
+                output = "\n".join(lines) if lines else "No matches found."
+                return ToolResult(output=output)
+            glob_pattern = include or "*"
+            results = []
+            for file_path in sorted(resolved.rglob(glob_pattern)):
+                if file_path.is_file() and not any(p.startswith(".") for p in file_path.relative_to(resolved).parts):
+                    if file_path.stat().st_size > 1_000_000:
+                        continue
+                    lines = await asyncio.to_thread(self._search_file, file_path, pattern)
+                    results.extend(lines)
+                if len(results) > 200:
+                    results.append("... (truncated at 200 matches)")
+                    break
+            output = "\n".join(results) if results else "No matches found."
+            return ToolResult(output=output)
+        except PermissionError as exc:
+            return ToolResult(output=str(exc), error=True)
+        except Exception as exc:
+            return ToolResult(output=str(exc), error=True)
+
+    @staticmethod
+    def _search_file(file_path: Path, pattern: str) -> list[str]:
+        import re as _re
+        results = []
+        try:
+            regex = _re.compile(pattern, _re.IGNORECASE)
+            text = file_path.read_text(errors="replace")
+            for i, line in enumerate(text.splitlines(), 1):
+                if regex.search(line):
+                    results.append(f"{file_path}:{i}: {line.strip()[:200]}")
+        except Exception:
+            pass
+        return results
+
+
+class GlobTool(Tool):
+    name = "glob"
+    description = "Find files matching a pattern. Returns file paths relative to workspace."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "pattern": {"type": "string", "description": "Glob pattern (e.g. '**/*.py', 'src/**/*.ts')"},
+            "path": {"type": "string", "description": "Directory to search in (default: workspace)"},
+        },
+        "required": ["pattern"],
+    }
+
+    async def execute(self, pattern: str, path: str = ".", **_) -> ToolResult:
+        try:
+            resolved = _resolve_workspace_path(path)
+            if not resolved.is_dir():
+                return ToolResult(output=f"Not a directory: {path}", error=True)
+            matches = []
+            for p in sorted(resolved.glob(pattern)):
+                rel = p.relative_to(resolved)
+                matches.append(f"{rel}" + ("/" if p.is_dir() else ""))
+                if len(matches) >= 500:
+                    matches.append("... (truncated at 500 results)")
+                    break
+            output = "\n".join(matches) if matches else "No files found matching pattern."
+            return ToolResult(output=output)
+        except PermissionError as exc:
+            return ToolResult(output=str(exc), error=True)
+        except Exception as exc:
+            return ToolResult(output=str(exc), error=True)
+
+
+class TreeTool(Tool):
+    name = "tree"
+    description = "Show directory structure as a tree. Returns file and folder hierarchy."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Directory to show (default: workspace)"},
+            "depth": {"type": "integer", "description": "Max depth (default: 3)"},
+        },
+    }
+
+    async def execute(self, path: str = ".", depth: int = 3, **_) -> ToolResult:
+        try:
+            resolved = _resolve_workspace_path(path)
+            if not resolved.is_dir():
+                return ToolResult(output=f"Not a directory: {path}", error=True)
+            lines = await asyncio.to_thread(self._build_tree, resolved, resolved, depth, 0)
+            output = "\n".join(lines) if lines else "Empty directory."
+            return ToolResult(output=output)
+        except PermissionError as exc:
+            return ToolResult(output=str(exc), error=True)
+        except Exception as exc:
+            return ToolResult(output=str(exc), error=True)
+
+    @staticmethod
+    def _build_tree(base: Path, current: Path, max_depth: int, current_depth: int) -> list[str]:
+        if current_depth > max_depth:
+            return []
+        results = []
+        try:
+            entries = sorted(current.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
+        except PermissionError:
+            return []
+        for i, entry in enumerate(entries):
+            name = entry.name
+            if name.startswith(".") or name == "__pycache__":
+                continue
+            is_last = i == len(entries) - 1
+            connector = "└── " if is_last else "├── "
+            prefix = "    " * current_depth
+            if entry.is_dir():
+                results.append(f"{prefix}{connector}{name}/")
+                results.extend(TreeTool._build_tree(base, entry, max_depth, current_depth + 1))
+            else:
+                size = entry.stat().st_size
+                if size > 1024 * 1024:
+                    size_str = f" ({size // (1024*1024)}MB)"
+                elif size > 1024:
+                    size_str = f" ({size // 1024}KB)"
+                else:
+                    size_str = ""
+                results.append(f"{prefix}{connector}{name}{size_str}")
+            if len(results) > 300:
+                results.append("... (truncated)")
+                break
+        return results
+
+
 class ToolRegistry:
     """Registry of available tools."""
 
@@ -582,7 +729,7 @@ class ToolRegistry:
         self._register_defaults()
 
     def _register_defaults(self):
-        for tool_cls in [BashTool, FileReadTool, FileWriteTool, FileEditTool, WebFetchTool, ReadContextTool]:
+        for tool_cls in [BashTool, FileReadTool, FileWriteTool, FileEditTool, WebFetchTool, ReadContextTool, GrepTool, GlobTool, TreeTool]:
             self.register(tool_cls())
 
     def register(self, tool: Tool):
