@@ -17,8 +17,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [
 - **Auto-selección de skills** — `get_relevant()` conectado al system prompt. Skills relevantes al query del usuario se inyectan automáticamente con su contenido completo. Antes solo se inyectaba el summary de todas las skills.
 - **BashTool subprocess tracking** — `on_subprocess` callback registra el proceso activo, permitiendo kill desde Panic Buttons.
 - **Native exploration tools** — `GrepTool`, `GlobTool`, `TreeTool` implementadas en Python puro, sin depender de bash allowlist. GrepTool busca regex en archivos con filtro include. GlobTool encuentra archivos por patrón. TreeTool muestra estructura de directorios con tamaños y control de profundidad.
-- **Panic Buttons en menú Ctrl+P** — Interrupt y Kill añadidos al menú de comandos (21 items).
+- **Panic Buttons en menú Ctrl+P** — Interrupt y Kill añadidos al menú de comandos (22 items).
 - **Banner actualizado** — Muestra atajos de Panic Buttons: `Esc stop | Ctrl+K kill`.
+- **`/session` command** — Muestra sesión activa (ID + nº de mensajes). Disponible como comando y en Ctrl+P.
 
 ### Fixed
 
