@@ -429,8 +429,8 @@ class BytIAKODEApp(App):
         Binding("f3", "switch_provider", "Provider", show=False, priority=True),
         Binding("up", "history_up", "History prev", show=False),
         Binding("down", "history_down", "History next", show=False),
-        Binding("escape", "interrupt_agent", "Interrupt", show=False, priority=True),
-        Binding("ctrl+k", "kill_agent", "Kill", show=False, priority=True),
+        Binding("escape", "interrupt_agent", "Interrupt", show=True, priority=True),
+        Binding("ctrl+k", "kill_agent", "Kill agent", show=True, priority=True),
     ]
 
     is_processing: reactive[bool] = reactive(False)
@@ -518,7 +518,7 @@ class BytIAKODEApp(App):
         bk_status = f"[green]B-KODE.md[/]" if self.agent._bkode_path else "[dim]no B-KODE.md[/]"
         chat.mount(Static(
             Text.from_markup(
-                f"  {bk_status} | v{__version__} | Ctrl+P menu | /context | Shift+Drag select"
+                f"  {bk_status} | v{__version__} | Ctrl+P menu | Esc stop | Ctrl+K kill | /context"
             ),
             id="info-line",
         ))

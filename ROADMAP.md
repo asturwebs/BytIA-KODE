@@ -160,13 +160,16 @@
 - [x] **Auto-selección de skills** — `get_relevant()` conectado a `_build_system_prompt()`
 - [x] **Sandbox bypass fix** — `cat`, `head`, `tail` eliminados de bash allowlist
 - [x] **Session persistence fixes** — `load_session_by_id` type mismatch + `_persisted_count`
+- [x] **Native exploration tools** — GrepTool, GlobTool, TreeTool en Python puro (no dependen de bash)
+- [x] **Panic Buttons en Ctrl+P** — Interrupt + Kill en menú (21 items)
+- [x] **19 tests nuevos** — 101 total
 
 ### Pendiente
 
 - [ ] PromptTextArea: Shift+Enter/Ctrl+Enter = newline (Textual Key no expone modifiers de forma fiable)
 - [ ] Bash allowlist diferenciada por safe_mode
 - [ ] Safe mode backend real (confirmación de comandos destructivos)
-- [ ] Tools de exploración: `grep`, `tree`, `glob` nativos en Python
+- [x] ~~Tools de exploración: `grep`, `tree`, `glob` nativos en Python~~ (hecho en v0.6.0 — GrepTool, GlobTool, TreeTool)
 - [ ] Auto-fallback de providers (circuit breaker)
 
 ## v0.6.1 — Skills Avanzadas y Multi-agente

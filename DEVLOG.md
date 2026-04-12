@@ -68,6 +68,21 @@ Implementación completa de cancelación de dos niveles:
 - `9e6cc4b` fix: session persistence bugs + code block extraction regex
 - `2b63ec8` fix: remove auto-cleanup of empty sessions
 - `462d9b1` feat: Panic Buttons (Escape + Ctrl+K) + sandbox bypass fix
+- `8b20353` feat: v0.6.0 — Telegram panic buttons, auto-skills, docs bump
+- `679a791` feat: native GrepTool, GlobTool, TreeTool + Panic Buttons in Ctrl+P menu
+- `5e2aea7` feat: native exploration tools + 19 tests (101 total)
+
+### Native Exploration Tools (añadido en misma sesión)
+
+El agente dependía de bash (`grep`, `find`) para explorar el codebase, limitado por allowlist (24 binarios) y sandbox. Ahora tiene 3 tools nativas en Python:
+
+- **GrepTool** — Regex search en archivos. Soporta `include` glob filter. Cap: 200 matches, 1MB archivos.
+- **GlobTool** — File pattern matching con `pathlib.glob`. Cap: 500 resultados.
+- **TreeTool** — Directory hierarchy con tamaños (KB/MB), control de profundidad. Filtra `__pycache__` y hidden files. Cap: 300 líneas.
+
+Las 3 usan `_resolve_workspace_path()` sandbox y `asyncio.to_thread()` para I/O no bloqueante. Registradas en `ToolRegistry._register_defaults()`.
+
+19 tests nuevos cubriendo las 3 tools + Panic Buttons. Total: 101 tests.
 
 ---
 
