@@ -1,8 +1,10 @@
 """Agentic conversation loop - the brain."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import threading
 from importlib import resources
 from pathlib import Path
 from textwrap import dedent
@@ -115,11 +117,16 @@ class Agent:
         self._initialized = False
         self.on_tool_call: list = []  # callbacks: fn(tool_name: str)
         self.on_tool_done: list = []  # callbacks: fn(tool_name: str, output: str, error: bool)
+        self.on_subprocess: list = []  # callbacks: fn(process: asyncio.subprocess.Process | None)
 
         # Session persistence
         self._session_store = session_store or SessionStore(config.data_dir / "sessions.db")
         self._current_session_id: str | None = None
         self._persisted_count: int = 0
+
+        # Cancellation support (Panic Buttons)
+        self._cancel_event = threading.Event()
+        self._active_subprocess: asyncio.subprocess.Process | None = None
 
         # Register session tools (need store reference)
         self.tools.register(SessionListTool(self._session_store))
@@ -376,7 +383,10 @@ class Agent:
             logger.info("Tool call: %s(%s)", tool_name, arguments)
             for cb in self.on_tool_call:
                 cb(tool_name)
-            result: ToolResult = await self.tools.execute(tool_name, arguments)
+            result: ToolResult = await self.tools.execute(
+                tool_name, arguments,
+                on_subprocess=lambda p: [cb(p) for cb in self.on_subprocess],
+            )
             for cb in self.on_tool_done:
                 cb(tool_name, result.output, result.error)
             self.messages.append(Message(
@@ -424,6 +434,7 @@ class Agent:
 
         try:
             for _iteration in range(self.max_iterations):
+                self._cancel_event.clear()
                 all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
                 response_text = ""
                 tool_calls_accum: list = []
@@ -434,6 +445,9 @@ class Agent:
                     temperature=self.config.llm_temperature,
                     max_tokens=self.config.llm_max_tokens,
                 ):
+                    if self._cancel_event.is_set():
+                        yield "\n[interrupted]"
+                        break
                     if chunk_type == "text" and isinstance(data, str):
                         response_text += data
                         yield data
@@ -441,6 +455,8 @@ class Agent:
                         yield ("reasoning", data)
                     elif chunk_type == "tool_calls" and isinstance(data, list):
                         tool_calls_accum = data
+                else:
+                    continue
 
                 msg_count_before = len(self.messages)
                 self.messages.append(Message(
@@ -463,6 +479,9 @@ class Agent:
                         )
 
                 if not tool_calls_accum:
+                    break
+
+                if self._cancel_event.is_set():
                     break
 
                 await self._handle_tool_calls(tool_calls_accum)
@@ -545,6 +564,25 @@ class Agent:
         """Clear conversation history. Note: does NOT delete the session from disk."""
         self.messages.clear()
         self._current_session_id = None
+
+    def interrupt(self) -> None:
+        """Signal the agentic loop to stop after current chunk."""
+        self._cancel_event.set()
+
+    async def kill(self) -> None:
+        """Nuclear cancel: interrupt + kill subprocess + reset state."""
+        self._cancel_event.set()
+        if self._active_subprocess and self._active_subprocess.returncode is None:
+            try:
+                self._active_subprocess.terminate()
+                await asyncio.wait_for(self._active_subprocess.wait(), timeout=2.0)
+            except (ProcessLookupError, asyncio.TimeoutError):
+                try:
+                    self._active_subprocess.kill()
+                except ProcessLookupError:
+                    pass
+            self._active_subprocess = None
+        self._cancel_event.clear()
 
     async def close(self):
         await self.providers.close_all()

@@ -427,6 +427,8 @@ class BytIAKODEApp(App):
         Binding("f3", "switch_provider", "Provider", show=False, priority=True),
         Binding("up", "history_up", "History prev", show=False),
         Binding("down", "history_down", "History next", show=False),
+        Binding("escape", "interrupt_agent", "Interrupt", show=False, priority=True),
+        Binding("ctrl+k", "kill_agent", "Kill", show=False, priority=True),
     ]
 
     is_processing: reactive[bool] = reactive(False)
@@ -441,6 +443,7 @@ class BytIAKODEApp(App):
         self.agent = Agent(self.config)
         self.agent.on_tool_call.append(self._on_agent_tool_call)
         self.agent.on_tool_done.append(self._on_agent_tool_done)
+        self.agent.on_subprocess.append(self._on_agent_subprocess)
         self._history: list[str] = []
         self._history_pos = -1
         self._spinner_timer = None
@@ -454,6 +457,9 @@ class BytIAKODEApp(App):
         chat.mount(ToolBlock(tool_name, output, error=error))
         chat.scroll_end(animate=False)
         self.set_timer(0.5, lambda: self.query_one(ActivityIndicator).set_status("thinking"))
+
+    def _on_agent_subprocess(self, process):
+        self.agent._active_subprocess = process
 
     async def _play_and_update(self, btn_id: str, button: Button) -> None:
         await play_speech(self._audio_content[btn_id])
@@ -1016,6 +1022,23 @@ class BytIAKODEApp(App):
     def action_reset_conversation(self):
         self.agent.reset()
         self._add_system_message("Conversation reset.")
+
+    def action_interrupt_agent(self):
+        if self.is_processing:
+            self.agent.interrupt()
+            self._add_system_message("Interrupting...")
+
+    async def action_kill_agent(self):
+        if self.is_processing:
+            await self.agent.kill()
+            self._add_system_message("Killed. Session preserved.")
+            chat = self.query_one("#chat-area", VerticalScroll)
+            for child in chat.children:
+                if isinstance(child, Static) and getattr(child, "id", None) == "streaming-output":
+                    child.remove()
+                    break
+            self.is_processing = False
+            self._stop_spinner()
 
     def action_clear_screen(self):
         chat = self.query_one("#chat-area", VerticalScroll)
