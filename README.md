@@ -1,8 +1,8 @@
-# BytIA KODE v0.5.4
+# BytIA KODE v0.6.0
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.5.4-yellow.svg)
+![Release](https://img.shields.io/badge/release-0.6.0-yellow.svg)
 ![Tests](https://img.shields.io/badge/tests-82%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
@@ -36,11 +36,19 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.5.4`
+> Release actual: `0.6.0`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+## Novedades en v0.6.0
+
+- **Panic Buttons** — Cancelación de dos niveles: `Escape` interrumpe la generación, `Ctrl+K` hace kill nuclear (cancela + mata subprocess + limpia). Telegram: `/stop` y `/kill`.
+- **Auto-selección de skills** — Las skills relevantes al query del usuario se inyectan automáticamente en el system prompt con contenido completo.
+- **Sandbox hardening** — `cat`, `head`, `tail` eliminados de bash allowlist. Ahora `file_read` es la única vía de lectura de archivos.
+- **Session fixes** — `load_session_by_id` ya no crashea por type mismatch, y `_persisted_count` se actualiza correctamente (sin duplicados en SQLite).
+- **Telegram guard** — No apila mensajes mientras procesa (race condition corregida).
 
 ## Novedades en v0.5.4
 
@@ -60,7 +68,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 - **Multi-workspace context** — CONTEXT.md auto-generado por proyecto. El agente detecta lenguaje, estructura, git y herramientas del workspace actual.
 - **Logging a archivo** — Logs rotativos en `~/.bytia-kode/logs/bytia-kode.log` (1MB, 3 backups).
 - **Copiar respuestas** — `Ctrl+X` copia último bloque de código, `Ctrl+Shift+C` copia respuesta completa.
-- **Panic Buttons** (pendiente) — `Escape` para interrumpir, `Ctrl+K` para kill. Ver [issue #1](https://github.com/asturwebs/BytIA-KODE/issues/1).
+- **Panic Buttons** — `Escape` para interrumpir, `Ctrl+K` para kill. Implementado en v0.6.0.
 
 ## Novedades en v0.5.1
 

@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.5.3 (Alpha estable)
+## Estado actual: v0.6.0 (Alpha estable)
 
 ### Completado
 
@@ -128,15 +128,15 @@
 
 ### Panic Buttons (Interrupt + Kill)
 
-- [ ] **Interrupt** — Para generación/tool actual, agente sigue vivo
+- [x] **Interrupt** — Para generación/tool actual, agente sigue vivo
   - TUI: `Escape` (estándar: Claude Code, VS Code)
   - Telegram: `/stop`
-  - Requiere: `asyncio.Event` en Agent, cancelación de stream LLM, kill subprocess BashTool
-- [ ] **Kill** — Nuclear: cancela procesamiento + reset + cleanup total
+  - Implementado: `threading.Event` en Agent, cancelación en stream loop y pre-tool
+- [x] **Kill** — Nuclear: cancela procesamiento + kill subprocess + cleanup widgets
   - TUI: `Ctrl+K`
   - Telegram: `/kill`
-  - Requiere: referencia al Worker de Textual, tracking de subprocesses, cleanup completo
-- [ ] Guard de Telegram: no apilar mensajes mientras se procesa (race condition actual)
+  - Implementado: `Agent.kill()` con terminate/kill del subprocess activo
+- [x] Guard de Telegram: no apilar mensajes mientras se procesa (`_processing` set)
 - [ ] `AgentCancelledError` con cleanup parcial (respuestas streaming, ToolBlock state)
 - [ ] Tests de cancelación: interrupt mid-stream, interrupt mid-tool, kill durante bash
 
@@ -151,9 +151,17 @@
 - [ ] Test: ToolBlock muestra output de tools
 - [ ] Test: on_mount crea sesión y detecta modelo
 
-## v0.6.0 — Skills Inteligentes y Multi-agente
+## v0.6.0 — Skills Inteligentes, Panic Buttons y Seguridad (COMPLETADO)
 
-**Objetivo:** Resolver issues menores pendientes y mejorar UX.
+### Completado en v0.6.0
+
+- [x] **Panic Buttons** — Interrupt (Escape/`/stop`) + Kill (Ctrl+K/`/kill`)
+- [x] **Telegram guard** — No apila mensajes mientras procesa
+- [x] **Auto-selección de skills** — `get_relevant()` conectado a `_build_system_prompt()`
+- [x] **Sandbox bypass fix** — `cat`, `head`, `tail` eliminados de bash allowlist
+- [x] **Session persistence fixes** — `load_session_by_id` type mismatch + `_persisted_count`
+
+### Pendiente
 
 - [ ] PromptTextArea: Shift+Enter/Ctrl+Enter = newline (Textual Key no expone modifiers de forma fiable)
 - [ ] Bash allowlist diferenciada por safe_mode
@@ -161,14 +169,12 @@
 - [ ] Tools de exploración: `grep`, `tree`, `glob` nativos en Python
 - [ ] Auto-fallback de providers (circuit breaker)
 
-## v0.6.0 — Skills Inteligentes y Multi-agente
+## v0.6.1 — Skills Avanzadas y Multi-agente
 
 **Objetivo:** Skills autónomas y equipo de desarrollo virtual.
 
 ### Skills avanzadas
-- [ ] Auto-selección de skills (cargar solo relevantes al query actual)
-  - `get_relevant()` existe en SkillLoader pero NO se invoca en `_build_system_prompt()`
-  - Scoring: trigger 3pt, description 2pt, content 1pt (ya diseñado)
+- [x] ~~Auto-selección de skills~~ (hecho en v0.6.0 — `get_relevant()` conectado al SP)
 - [ ] Tools dinámicas en skills (scripts en `skills/<name>/scripts/` auto-registrados)
 - [ ] `write_skill` tool para que el agente cree skills programáticamente
 - [ ] Skill como sub-agente (SP propio dentro de la skill)

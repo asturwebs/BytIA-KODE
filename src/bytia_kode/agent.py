@@ -229,6 +229,12 @@ class Agent:
         skill_summary = self.skills.skill_summary()
         if skill_summary:
             parts.append(skill_summary)
+        last_user = next((m.content for m in reversed(self.messages) if m.role == "user"), "")
+        if last_user:
+            relevant = self.skills.get_relevant(last_user)
+            for skill in relevant:
+                if skill.instructions:
+                    parts.append(f"# Skill: {skill.name}\n{skill.instructions}")
         session_context = self._get_previous_session_summary()
         if session_context:
             parts.append(session_context)

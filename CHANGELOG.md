@@ -4,6 +4,40 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.6.0] - 2026-04-12
+
+### Added
+
+- **Panic Buttons (#1)** — Cancelación de dos niveles para el agente:
+  - **Interrupt** — `Escape` (TUI) / `/stop` (Telegram): para generación/tool actual, agente sigue vivo
+  - **Kill** — `Ctrl+K` (TUI) / `/kill` (Telegram): cancelación nuclear + kill subprocess + cleanup de widgets
+  - `Agent.interrupt()` / `Agent.kill()` — mecanismo basado en `threading.Event` + subprocess tracking
+  - Cancelación checkeada en cada chunk del stream SSE y antes de ejecutar tool calls
+- **Telegram guard** — No apila mensajes mientras procesa (race condition previa). Responde con aviso de usar `/stop`.
+- **Auto-selección de skills** — `get_relevant()` conectado al system prompt. Skills relevantes al query del usuario se inyectan automáticamente con su contenido completo. Antes solo se inyectaba el summary de todas las skills.
+- **BashTool subprocess tracking** — `on_subprocess` callback registra el proceso activo, permitiendo kill desde Panic Buttons.
+
+### Fixed
+
+- **`load_session_by_id` crash** — Asignaba `list[dict]` a `list[Message]` (type mismatch). Ahora usa `_load_messages_from_store()` que convierte dicts a objetos Message.
+- **`_persisted_count` no actualizado al cargar sesión** — Causaba re-inserción masiva de mensajes en SQLite. Ahora se actualiza en `load_session_by_id()`.
+- **Regex code blocks** — `action_copy_last_code` no capturaba bloques sin language tag ni con guiones (`c++`, `objective-c`). Fix: `[a-zA-Z0-9_+-]*\n?`.
+- **Sandbox bypass** — `cat`, `head`, `tail` eliminados de bash allowlist. Permitían leer cualquier archivo saltándose el sandbox de `file_read`. Ahora `file_read` es la única vía de lectura.
+- **Session auto-cleanup removido** — Las sesiones persisten indefinidamente hasta borrado manual. El método `cleanup_empty_sessions()` queda disponible para uso manual.
+
+### Changed
+
+- `_build_system_prompt()` — Inyecta skills relevantes al query (hasta 5) con contenido completo, no solo summary.
+- BashTool `execute()` — Nuevo parámetro `on_subprocess` para tracking del proceso activo.
+- `_DEFAULT_BINARIES` — 27 → 24 binarios (eliminados `cat`, `head`, `tail`).
+- `_handle_tool_calls()` — Pasa callback `on_subprocess` a `execute()`.
+- Telegram `Bot._chat()` — Guard con `_processing` set para evitar mensajes concurrentes.
+- Agent `__init__` — `_cancel_event` (threading.Event), `_active_subprocess`, `on_subprocess` callback list.
+
+### Tests
+
+- 82 passed (sin cambios — las features nuevas son de integración TUI/Telegram).
+
 ## [0.5.6] - 2026-04-12
 
 ### Fixed
