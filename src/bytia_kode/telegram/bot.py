@@ -20,6 +20,7 @@ class TelegramBot:
         self.config = config
         self.session_store = SessionStore(config.data_dir / "sessions.db")
         self._agents: dict[str, Agent] = {}  # chat_id -> Agent
+        self._processing: set[str] = set()  # chat_ids currently processing
         self.app = Application.builder().token(config.telegram.bot_token).build()
         self._setup_handlers()
 
@@ -40,6 +41,8 @@ class TelegramBot:
     def _setup_handlers(self):
         self.app.add_handler(CommandHandler("start", self._start))
         self.app.add_handler(CommandHandler("reset", self._reset))
+        self.app.add_handler(CommandHandler("stop", self._stop))
+        self.app.add_handler(CommandHandler("kill", self._kill))
         self.app.add_handler(CommandHandler("help", self._help))
         self.app.add_handler(CommandHandler("model", self._model))
         self.app.add_handler(CommandHandler("sessions", self._sessions))
@@ -77,6 +80,35 @@ class TelegramBot:
         agent = self._get_agent(str(update.effective_user.id))
         agent.reset()
         await update.message.reply_text("Conversation reset.")
+
+    async def _stop(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not update.message or not update.effective_user:
+            return
+        if not self._is_allowed(update.effective_user.id):
+            await self._deny(update)
+            return
+        chat_id = str(update.effective_user.id)
+        if chat_id in self._processing:
+            agent = self._get_agent(chat_id)
+            agent.interrupt()
+            await update.message.reply_text("Interrupting...")
+        else:
+            await update.message.reply_text("Nothing to stop.")
+
+    async def _kill(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not update.message or not update.effective_user:
+            return
+        if not self._is_allowed(update.effective_user.id):
+            await self._deny(update)
+            return
+        chat_id = str(update.effective_user.id)
+        if chat_id in self._processing:
+            agent = self._get_agent(chat_id)
+            await agent.kill()
+            self._processing.discard(chat_id)
+            await update.message.reply_text("Killed. Session preserved.")
+        else:
+            await update.message.reply_text("Nothing to kill.")
 
     async def _help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not update.message or not update.effective_user:
@@ -150,6 +182,11 @@ class TelegramBot:
         logger.info("TG [%s]", update.effective_user.id)
         chat_id = str(update.effective_user.id)
 
+        if chat_id in self._processing:
+            await update.message.reply_text("Still processing previous message. Use /stop to interrupt.")
+            return
+
+        self._processing.add(chat_id)
         try:
             response_text = ""
             agent = self._get_agent(chat_id)
@@ -169,6 +206,8 @@ class TelegramBot:
         except Exception as exc:
             logger.error("Chat error: %s", exc)
             await update.message.reply_text("Error interno en el procesamiento")
+        finally:
+            self._processing.discard(chat_id)
 
     def run(self):
         logger.info("Starting BytIA KODE Telegram bot...")

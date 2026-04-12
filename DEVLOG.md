@@ -1,5 +1,76 @@
 # BytIA KODE - Development Log
 
+## 2026-04-12 - Sesión 20: Panic Buttons, Seguridad y Auto-Skills (v0.6.0)
+
+### Contexto
+
+Revisión integral del proyecto con auditoría de seguridad (Semgrep), code review (subagent), y análisis estructural (Serena). Se identificaron y corrigieron bugs críticos, se cerró un agujero de seguridad, y se completaron features del roadmap.
+
+### Bugs corregidos
+
+1. **`load_session_by_id` crash (CRÍTICO)** — Asignaba `list[dict]` de SQLite directamente a `self.messages: list[Message]` con `# type: ignore`. En runtime, acceder a `.role`, `.content` causaba `AttributeError`. Fix: usar `_load_messages_from_store()` que convierte dicts → Message.
+2. **`_persisted_count` no actualizado** — Al cargar sesión, el contador quedaba en 0 → `save_current_session()` re-insertaba todos los mensajes. Fix: `self._persisted_count = len(self.messages)`.
+3. **Regex code blocks** — No capturaba bloques sin language tag ni con guiones. Fix: `[a-zA-Z0-9_+-]*\n?`.
+
+### Seguridad
+
+- **Sandbox bypass cerrado** — `cat`, `head`, `tail` eliminados de `_DEFAULT_BINARIES` (27→24). Permitían leer cualquier archivo del sistema bypassando el sandbox de `file_read`. Ahora `file_read` es la única vía de lectura.
+- **Auditoría Semgrep** — No se encontraron: `shell=True`, `eval()`, ni secrets hardcodeados.
+
+### Panic Buttons (#1)
+
+Implementación completa de cancelación de dos niveles:
+
+| Nivel | TUI | Telegram | Mecanismo |
+|-------|-----|----------|-----------|
+| Interrupt | `Escape` | `/stop` | `threading.Event` → stream loop break |
+| Kill | `Ctrl+K` | `/kill` | interrupt + subprocess.terminate/kill + widget cleanup |
+
+**Diseño:**
+- `Agent._cancel_event` (threading.Event) — funciona sin event loop (tests síncronos OK)
+- `Agent._active_subprocess` — referencia al proceso BashTool activo para kill
+- Cancelación checkeada en cada chunk SSE y antes de ejecutar tool calls
+- BashTool `on_subprocess` callback — registra/desregistra proceso activo
+- Telegram `_processing` set — guard contra mensajes concurrentes
+
+**Elección de threading.Event sobre asyncio.Event:** Los tests crean Agent sin event loop. `asyncio.Event()` requiere loop. `threading.Event` funciona en cualquier contexto y el checkeo `is_set()` es seguro desde corrutinas.
+
+### Auto-selección de Skills
+
+`get_relevant()` existía en `SkillLoader` con scoring (trigger 3pt, description 2pt, content 1pt) pero **nunca se invocaba**. Conectado a `_build_system_prompt()`:
+- Usa el último mensaje de usuario como query
+- Inyecta hasta 5 skills relevantes con contenido completo
+- Antes solo se inyectaba el summary de todas las skills (siempre, sin filtro)
+
+### Archivos modificados
+
+| Archivo | Cambios |
+|---------|---------|
+| `pyproject.toml` | version 0.5.6 → 0.6.0 |
+| `src/bytia_kode/agent.py` | +interrupt(), +kill(), +_cancel_event, +on_subprocess, auto-skills, session fixes |
+| `src/bytia_kode/tools/registry.py` | sandbox bypass fix, +on_subprocess param, allowlist 27→24 |
+| `src/bytia_kode/tui.py` | +Escape binding, +Ctrl+K binding, +interrupt/kill actions, regex fix |
+| `src/bytia_kode/telegram/bot.py` | +/stop, +/kill, +_processing guard |
+| `CHANGELOG.md` | entrada [0.6.0] |
+| `ROADMAP.md` | v0.6.0 completado, v0.6.1 renumerado |
+| `DEVLOG.md` | esta entrada |
+
+### Verificación
+
+- 82 tests pasando (sin cambios — features son de integración)
+- Panic Buttons agent-side verificado manualmente
+- TUI bindings verificados
+- Regex verificado con 5 formatos de code block
+- Import OK en todos los módulos
+
+### Commits
+
+- `9e6cc4b` fix: session persistence bugs + code block extraction regex
+- `2b63ec8` fix: remove auto-cleanup of empty sessions
+- `462d9b1` feat: Panic Buttons (Escape + Ctrl+K) + sandbox bypass fix
+
+---
+
 ## 2026-04-12 - Sesión 19: file_read Sandbox Fix + Legacy Cleanup
 
 ### Contexto
