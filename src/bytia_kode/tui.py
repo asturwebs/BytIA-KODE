@@ -370,6 +370,8 @@ class CommandMenuScreen(ModalScreen):
     COMMANDS = [
         ("\u2630  Quit", "quit"),
         ("\u21ba  Reset conversation", "reset_conversation"),
+        ("\u23f8  Interrupt agent", "interrupt_agent"),
+        ("\U0001f6d1  Kill agent", "kill_agent"),
         ("\U0001f4dd  New session", "new_session"),
         ("\U0001f4c3  List sessions", "list_sessions"),
         ("\U0001f4c2  Load session", "load_session"),
