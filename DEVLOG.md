@@ -72,6 +72,22 @@ Implementación completa de cancelación de dos niveles:
 - `679a791` feat: native GrepTool, GlobTool, TreeTool + Panic Buttons in Ctrl+P menu
 - `5e2aea7` feat: native exploration tools + 19 tests (101 total)
 - `7f1c2ff` feat: add /session command and current session in Ctrl+P menu
+- `750fc25` feat: persist reasoning in session + 5 tests (106 total)
+
+### Reasoning Persistence (añadido en misma sesión)
+
+El razonamiento/thinking del modelo se perdía entre sesiones. Solo se guardaba `response_text`. Ahora `chat()` acumula `reasoning_text` y lo almacena en el mensaje del asistente con formato:
+
+```
+<reasoning>
+... razonamiento del modelo ...
+</reasoning>
+respuesta visible
+```
+
+Al cargar una sesión pasada via `session_load`, el modelo ve su propio razonamiento previo — mantiene coherencia de pensamiento. Formato backward-compatible: sesiones sin reasoning cargan normalmente (no tienen el tag).
+
+5 tests nuevos en `TestAssistantPersistence`: user+assistant siempre guardados, reasoning preservado, no-reasoning fallback, empty response con reasoning, full conversation roundtrip (6 mensajes).
 
 ### Native Exploration Tools (añadido en misma sesión)
 
