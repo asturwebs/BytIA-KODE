@@ -9,6 +9,7 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 
 - **Agentic loop infinite restart (CRÍTICO)** — El patrón `for...else: continue` en `Agent.chat()` causaba que la respuesta del asistente nunca se guardara al completarse el stream. El modelo recibía los mismos mensajes otra vez y generaba otra respuesta, repitiendo hasta 50 iteraciones. Afectaba tanto TUI como Telegram. Fix: eliminar `else: continue`, añadir guard de cancelación explícito tras el stream.
 - **Cancelación con respuesta parcial** — Al cancelar (Escape/Ctrl+K) durante el stream, la respuesta parcial ahora se guarda en `self.messages` y se persiste en la sesión. Antes se perdía.
+- **ToolRegistry.execute() rechazaba `on_subprocess`** — El commit de Panic Buttons (v0.6.0) añadió `on_subprocess` a la llamada de `Agent._handle_tool_calls()` pero nunca actualizó `ToolRegistry.execute()` para aceptarlo. Toda tool call fallaba con `TypeError: got an unexpected keyword argument 'on_subprocess'`. Estaba enmascarado por el bug del bucle infinito (las tools nunca llegaban a ejecutarse). Fix: añadir `on_subprocess` como keyword-only param al registry y reenviarlo al tool.
 
 ### Tests
 

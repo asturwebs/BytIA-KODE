@@ -1073,4 +1073,32 @@ El modelo recibe los mismos mensajes otra vez → genera otra respuesta → nunc
 
 ### Verificación
 
+- 92 tests pasando (0 fallos)
+
+---
+
+## 2026-04-13 - Sesión 25: Fix ToolRegistry `on_subprocess` TypeError
+
+### Contexto
+Tras arreglar el bucle infinito en v0.6.1, las tool calls ahora llegan a ejecutarse realmente — pero fallan con `ToolRegistry.execute() got an unexpected keyword argument 'on_subprocess'`. El bug fue introducido en v0.6.0 (commit `462d9b1`, Panic Buttons) al añadir `on_subprocess` a la llamada del agente sin actualizar la firma del registry. Estuvo enmascarado por el bug del bucle infinito.
+
+### Diagnóstico
+- `Agent._handle_tool_calls()` pasa `on_subprocess=lambda p: ...` a `ToolRegistry.execute()`
+- `ToolRegistry.execute()` solo aceptaba `(tool_name, arguments)` — `on_subprocess` es TypeError
+- `BashTool.execute()` sí acepta `on_subprocess=None, **_` — el callback va al tool correcto
+- Todas las herramientas tienen `**_` en su firma, así que aceptan kwargs extra sin problema
+
+### Fix
+- `ToolRegistry.execute()`: añadido `*, on_subprocess=None` como keyword-only param
+- Si `on_subprocess is not None`, se inyecta en el dict de arguments antes de reenviar al tool
+
+### Archivos modificados
+
+| Archivo | Cambios |
+|---------|---------|
+| `src/bytia_kode/tools/registry.py` | `ToolRegistry.execute()` acepta `on_subprocess` |
+| `CHANGELOG.md` | Añadido bugfix a v0.6.1 |
+| `DEVLOG.md` | Esta entrada |
+
+### Verificación
 - 112 tests pasando (0 fallos)

@@ -744,10 +744,12 @@ class ToolRegistry:
     def list_tools(self) -> list[str]:
         return list(self._tools.keys())
 
-    async def execute(self, tool_name: str, arguments: dict[str, Any] | None = None) -> ToolResult:
+    async def execute(self, tool_name: str, arguments: dict[str, Any] | None = None, *, on_subprocess=None) -> ToolResult:
         if arguments is None:
             arguments = {}
         tool = self._tools.get(tool_name)
         if not tool:
             return ToolResult(output=f"Unknown tool: {tool_name}", error=True)
+        if on_subprocess is not None:
+            arguments = {**arguments, "on_subprocess": on_subprocess}
         return await tool.execute(**arguments)
