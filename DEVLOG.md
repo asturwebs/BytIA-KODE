@@ -1073,4 +1073,4 @@ El modelo recibe los mismos mensajes otra vez → genera otra respuesta → nunc
 
 ### Verificación
 
-- 92 tests pasando (0 fallos)
+- 112 tests pasando (0 fallos)
