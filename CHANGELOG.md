@@ -13,7 +13,7 @@ Todos los cambios relevantes del proyecto se documentan en este archivo.
 ### Tests
 
 - 6 tests nuevos (`test_agentic_loop.py`): verificación de terminación del loop, persistencia, cancelación, y que el provider se llama exactamente 1 vez (no en bucle).
-- **92 tests** total (6 nuevos para agentic loop).
+- **112 tests** total (6 nuevos para agentic loop).
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [0.6.0] - 2026-04-12
