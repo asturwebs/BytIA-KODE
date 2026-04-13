@@ -463,8 +463,18 @@ class Agent:
                         yield ("reasoning", data)
                     elif chunk_type == "tool_calls" and isinstance(data, list):
                         tool_calls_accum = data
-                else:
-                    continue
+
+                if self._cancel_event.is_set():
+                    if response_text or reasoning_text:
+                        partial = response_text or "[razonamiento sin respuesta de texto]"
+                        if reasoning_text:
+                            partial = f"<reasoning>\n{reasoning_text}\n</reasoning>\n{partial}"
+                        self.messages.append(Message(role="assistant", content=partial))
+                        if self._current_session_id:
+                            self._session_store.append_message(
+                                self._current_session_id, role="assistant", content=partial,
+                            )
+                    break
 
                 msg_count_before = len(self.messages)
                 stored_content = response_text or "[razonamiento sin respuesta de texto]"

@@ -1021,3 +1021,56 @@ The Kernel is like `vmlinux` — portable, hardware-agnostic. The Runtime is lik
 - `1df5552` — Main repo: full RFC-001 migration
 - `6409b8d` — KODE: agent.py + symlinks
 - `1f46990` — Kernel YAML fix + legacy archive
+
+## 2026-04-13 - Sesión 24: Fix Agentic Loop Infinito (v0.6.1)
+
+### Contexto
+
+Pedro reportó que la TUI entraba constantemente en bucles de razonamiento/respuesta. La WebUI de llama.cpp y el kode bot funcionaban bien, pero la TUI y Telegram repetían sin parar.
+
+### Diagnóstico
+
+Investigación con 2 subagentes en paralelo:
+1. **Análisis del flujo de mensajes** — TUI, Telegram, agent, provider, session
+2. **Análisis de la BD de sesiones** — evidencia de bucles en los datos
+
+**Root cause:** `for...else: continue` en `Agent.chat()` (agent.py:452-453). Cuando el stream SSE completa normalmente (sin cancelación), el `else` ejecuta `continue` en el bucle externo, saltándose:
+- Guardar la respuesta del asistente en `self.messages`
+- Persistir en la sesión SQLite
+- Procesar tool calls
+
+El modelo recibe los mismos mensajes otra vez → genera otra respuesta → nunca se guarda → bucle de hasta 50 iteraciones.
+
+**Evidencia en BD:** Sesiones con 146, 123, 102, 85, 84, 79, 75 mensajes (normal: 2-6).
+
+### Fix
+
+- Eliminado `else: continue`
+- Añadido guard de cancelación explícito tras el stream
+- Cancelación con respuesta parcial: se guarda lo que se haya generado antes de break
+
+### Tests nuevos (6)
+
+| Test | Verifica |
+|------|----------|
+| `test_text_response_exits_loop` | Respuesta de texto sale del loop inmediatamente |
+| `test_reasoning_response_exits_loop` | Reasoning + texto se guarda y sale |
+| `test_empty_text_reasoning_only_exits_loop` | Solo reasoning también sale |
+| `test_cancellation_saves_partial_and_exits` | Cancelación guarda parcial |
+| `test_no_infinite_loop_on_normal_response` | Provider llamado exactamente 1 vez |
+| `test_session_persistence_on_normal_response` | Respuesta persistida en SQLite |
+
+### Archivos modificados
+
+| Archivo | Cambios |
+|---------|---------|
+| `src/bytia_kode/agent.py` | Eliminado `else: continue`, añadido cancel guard |
+| `tests/test_agentic_loop.py` | 6 tests nuevos |
+| `docs/specs/2026-04-13-agentic-loop-fix-design.md` | Design spec |
+| `CHANGELOG.md` | Entrada v0.6.1 |
+| `DEVLOG.md` | Esta entrada |
+| `README.md` | Badge 92 tests |
+
+### Verificación
+
+- 92 tests pasando (0 fallos)

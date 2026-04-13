@@ -2,6 +2,18 @@
 
 Todos los cambios relevantes del proyecto se documentan en este archivo.
 
+
+## [0.6.1] - 2026-04-13
+
+### Fixed
+
+- **Agentic loop infinite restart (CRÍTICO)** — El patrón `for...else: continue` en `Agent.chat()` causaba que la respuesta del asistente nunca se guardara al completarse el stream. El modelo recibía los mismos mensajes otra vez y generaba otra respuesta, repitiendo hasta 50 iteraciones. Afectaba tanto TUI como Telegram. Fix: eliminar `else: continue`, añadir guard de cancelación explícito tras el stream.
+- **Cancelación con respuesta parcial** — Al cancelar (Escape/Ctrl+K) durante el stream, la respuesta parcial ahora se guarda en `self.messages` y se persiste en la sesión. Antes se perdía.
+
+### Tests
+
+- 6 tests nuevos (`test_agentic_loop.py`): verificación de terminación del loop, persistencia, cancelación, y que el provider se llama exactamente 1 vez (no en bucle).
+- **92 tests** total (6 nuevos para agentic loop).
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [0.6.0] - 2026-04-12
