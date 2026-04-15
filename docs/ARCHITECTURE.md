@@ -245,11 +245,11 @@ Implementado via `Agent._cancel_event` (threading.Event) y `Agent._active_subpro
 
 - `tools/registry.py` — registro y ejecución de tools
 - `tools/session.py` — tools de sesión (session_list, session_load, session_search)
-- Tools actuales: `bash`, `file_read`, `file_write`, `file_edit`, `web_fetch`, `session_list`, `session_load`, `session_search`
+- Tools actuales (12): `bash`, `file_read`, `file_write`, `file_edit`, `web_fetch`, `read_context`, `grep`, `glob`, `tree`, `session_list`, `session_load`, `session_search`
 
 ### Seguridad de tools
 
-- **BashTool**: allowlist de 24 binarios (`ls`, `pwd`, `echo`, `mkdir`, `rmdir`, `touch`, `chmod`, `chown`, `find`, `grep`, `rg`, `wc`, `sort`, `uniq`, `diff`, `git`, `python3`, `node`, `bun`, `uv`, `npm`, `npx`, `make`, `cmake`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
+- **BashTool**: allowlist de 24 binarios (`ls`, `pwd`, `echo`, `git`, `grep`, `find`, `mkdir`, `touch`, `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `uv`, `python`, `python3`, `pip`, `pip3`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
 - **FileReadTool / FileWriteTool**: `_resolve_workspace_path()` impide path traversal. I/O delegado a `asyncio.to_thread` para no bloquear el event loop.
 - **FileEditTool**: search/replace + create. Backup automático con timestamp. Diff unificado. `_no_match_help` con diagnósticos de partial match.
 - **WebFetchTool**: HTTP GET via httpx. Solo URLs http/https. Validación de content-type (text/*, json, xml). HTML se convierte a texto plano (tag stripping). Truncation a 30k chars. Timeout configurable (15s default).
