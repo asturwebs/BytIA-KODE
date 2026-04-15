@@ -46,7 +46,7 @@ excepciones → report_failure() → yield provider_used (nuevo provider) → co
 ### Gestión de contexto
 
 - `MAX_CONTEXT_TOKENS = 131072` (128k) — fallback cuando el router no devuelve ctx-size (para modelos GGUF con 256k)
-- `_estimate_tokens()`: heurística chars/3 para uso de sesión
+- `_estimate_tokens()`: heurística adaptativa — chars/3.5 para contenido ASCII (>85%), chars/3 para texto mixto
 - `get_router_info()`: extrae ctx-size real de los args del modelo (`--ctx-size`) vía `/v1/models`
 - `_manage_context()`: cuando se supera 75% del límite, comprime los 2 mensajes más antiguos en un resumen de sistema
 

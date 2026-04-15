@@ -1,6 +1,6 @@
 # BytIA KODE - Development Log
 
-## Session 24 — 2026-04-15 — Circuit Breaker Hardening
+## Session 24 — 2026-04-15 — Circuit Breaker Hardening (v0.7.1)
 
 **Scope:** Fix 5 bugs found during live TUI testing of circuit breaker + fallback system.
 
@@ -34,8 +34,18 @@ Session 23 (v0.7.0) introduced circuit breaker with auto-fallback. Live testing 
 ### Test Results
 
 ```
-110 passed in 1.26s
+130 passed in 1.50s
 ```
+
+### Commits
+
+| Commit | Description |
+|--------|-------------|
+| `3f77925` | fix: update status line when circuit breaker switches provider |
+| `9b13639` | fix: eliminate recursive chat() call, use loop-continue for provider fallback |
+| `4320b07` | fix: auto-fallback to next provider when router is down at startup |
+| `e9532bf` | fix: update status line when circuit breaker switches provider |
+| `ac25666` | fix: circuit breaker hardening — reasoning leak, fallback signaling, recovery (v0.7.1) |
 
 ### Live Test Session
 
@@ -68,7 +78,7 @@ Session 23 (v0.7.0) introduced circuit breaker with auto-fallback. Live testing 
 
 ### Testing
 
-- 112 tests (2 new circuit breaker tests + test mocks updated for `get_healthy()`)
+- 130 tests (2 new circuit breaker tests + test mocks updated for `get_healthy()`)
 - Live testing confirmed basic fallback flow
 
 ---
