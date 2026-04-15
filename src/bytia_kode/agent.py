@@ -420,8 +420,8 @@ class Agent:
             detected = await self.providers.auto_detect_model()
             self._initialized = True
             if not detected:
-                yield "No hay ningún modelo cargado en el router. Carga uno primero (routeron + UI en :8080/slots)."
-                return
+                self.providers.report_failure("primary")
+                yield ("system", "No hay modelo en el router. Intentando con fallback...")
 
         sanitized_message = _sanitize_user_message(user_message)
         if not sanitized_message:
@@ -524,7 +524,8 @@ class Agent:
             if remaining:
                 next_provider = remaining[0]
                 yield ("system", f"Provider '{provider}' falló. Intentando con '{next_provider}'...")
-                self.messages = self.messages[:-1] if self.messages and self.messages[-1].role == "user" else self.messages
+                if self.messages and self.messages[-1].role == "user":
+                    self.messages = self.messages[:-1]
                 async for chunk in self.chat(user_message, provider=next_provider):
                     yield chunk
                 return
