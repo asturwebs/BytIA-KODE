@@ -47,6 +47,7 @@ class TestAgenticLoopTermination:
 
         agent.providers._primary = mock_provider
         agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
 
         collected = []
         async for chunk in agent.chat("hola"):
@@ -68,6 +69,7 @@ class TestAgenticLoopTermination:
 
         agent.providers._primary = mock_provider
         agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
 
         collected = []
         async for chunk in agent.chat("test"):
@@ -88,6 +90,7 @@ class TestAgenticLoopTermination:
 
         agent.providers._primary = mock_provider
         agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
 
         collected = []
         async for chunk in agent.chat("test"):
@@ -119,6 +122,7 @@ class TestAgenticLoopTermination:
         mock_provider.chat_stream = _stream
         agent.providers._primary = mock_provider
         agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
 
         collected = []
         async for chunk in agent.chat("test"):
@@ -142,6 +146,7 @@ class TestAgenticLoopTermination:
         mock_provider.chat_stream = _stream
         agent.providers._primary = mock_provider
         agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
 
         collected = []
         async for chunk in agent.chat("test"):
@@ -158,6 +163,8 @@ class TestAgenticLoopTermination:
 
         agent.providers._primary = mock_provider
         agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
 
         sid = agent._session_store.create_session("tui")
         agent._current_session_id = sid
@@ -192,23 +199,22 @@ class TestProviderFallback:
             "primary": failing_provider,
             "fallback": working_provider,
         }[name])
+        agent.providers.get_healthy = MagicMock(return_value=(failing_provider, "primary"))
 
         collected = []
         async for chunk in agent.chat("test"):
             collected.append(chunk)
 
-        system_msgs = [c for c in collected if isinstance(c, tuple) and c[0] == "system"]
-        assert len(system_msgs) >= 1
-        assert "fallback" in system_msgs[0][1].lower()
+        assert any("Fallback response" in str(c) for c in collected)
 
     @pytest.mark.asyncio
-    async def test_system_message_on_provider_switch(self, agent):
-        """Agent yields ('system', msg) when switching providers."""
+    async def test_fallback_switch_on_provider_failure(self, agent):
+        """Agent retries with next provider when primary fails, no system messages needed."""
         failing_provider = AsyncMock()
         failing_provider.chat_stream = MagicMock(side_effect=ConnectionError("Down"))
 
         working_provider = AsyncMock()
-        working_provider.chat_stream = _mock_stream_response(text="OK")
+        working_provider.chat_stream = _mock_stream_response(text="OK from fallback")
 
         agent.providers._primary = failing_provider
         agent.providers._fallback = working_provider
@@ -218,13 +224,13 @@ class TestProviderFallback:
             "primary": failing_provider,
             "fallback": working_provider,
         }[name])
+        agent.providers.get_healthy = MagicMock(return_value=(failing_provider, "primary"))
 
         collected = []
         async for chunk in agent.chat("test"):
             collected.append(chunk)
 
-        system_msgs = [c for c in collected if isinstance(c, tuple) and c[0] == "system"]
-        assert any("fallback" in m[1].lower() for m in system_msgs)
+        assert any("OK from fallback" in str(c) for c in collected)
 
     @pytest.mark.asyncio
     async def test_all_providers_fail_yields_error(self, agent):
@@ -239,6 +245,7 @@ class TestProviderFallback:
             cb._failure_threshold = 1
 
         agent.providers.get = MagicMock(return_value=failing)
+        agent.providers.get_healthy = MagicMock(return_value=(failing, "primary"))
 
         collected = []
         async for chunk in agent.chat("test"):

@@ -420,8 +420,13 @@ class Agent:
             detected = await self.providers.auto_detect_model()
             self._initialized = True
             if not detected:
-                self.providers.report_failure("primary")
-                yield ("system", "No hay modelo en el router. Intentando con fallback...")
+                primary_cb = self.providers._circuits.get("primary")
+                if primary_cb:
+                    primary_cb.force_open()
+                for _name in self.providers._priority_order:
+                    if _name != "primary" and self.providers._circuits.get(_name) and self.providers._circuits[_name].is_available:
+                        provider = _name
+                        break
 
         sanitized_message = _sanitize_user_message(user_message)
         if not sanitized_message:
@@ -435,21 +440,19 @@ class Agent:
                 role="user", content=sanitized_message,
             )
         client, used_provider = self.providers.get_healthy(provider)
-        if used_provider != provider:
-            yield ("system", f"Provider '{provider}' no disponible. Usando '{used_provider}'.")
-            provider = used_provider
+        provider = used_provider
         provider_client = client
         tool_defs = self.tools.get_tool_defs()
         await self._manage_context(provider_client)
 
-        try:
-            for _iteration in range(self.max_iterations):
-                self._cancel_event.clear()
-                all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
-                response_text = ""
-                reasoning_text = ""
-                tool_calls_accum: list = []
+        for _iteration in range(self.max_iterations):
+            self._cancel_event.clear()
+            all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
+            response_text = ""
+            reasoning_text = ""
+            tool_calls_accum: list = []
 
+            try:
                 async for chunk_type, data in provider_client.chat_stream(
                     messages=all_messages,
                     tools=tool_defs if tool_defs else None,
@@ -467,74 +470,69 @@ class Agent:
                         yield ("reasoning", data)
                     elif chunk_type == "tool_calls" and isinstance(data, list):
                         tool_calls_accum = data
-
-                if self._cancel_event.is_set():
-                    if response_text or reasoning_text:
-                        partial = response_text or "[razonamiento sin respuesta de texto]"
-                        if reasoning_text:
-                            partial = f"<reasoning>\n{reasoning_text}\n</reasoning>\n{partial}"
-                        self.messages.append(Message(role="assistant", content=partial))
-                        if self._current_session_id:
-                            self._session_store.append_message(
-                                self._current_session_id, role="assistant", content=partial,
-                            )
-                    break
-
-                msg_count_before = len(self.messages)
-                stored_content = response_text or "[razonamiento sin respuesta de texto]"
-                if reasoning_text:
-                    stored_content = f"<reasoning>\n{reasoning_text}\n</reasoning>\n{stored_content}"
-                self.messages.append(Message(
-                    role="assistant",
-                    content=stored_content,
-                    tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
-                ))
-
-                # Auto-save: append assistant response (user message already saved before inference)
+            except (TimeoutError, ConnectionError, RuntimeError, httpx.HTTPError) as exc:
+                error_message = _format_chat_error(exc)
+                logger.error("Agent chat failure on '%s': %s", provider, error_message)
+                self.providers.report_failure(provider)
+                remaining = [n for n in self.providers._priority_order
+                             if n != provider
+                             and self.providers._circuits.get(n)
+                             and self.providers._circuits[n].is_available]
+                if remaining:
+                    provider = remaining[0]
+                    provider_client = self.providers.get(provider)
+                    continue
+                self.messages.append(Message(role="assistant", content=f"[Error: {error_message}]"))
                 if self._current_session_id:
                     self._session_store.append_message(
-                        self._current_session_id,
-                        role="assistant", content=stored_content,
-                        tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
+                        self._current_session_id, role="assistant", content=f"[Error: {error_message}]",
                     )
-                    # Auto-title from first user message
-                    if msg_count_before == 0 and sanitized_message:
-                        self._session_store.update_title(
-                            self._current_session_id, sanitized_message[:80],
-                        )
-
-                if not tool_calls_accum:
-                    self.providers.report_success(provider)
-                    break
-
-                if self._cancel_event.is_set():
-                    break
-
-                await self._handle_tool_calls(tool_calls_accum)
-            else:
-                yield "\n[Max iterations reached]"
-        except (TimeoutError, ConnectionError, RuntimeError, httpx.HTTPError) as exc:
-            error_message = _format_chat_error(exc)
-            logger.error("Agent chat failure on '%s': %s", provider, error_message)
-            self.providers.report_failure(provider)
-            remaining = [n for n in self.providers._priority_order
-                         if n != provider
-                         and self.providers._circuits.get(n)
-                         and self.providers._circuits[n].is_available]
-            if remaining:
-                next_provider = remaining[0]
-                yield ("system", f"Provider '{provider}' falló. Intentando con '{next_provider}'...")
-                if self.messages and self.messages[-1].role == "user":
-                    self.messages = self.messages[:-1]
-                async for chunk in self.chat(user_message, provider=next_provider):
-                    yield chunk
+                yield ("error", error_message)
                 return
-            self.messages.append(Message(role="assistant", content=f"[Error: {error_message}]"))
+
+            if self._cancel_event.is_set():
+                if response_text or reasoning_text:
+                    partial = response_text or "[razonamiento sin respuesta de texto]"
+                    if reasoning_text:
+                        partial = f"<reasoning>\n{reasoning_text}\n</reasoning>\n{partial}"
+                    self.messages.append(Message(role="assistant", content=partial))
+                    if self._current_session_id:
+                        self._session_store.append_message(
+                            self._current_session_id, role="assistant", content=partial,
+                        )
+                break
+
+            msg_count_before = len(self.messages)
+            stored_content = response_text or "[razonamiento sin respuesta de texto]"
+            if reasoning_text:
+                stored_content = f"<reasoning>\n{reasoning_text}\n</reasoning>\n{stored_content}"
+            self.messages.append(Message(
+                role="assistant",
+                content=stored_content,
+                tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
+            ))
+
             if self._current_session_id:
                 self._session_store.append_message(
-                    self._current_session_id, role="assistant", content=f"[Error: {error_message}]",
+                    self._current_session_id,
+                    role="assistant", content=stored_content,
+                    tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
                 )
-            yield ("error", error_message)
+                if msg_count_before == 0 and sanitized_message:
+                    self._session_store.update_title(
+                        self._current_session_id, sanitized_message[:80],
+                    )
+
+            if not tool_calls_accum:
+                self.providers.report_success(provider)
+                break
+
+            if self._cancel_event.is_set():
+                break
+
+            await self._handle_tool_calls(tool_calls_accum)
+        else:
+            yield "\n[Max iterations reached]"
 
     def set_session(self, source: str = "tui", source_ref: str = "") -> str:
         """Set the current session. Creates or resumes if exists."""
