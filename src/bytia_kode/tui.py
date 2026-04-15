@@ -1000,6 +1000,8 @@ class BytIAKODEApp(App):
                         await chat.mount(stream_widget)
                     stream_widget.update(RichMarkdown(response_text))
                     chat.scroll_end(animate=False)
+                elif isinstance(chunk, tuple) and chunk[0] == "system":
+                    self._add_message("system", chunk[1])
                 elif isinstance(chunk, tuple) and chunk[0] == "error":
                     if stream_widget and stream_widget.is_mounted:
                         stream_widget.remove()
