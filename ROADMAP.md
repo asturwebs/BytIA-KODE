@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.6.0 (Alpha estable)
+## Estado actual: v0.7.0 (Alpha estable)
 
 ### Completado
 
@@ -170,7 +170,7 @@
 - [ ] Bash allowlist diferenciada por safe_mode
 - [ ] Safe mode backend real (confirmación de comandos destructivos)
 - [x] ~~Tools de exploración: `grep`, `tree`, `glob` nativos en Python~~ (hecho en v0.6.0 — GrepTool, GlobTool, TreeTool)
-- [ ] Auto-fallback de providers (circuit breaker)
+- [x] ~~Auto-fallback de providers (circuit breaker)~~ (hecho en v0.7.0)
 
 ## v0.6.1 — Skills Avanzadas y Multi-agente
 

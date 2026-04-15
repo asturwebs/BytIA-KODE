@@ -307,10 +307,16 @@ Los tests están en `tests/`. El pre-commit hook los ejecuta automáticamente.
 
 | Archivo | Tests | Qué cubre |
 |---------|-------|-----------|
-| `test_session.py` | 19 | SessionStore: lifecycle, messages, list/search, delete, title, context |
-| `test_file_edit.py` | 14 | FileEditTool: replace, create, path traversal, diff, params |
-| `test_context_management.py` | 13 | Context: estimate_tokens, manage_context, summarize, update_limit |
-| **Total** | **46** | |
+| `tests/test_circuit_breaker.py` | 8 | CircuitBreaker state transitions |
+| `tests/test_provider_health.py` | 7 | ProviderManager health + get_healthy |
+| `tests/test_agentic_loop.py` | 9 | Agent loop termination + fallback |
+| `tests/test_session.py` | 18 | SessionStore CRUD, messages, search |
+| `tests/test_context.py` | 9 | Workspace hash, context generation |
+| `tests/test_context_management.py` | 10 | Token estimation, context compression |
+| `tests/test_exploration_tools.py` | 15 | GrepTool, GlobTool, TreeTool |
+| `tests/test_file_edit.py` | 15 | FileEditTool replace/create |
+| `src/tests/test_basics.py` | 18 | Provider client, agent SP, tools, security |
+| **Total** | **~130** | |
 
 ## Build y Release
 
