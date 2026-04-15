@@ -41,8 +41,8 @@ jobs:
           venv.create(env_dir, with_pip=True)
           py = env_dir / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
           subprocess.check_call([str(py), '-m', 'pip', 'install', wheel])
-          code = "from importlib import resources; r = resources.files('bytia_kode.prompts').joinpath('bytia.kernel.yaml'); print(r.is_file())"
+          code = "from importlib import resources; r = resources.files('bytia_kode.prompts').joinpath('kernel.default.yaml'); print(r.is_file())"
           output = subprocess.check_output([str(py), '-c', code], text=True).strip()
           if output != 'True':
-              raise SystemExit('bytia.kernel.yaml no está disponible como recurso empaquetado')
+              raise SystemExit('kernel.default.yaml no está disponible como recurso empaquetado')
           PY
