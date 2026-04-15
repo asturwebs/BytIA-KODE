@@ -2,6 +2,17 @@
 
 Todos los cambios relevantes del proyecto se documentan en este archivo.
 
+## [0.7.0] - 2026-04-15
+
+### Added
+- Circuit Breaker pattern for provider auto-fallback (CLOSED → OPEN → HALF_OPEN)
+- `providers/circuit.py` — new `CircuitBreaker` class with configurable threshold and recovery
+- `ProviderManager.get_healthy()` — returns first available provider by priority
+- `ProviderManager.report_success/failure()` — feedback loop for circuit state
+- `ProviderManager.get_status()` — circuit state for debugging/UI
+- `Agent.chat()` automatic fallback to next provider on failure
+- System messages in TUI and Telegram when provider switches
+- 24 new tests (8 CircuitBreaker + 7 ProviderManager + 3 Agent fallback + 6 existing fixed)
 
 ## [0.6.1] - 2026-04-13
 

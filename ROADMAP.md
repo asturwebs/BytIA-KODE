@@ -190,7 +190,18 @@
 - [ ] Ejecución asíncrona de tareas largas
 - [ ] Generación automática de Pull Requests
 
-## v0.7.0 — Memoria y Conocimiento
+## v0.7.0 — Circuit Breaker y Provider Resilience (COMPLETADO)
+
+### Completado
+
+- [x] **CircuitBreaker class** — CLOSED/OPEN/HALF_OPEN state machine con auto-recuperación
+- [x] **ProviderManager.get_healthy()** — routing inteligente por prioridad con health check
+- [x] **Agent auto-fallback** — si provider falla, intenta siguiente automáticamente
+- [x] **System messages** — aviso al usuario cuando se cambia de provider (TUI + Telegram)
+- [x] **report_success / report_failure** — feedback loop del agentic loop al circuit breaker
+- [x] **24 tests nuevos** — 8 CircuitBreaker + 7 ProviderManager + 3 Agent fallback + 6 existentes arreglados
+
+## v0.8.0 — Memoria y Conocimiento
 
 **Objetivo:** Memoria semántica y base de conocimiento.
 
