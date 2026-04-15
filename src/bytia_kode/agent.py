@@ -442,6 +442,7 @@ class Agent:
         client, used_provider = self.providers.get_healthy(provider)
         provider = used_provider
         provider_client = client
+        yield ("provider_used", used_provider)
         tool_defs = self.tools.get_tool_defs()
         await self._manage_context(provider_client)
 
@@ -462,7 +463,7 @@ class Agent:
                     if self._cancel_event.is_set():
                         yield "\n[interrupted]"
                         break
-                    if chunk_type == "text" and isinstance(data, str):
+                    if chunk_type == "text" and isinstance(data, str) and data:
                         response_text += data
                         yield data
                     elif chunk_type == "reasoning" and isinstance(data, str):
