@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="https://github.com/asturwebs/BytIA-KODE.git"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/bytia/proyectos/BytIA-KODE}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/BytIA-KODE}"
 BIN_DIR="$HOME/.local/bin"
 
 RED='\033[0;31m'
