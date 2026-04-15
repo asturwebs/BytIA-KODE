@@ -534,7 +534,6 @@ class BytIAKODEApp(App):
             chat.mount(Static(t))
 
     def _on_provider_changed(self, old_provider: str, new_provider: str) -> None:
-        self._add_system_message(f"Switched to: {self._provider_display_name(new_provider)}")
         self.query_one(ActivityIndicator)._refresh()
         if new_provider == "primary":
             self.run_worker(self._auto_detect_model, exclusive=True)
@@ -1004,7 +1003,9 @@ class BytIAKODEApp(App):
                     chat.scroll_end(animate=False)
                 elif isinstance(chunk, tuple) and chunk[0] == "provider_used":
                     if chunk[1] != self.active_provider:
+                        old = self.active_provider
                         self.active_provider = chunk[1]
+                        self._add_system_message(f"Switched to: {self._provider_display_name(chunk[1])}")
                 elif isinstance(chunk, tuple) and chunk[0] == "system":
                     self._add_message("system", chunk[1])
                 elif isinstance(chunk, tuple) and chunk[0] == "error":

@@ -482,6 +482,7 @@ class Agent:
                 if remaining:
                     provider = remaining[0]
                     provider_client = self.providers.get(provider)
+                    yield ("provider_used", provider)
                     continue
                 self.messages.append(Message(role="assistant", content=f"[Error: {error_message}]"))
                 if self._current_session_id:
@@ -493,20 +494,16 @@ class Agent:
 
             if self._cancel_event.is_set():
                 if response_text or reasoning_text:
-                    partial = response_text or "[razonamiento sin respuesta de texto]"
-                    if reasoning_text:
-                        partial = f"<reasoning>\n{reasoning_text}\n</reasoning>\n{partial}"
-                    self.messages.append(Message(role="assistant", content=partial))
+                    stored_cancel = response_text or "(respuesta cancelada)"
+                    self.messages.append(Message(role="assistant", content=stored_cancel))
                     if self._current_session_id:
                         self._session_store.append_message(
-                            self._current_session_id, role="assistant", content=partial,
+                            self._current_session_id, role="assistant", content=stored_cancel,
                         )
                 break
 
             msg_count_before = len(self.messages)
-            stored_content = response_text or "[razonamiento sin respuesta de texto]"
-            if reasoning_text:
-                stored_content = f"<reasoning>\n{reasoning_text}\n</reasoning>\n{stored_content}"
+            stored_content = response_text or "(sin respuesta de texto)"
             self.messages.append(Message(
                 role="assistant",
                 content=stored_content,

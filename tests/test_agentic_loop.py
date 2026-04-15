@@ -76,9 +76,8 @@ class TestAgenticLoopTermination:
             collected.append(chunk)
 
         assert len(agent.messages) == 2
-        assert "<reasoning>" in agent.messages[1].content
-        assert "Pensando..." in agent.messages[1].content
-        assert "Mi respuesta." in agent.messages[1].content
+        assert "<reasoning>" not in agent.messages[1].content
+        assert agent.messages[1].content == "Mi respuesta."
 
     @pytest.mark.asyncio
     async def test_empty_text_reasoning_only_exits_loop(self, agent):
@@ -97,7 +96,7 @@ class TestAgenticLoopTermination:
             collected.append(chunk)
 
         assert len(agent.messages) == 2
-        assert "Solo pensando..." in agent.messages[1].content
+        assert agent.messages[1].content == "(sin respuesta de texto)"
 
     @pytest.mark.asyncio
     async def test_cancellation_saves_partial_and_exits(self, agent):

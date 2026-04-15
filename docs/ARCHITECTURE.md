@@ -31,15 +31,16 @@ Responsabilidades:
 ### Flujo de `chat()` (streaming)
 
 ```
-validar input → registrar user msg → iterar:
+validar input → registrar user msg → get_healthy() → yield provider_used → iterar:
     llamar provider.chat_stream() → yield chunks:
         ("text", delta)         → yield al TUI para render streaming
-        ("reasoning", delta)    → yield al TUI para ThinkingBlock
+        ("reasoning", delta)    → yield al TUI para ThinkingBlock (NO se almacena en historial)
         ("tool_calls", [TC])    → acumular, ejecutar al final del chunk
-    registrar assistant msg con content y/o tool_calls
+    registrar assistant msg con response_text (sin reasoning tags)
     AUTO-SAVE: append user msg + assistant msg a sesión activa
     si tool_calls → _handle_tool_calls() → registrar tool results → AUTO-SAVE → continuar
-excepciones → yield error (NO se persiste en historial)
+excepciones → report_failure() → yield provider_used (nuevo provider) → continue con fallback
+              si no hay fallback → yield error (NO se persiste en historial)
 ```
 
 ### Gestión de contexto
@@ -150,10 +151,11 @@ Cada provider tiene un `CircuitBreaker` asociado con 3 estados:
 | HALF_OPEN | Probando recuperación | 1 petición permitida |
 
 **Flujo:**
-1. `ProviderManager.get_healthy(preferred)` devuelve el primer provider con circuit CLOSED o HALF_OPEN
+1. `ProviderManager.get_healthy(preferred)` recorre la priority order completa desde el inicio (primary → fallback → local). Esto permite que circuits en HALF_OPEN se prueben automáticamente en cada nueva petición.
 2. Si el provider falla → `report_failure()` → threshold (3 fallos) → circuit OPEN
-3. Tras 60s → HALF_OPEN → 1 petición de prueba → éxito=CLOSED / fallo=OPEN
-4. Si el preferido está OPEN → intenta fallback → local automáticamente
+3. Tras 60s → HALF_OPEN → siguiente petición lo prueba → éxito=CLOSED / fallo=OPEN
+4. Si todos los circuits están OPEN → se usa `preferred` como último recurso
+5. Dentro de una petición, si el provider falla → exception handler cambia al siguiente provider disponible → `yield ("provider_used", new_provider)` para notificar al TUI
 
 ### Switching
 
@@ -249,7 +251,7 @@ Implementado via `Agent._cancel_event` (threading.Event) y `Agent._active_subpro
 
 ### Seguridad de tools
 
-- **BashTool**: allowlist de 24 binarios (`ls`, `pwd`, `echo`, `git`, `grep`, `find`, `mkdir`, `touch`, `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `uv`, `python`, `python3`, `pip`, `pip3`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
+- **BashTool**: allowlist de 25 binarios (`ls`, `pwd`, `echo`, `git`, `grep`, `find`, `mkdir`, `rmdir`, `touch`, `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `uv`, `python`, `python3`, `pip`, `pip3`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
 - **FileReadTool / FileWriteTool**: `_resolve_workspace_path()` impide path traversal. I/O delegado a `asyncio.to_thread` para no bloquear el event loop.
 - **FileEditTool**: search/replace + create. Backup automático con timestamp. Diff unificado. `_no_match_help` con diagnósticos de partial match.
 - **WebFetchTool**: HTTP GET via httpx. Solo URLs http/https. Validación de content-type (text/*, json, xml). HTML se convierte a texto plano (tag stripping). Truncation a 30k chars. Timeout configurable (15s default).
