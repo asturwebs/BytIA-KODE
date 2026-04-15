@@ -1,9 +1,9 @@
-# BytIA KODE v0.6.0
+# BytIA KODE v0.7.0
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.6.0-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-112%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.7.0-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-130%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -36,11 +36,18 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.6.0`
+> Release actual: `0.7.0`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+### Novedades en v0.7.0 — Circuit Breaker y Provider Resilience
+
+- **Circuit Breaker** — Fallback automático de providers (CLOSED → OPEN → HALF_OPEN). Si el primario falla, el agente cambia al siguiente sin intervención del usuario.
+- **Auto-recuperación** — Tras 60s, el provider caído se reactiva automáticamente.
+- **System messages** — TUI y Telegram muestran avisos cuando se cambia de provider.
+- **24 tests nuevos** — CircuitBreaker (8), ProviderManager (7), Agent fallback (3), fixes (6)
 
 ## Novedades en v0.6.0
 
@@ -50,7 +57,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 - **Session fixes** — `load_session_by_id` ya no crashea por type mismatch, y `_persisted_count` se actualiza correctamente (sin duplicados en SQLite).
 - **Telegram guard** — No apila mensajes mientras procesa (race condition corregida).
 - **Native exploration tools** — `grep`, `glob`, `tree` implementados en Python puro. El agente ya no necesita bash para explorar el codebase. GrepTool (regex + include filter), GlobTool (pattern matching), TreeTool (directory tree con tamaños).
-- **112 tests** — 6 tests nuevos de agentic loop (v0.6.1) cubriendo terminación del agentic loop.
+- **130 tests** — 6 tests nuevos de agentic loop (v0.6.1) cubriendo terminación del agentic loop.
 - **`/session` command** — Muestra la sesión activa (ID + mensajes). También en Ctrl+P.
 - **Reasoning persistence** — El razonamiento del modelo se guarda en la sesión. Al cargar sesiones anteriores, ve su propio thinking previo.
 
@@ -153,6 +160,7 @@ agent.py
   ├─ prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml
   ├─ session.py                    ← SQLite WAL persistence
   ├─ providers/manager.py
+  ├─ providers/circuit.py          ← Circuit breaker (CLOSED/OPEN/HALF_OPEN)
   ├─ providers/client.py
   ├─ tools/registry.py
   ├─ tools/session.py              ← session_list, session_load, session_search
@@ -282,6 +290,9 @@ Pulsa `F2` para cambiar entre los 19 temas disponibles (12 oscuros + 7 claros, p
 | `session_list` | Listar sesiones guardadas | Solo lectura |
 | `session_load` | Cargar contexto de sesión pasada | Solo lectura |
 | `session_search` | Buscar sesiones por título | Solo lectura |
+| `grep` | GrepTool | Búsqueda regex en archivos | v0.6.0 |
+| `glob` | GlobTool | Pattern matching de archivos | v0.6.0 |
+| `tree` | TreeTool | Jerarquía de directorios | v0.6.0 |
 
 Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.
 
@@ -400,7 +411,6 @@ Motor I/O asíncrono validado con benchmark: **4.90x speedup** (80% mejora) fren
 - `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
 - Las skills no registran tools dinámicas todavía (previsto para v0.6.0).
 - El estimador de tokens es una heurística (chars/3), no un tokenizer real.
-- No hay auto-fallback de providers (circuit breaker pendiente).
 - PromptTextArea no soporta Shift+Enter para newline (limitación de Textual).
 
 ## Contribuir

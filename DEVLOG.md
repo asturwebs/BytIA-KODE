@@ -1,6 +1,6 @@
 # BytIA KODE - Development Log
 
-## 2026-04-15 - Sesión 24: Circuit Breaker y Provider Resilience (v0.7.0)
+## 2026-04-15 - Sesión 26: Circuit Breaker y Provider Resilience (v0.7.0)
 
 ### Contexto
 

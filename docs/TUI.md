@@ -2,7 +2,7 @@
 
 > **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
 
-Documento actualizado para la versión 0.5.0.
+Documento actualizado para la versión 0.7.0.
 
 ## Componentes
 
@@ -55,6 +55,13 @@ Al ejecutar `/sessions`, se muestra una tabla con:
 ### Acceso cruzado
 
 Las sesiones de TUI y Telegram se almacenan en la misma base de datos. Desde la TUI puedes cargar sesiones de Telegram con `/load <id>` (y viceversa). El modelo también puede acceder a sesiones pasadas usando las session tools (`session_list`, `session_load`, `session_search`).
+
+#### Panic buttons (Telegram)
+
+| Comando | Acción |
+| --- | --- |
+| `/stop` | Interrupt (para generación actual) |
+| `/kill` | Kill (cancelación nuclear + kill subprocess) |
 
 ## Barra de estado (ActivityIndicator)
 
@@ -147,6 +154,9 @@ Popup modal con lista de comandos seleccionable:
 | Copy last code | Copiar último bloque de código |
 | Show model info | Info del modelo |
 | List available models | Listar modelos del provider |
+| Session info | Ver información de la sesión activa |
+| Interrupt | Para generación actual (Escape) |
+| Kill | Cancelación nuclear + kill subprocess (Ctrl+K) |
 
 Navegación: `↑`/`↓` para mover, `Enter` para seleccionar, `Escape` para cerrar.
 
@@ -172,6 +182,7 @@ Navegación: `↑`/`↓` para mover, `Enter` para seleccionar, `Escape` para cer
 | `/history` | Mostrar prompts recientes |
 | `/cwd` | Mostrar directorio actual |
 | `/safe` | Alternar estado visual de safe mode |
+| `/session` | Ver información de la sesión activa |
 
 ## Atajos de teclado
 
@@ -187,6 +198,8 @@ Navegación: `↑`/`↓` para mover, `Enter` para seleccionar, `Escape` para cer
 | `Ctrl+D` | Toggle reasoning (último bloque) |
 | `Ctrl+E` | Alternar safe mode |
 | `Ctrl+X` | Copiar último bloque de código |
+| `Escape` | Para generación actual |
+| `Ctrl+K` | Cancelación nuclear + kill subprocess |
 | `F2` | Cambiar tema cíclicamente |
 | `F3` | Cambiar provider (primary/fallback/local) |
 | `↑` / `↓` | Historial de entrada |

@@ -1,6 +1,6 @@
 # Arquitectura técnica
 
-Documento actualizado para la release 0.5.0.
+Documento actualizado para la release 0.7.0.
 
 ## Entrada principal
 
@@ -139,6 +139,22 @@ Usuario envía mensaje
 | `("reasoning", str)` | Delta de razonamiento | `choices[0].delta.reasoning_content` (DeepSeek) o `.reasoning` (Gemma 4) |
 | `("tool_calls", [ToolCall])` | Tool calls completadas | Acumuladas por índice SSE |
 
+### Circuit Breaker (`providers/circuit.py`)
+
+Cada provider tiene un `CircuitBreaker` asociado con 3 estados:
+
+| Estado | Significado | Tráfico |
+|--------|------------|---------|
+| CLOSED | Funcionando normalmente | Permitido |
+| OPEN | Provider caído | Bloqueado |
+| HALF_OPEN | Probando recuperación | 1 petición permitida |
+
+**Flujo:**
+1. `ProviderManager.get_healthy(preferred)` devuelve el primer provider con circuit CLOSED o HALF_OPEN
+2. Si el provider falla → `report_failure()` → threshold (3 fallos) → circuit OPEN
+3. Tras 60s → HALF_OPEN → 1 petición de prueba → éxito=CLOSED / fallo=OPEN
+4. Si el preferido está OPEN → intenta fallback → local automáticamente
+
 ### Switching
 
 `F3` en la TUI alterna entre providers configurados. El provider activo determina a qué endpoint se envían los mensajes. Al cambiar, la ActivityIndicator se actualiza dinámicamente.
@@ -214,6 +230,17 @@ class TelegramBot:
 - **Aislamiento**: cada `chat_id` tiene su propia sesión e historial.
 - **Acceso cruzado**: el modelo puede usar `session_list(source="telegram")` para acceder a sesiones de Telegram desde la TUI.
 
+### Panic Buttons (v0.6.0)
+
+Cancelación de dos niveles:
+
+| Nivel | TUI | Telegram | Mecanismo |
+|-------|-----|----------|-----------|
+| Interrupt | `Escape` | `/stop` | `threading.Event` → stream loop break |
+| Kill | `Ctrl+K` | `/kill` | interrupt + subprocess.terminate/kill + cleanup |
+
+Implementado via `Agent._cancel_event` (threading.Event) y `Agent._active_subprocess` para kill del proceso activo.
+
 ## Tools
 
 - `tools/registry.py` — registro y ejecución de tools
@@ -222,7 +249,7 @@ class TelegramBot:
 
 ### Seguridad de tools
 
-- **BashTool**: allowlist de binarios (`ls`, `pwd`, `cat`, `echo`, `git`, `grep`, `find`, `mkdir`, `touch`, `uv`, `python`, `python3`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
+- **BashTool**: allowlist de 24 binarios (`ls`, `pwd`, `echo`, `mkdir`, `rmdir`, `touch`, `chmod`, `chown`, `find`, `grep`, `rg`, `wc`, `sort`, `uniq`, `diff`, `git`, `python3`, `node`, `bun`, `uv`, `npm`, `npx`, `make`, `cmake`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
 - **FileReadTool / FileWriteTool**: `_resolve_workspace_path()` impide path traversal. I/O delegado a `asyncio.to_thread` para no bloquear el event loop.
 - **FileEditTool**: search/replace + create. Backup automático con timestamp. Diff unificado. `_no_match_help` con diagnósticos de partial match.
 - **WebFetchTool**: HTTP GET via httpx. Solo URLs http/https. Validación de content-type (text/*, json, xml). HTML se convierte a texto plano (tag stripping). Truncation a 30k chars. Timeout configurable (15s default).
@@ -240,6 +267,16 @@ class SessionListTool(Tool):
 
 El `Agent` registra estas tools automáticamente en `__init__` después de crear el store.
 
+### Herramientas de Exploración Nativas (v0.6.0)
+
+Tres tools nativas en Python que no dependen de bash:
+
+- **GrepTool** — Búsqueda regex en archivos con glob filter. Cap: 200 matches, 1MB archivos.
+- **GlobTool** — Pattern matching con `pathlib.glob`. Cap: 500 resultados.
+- **TreeTool** — Jerarquía de directorios con tamaños. Cap: 300 líneas.
+
+Todas usan `_resolve_workspace_path()` para sandbox y `asyncio.to_thread()` para I/O no bloqueante.
+
 ## Skills
 
 - `skills/loader.py` — carga, búsqueda y gestión de skills persistentes
@@ -256,7 +293,7 @@ Skills son procedimientos reutilizables almacenados como archivos SKILL.md con f
 - `verify_skill()`: marca como verificada tras validación del usuario
 - `skill_summary()`: genera resumen para inyección en system prompt
 
-**Evolución prevista (v0.6.0):**
+**Evolución prevista (v0.8.0):**
 
 Las skills pasarán de instrucciones estáticas a unidades autónomas:
 - **Tools dinámicas**: scripts en `skills/<name>/scripts/` auto-registrados como tools
@@ -335,6 +372,5 @@ Librerías y frameworks que usamos, no creamos. Versión mínima según `pyproje
 
 - `safe_mode` no endurece todavía el backend.
 - La memoria semántica avanzada sigue fuera de producción (requiere grupo `memory`).
-- No hay auto-fallback de providers (circuit breaker pendiente).
 - El estimador de tokens es una heurística (chars/3), no un tokenizer real.
 - PromptTextArea no soporta Shift+Enter para newline (limitación de Textual).
