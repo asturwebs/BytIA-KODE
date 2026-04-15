@@ -45,3 +45,8 @@ class CircuitBreaker:
             self._state = self.OPEN
         elif self._failure_count >= self._failure_threshold:
             self._state = self.OPEN
+
+    def force_open(self) -> None:
+        self._state = self.OPEN
+        self._failure_count = self._failure_threshold
+        self._last_failure_time = time.monotonic()
