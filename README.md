@@ -104,6 +104,16 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 ## Instalación
 
+### Instalación rápida (recomendada)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asturwebs/BytIA-KODE/main/install.sh | bash
+```
+
+Esto instala todo automáticamente: clona el repo, configura el entorno Python, crea el wrapper `bytia-kode` en `~/.local/bin`, y genera el `.env` con valores por defecto. Solo necesitas editar el `.env` con tu provider y API key.
+
+### Instalación manual
+
 Requiere [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```bash
