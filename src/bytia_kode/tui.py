@@ -1,6 +1,7 @@
 """BytIA KODE TUI - Theme-aware CLI interface with Textual. v4"""
 from __future__ import annotations
 
+import re
 import asyncio
 import json
 import logging
@@ -1002,6 +1003,9 @@ class BytIAKODEApp(App):
                     chat.scroll_end(animate=False)
                 elif isinstance(chunk, tuple) and chunk[0] == "system":
                     self._add_message("system", chunk[1])
+                    provider_match = re.search(r"(?:Usando|Intentando con) '(\w+)'", chunk[1])
+                    if provider_match and provider_match.group(1) != self.active_provider:
+                        self.active_provider = provider_match.group(1)
                 elif isinstance(chunk, tuple) and chunk[0] == "error":
                     if stream_widget and stream_widget.is_mounted:
                         stream_widget.remove()
