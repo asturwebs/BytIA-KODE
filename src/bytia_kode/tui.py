@@ -536,7 +536,8 @@ class BytIAKODEApp(App):
     def _on_provider_changed(self, old_provider: str, new_provider: str) -> None:
         self._add_system_message(f"Switched to: {self._provider_display_name(new_provider)}")
         self.query_one(ActivityIndicator)._refresh()
-        self.run_worker(self._auto_detect_model, exclusive=True)
+        if new_provider == "primary":
+            self.run_worker(self._auto_detect_model, exclusive=True)
 
     async def _auto_detect_model(self) -> None:
         """Auto-detect loaded model from router on startup/provider switch."""
@@ -1001,16 +1002,15 @@ class BytIAKODEApp(App):
                         await chat.mount(stream_widget)
                     stream_widget.update(RichMarkdown(response_text))
                     chat.scroll_end(animate=False)
+                elif isinstance(chunk, tuple) and chunk[0] == "provider_used":
+                    if chunk[1] != self.active_provider:
+                        self.active_provider = chunk[1]
                 elif isinstance(chunk, tuple) and chunk[0] == "system":
                     self._add_message("system", chunk[1])
-                    provider_match = re.search(r"(?:Usando|Intentando con) '(\w+)'", chunk[1])
-                    if provider_match and provider_match.group(1) != self.active_provider:
-                        self.active_provider = provider_match.group(1)
                 elif isinstance(chunk, tuple) and chunk[0] == "error":
                     if stream_widget and stream_widget.is_mounted:
                         stream_widget.remove()
                     self._add_message("error", chunk[1])
-
             # Finalize: remove streaming widget, add formatted message
             if stream_widget and stream_widget.is_mounted:
                 stream_widget.remove()
