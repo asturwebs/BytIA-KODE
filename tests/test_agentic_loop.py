@@ -170,3 +170,79 @@ class TestAgenticLoopTermination:
         assert msgs[0]["role"] == "user"
         assert msgs[1]["role"] == "assistant"
         assert "Persisted!" in msgs[1]["content"]
+
+
+class TestProviderFallback:
+    """Verify automatic provider fallback when primary fails."""
+
+    @pytest.mark.asyncio
+    async def test_fallback_on_primary_failure(self, agent):
+        """When primary fails, agent falls back to next available provider."""
+        failing_provider = AsyncMock()
+        failing_provider.chat_stream = MagicMock(side_effect=ConnectionError("Primary down"))
+
+        working_provider = AsyncMock()
+        working_provider.chat_stream = _mock_stream_response(text="Fallback response.")
+
+        agent.providers._primary = failing_provider
+        agent.providers._fallback = working_provider
+        agent.providers._circuits["primary"]._failure_threshold = 1
+
+        agent.providers.get = MagicMock(side_effect=lambda name: {
+            "primary": failing_provider,
+            "fallback": working_provider,
+        }[name])
+
+        collected = []
+        async for chunk in agent.chat("test"):
+            collected.append(chunk)
+
+        system_msgs = [c for c in collected if isinstance(c, tuple) and c[0] == "system"]
+        assert len(system_msgs) >= 1
+        assert "fallback" in system_msgs[0][1].lower()
+
+    @pytest.mark.asyncio
+    async def test_system_message_on_provider_switch(self, agent):
+        """Agent yields ('system', msg) when switching providers."""
+        failing_provider = AsyncMock()
+        failing_provider.chat_stream = MagicMock(side_effect=ConnectionError("Down"))
+
+        working_provider = AsyncMock()
+        working_provider.chat_stream = _mock_stream_response(text="OK")
+
+        agent.providers._primary = failing_provider
+        agent.providers._fallback = working_provider
+        agent.providers._circuits["primary"]._failure_threshold = 1
+
+        agent.providers.get = MagicMock(side_effect=lambda name: {
+            "primary": failing_provider,
+            "fallback": working_provider,
+        }[name])
+
+        collected = []
+        async for chunk in agent.chat("test"):
+            collected.append(chunk)
+
+        system_msgs = [c for c in collected if isinstance(c, tuple) and c[0] == "system"]
+        assert any("fallback" in m[1].lower() for m in system_msgs)
+
+    @pytest.mark.asyncio
+    async def test_all_providers_fail_yields_error(self, agent):
+        """When all providers fail, yields ('error', msg)."""
+        failing = AsyncMock()
+        failing.chat_stream = MagicMock(side_effect=ConnectionError("All down"))
+
+        agent.providers._primary = failing
+        agent.providers._fallback = failing
+        agent.providers._local = failing
+        for cb in agent.providers._circuits.values():
+            cb._failure_threshold = 1
+
+        agent.providers.get = MagicMock(return_value=failing)
+
+        collected = []
+        async for chunk in agent.chat("test"):
+            collected.append(chunk)
+
+        error_msgs = [c for c in collected if isinstance(c, tuple) and c[0] == "error"]
+        assert len(error_msgs) >= 1

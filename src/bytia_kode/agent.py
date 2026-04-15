@@ -434,7 +434,11 @@ class Agent:
                 self._current_session_id,
                 role="user", content=sanitized_message,
             )
-        provider_client = self.providers.get(provider)
+        client, used_provider = self.providers.get_healthy(provider)
+        if used_provider != provider:
+            yield ("system", f"Provider '{provider}' no disponible. Usando '{used_provider}'.")
+            provider = used_provider
+        provider_client = client
         tool_defs = self.tools.get_tool_defs()
         await self._manage_context(provider_client)
 
@@ -500,6 +504,7 @@ class Agent:
                         )
 
                 if not tool_calls_accum:
+                    self.providers.report_success(provider)
                     break
 
                 if self._cancel_event.is_set():
@@ -510,7 +515,19 @@ class Agent:
                 yield "\n[Max iterations reached]"
         except (TimeoutError, ConnectionError, RuntimeError, httpx.HTTPError) as exc:
             error_message = _format_chat_error(exc)
-            logger.error("Agent chat failure: %s", error_message)
+            logger.error("Agent chat failure on '%s': %s", provider, error_message)
+            self.providers.report_failure(provider)
+            remaining = [n for n in self.providers._priority_order
+                         if n != provider
+                         and self.providers._circuits.get(n)
+                         and self.providers._circuits[n].is_available]
+            if remaining:
+                next_provider = remaining[0]
+                yield ("system", f"Provider '{provider}' falló. Intentando con '{next_provider}'...")
+                self.messages = self.messages[:-1] if self.messages and self.messages[-1].role == "user" else self.messages
+                async for chunk in self.chat(user_message, provider=next_provider):
+                    yield chunk
+                return
             self.messages.append(Message(role="assistant", content=f"[Error: {error_message}]"))
             if self._current_session_id:
                 self._session_store.append_message(

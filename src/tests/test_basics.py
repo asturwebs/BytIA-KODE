@@ -234,12 +234,15 @@ def test_agent_preserves_history_on_provider_runtime_error():
     agent = Agent(load_config())
     agent._initialized = True
     agent.providers.get = lambda provider: FailingProvider()
+    agent.providers.get_healthy = lambda preferred: (FailingProvider(), preferred)
 
     async def run_chat():
         return [chunk async for chunk in agent.chat("hola")]
 
     result = asyncio.run(run_chat())
-    assert result == [("error", "Provider runtime error: provider exploded")]
+    error_msgs = [c for c in result if isinstance(c, tuple) and c[0] == "error"]
+    assert len(error_msgs) >= 1
+    assert "provider exploded" in error_msgs[0][1]
     assert len(agent.messages) == 2
     assert agent.messages[0].role == "user"
     assert agent.messages[0].content == "hola"
