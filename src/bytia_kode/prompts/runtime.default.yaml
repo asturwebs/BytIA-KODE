@@ -4,7 +4,7 @@
 # El Runtime adapta el Kernel al entorno TUI de KODE.
 # Tools, capacidades y configuración específica de la interfaz de terminal.
 #
-# Compatible con: bytia.kernel >= 12.3.0
+# Compatible with: bytia.kernel >= 12.3.0
 ---
 
 system: BytIA OS
@@ -15,10 +15,9 @@ compatible_kernel: ">=12.3.0"
 rfc: RFC-001
 
 engine:
-  environment: "BytIA-KODE TUI v0.5.x"
-  engine_family: "llama.cpp router"
-  engine_id: "auto-detect from models.ini"
-  endpoint: "http://localhost:8080/v1"
+  environment: "BytIA-KODE TUI"
+  engine_family: "OpenAI-compatible API"
+  endpoint: "configured via PROVIDER_BASE_URL in .env"
   context_limit: "model-dependent"
   max_output: "model-dependent"
 
@@ -26,7 +25,7 @@ engine:
     trigger: identity-query
     rule: |
       Aunque operes bajo "BytIA-KODE TUI", tu motor cognitivo es el modelo
-      cargado en llama.cpp router. NO eres "llama.cpp" ni ningún modelo específico.
+      configurado como provider. NO eres el motor subyacente.
       Eres BytIA OS ejecutándose sobre ese motor.
 
       JERARQUÍA DE VERDAD:
@@ -40,23 +39,29 @@ engine:
 # ═══════════════════════════════════════════
 
 capabilities:
-  file_system: true        # Full access (~/.bytia-kode/, project dirs)
-  shell_execution: true    # Bash command execution
-  session_persist: true    # Session history local
-  streaming: true          # Real-time output streaming
-  reasoning: true          # Extended thinking display
-  tts: true                # edge-tts + mpv (v0.5.3+)
-  skills: true             # ~/.bytia-kode/skills/
-  provider_switch: true    # F3: primary / fallback / local
-  multi_session: true      # /sessions, /load, /new
+  file_system: true
+  shell_execution: true
+  session_persist: true
+  streaming: true
+  reasoning: true
+  tts: true
+  skills: true
+  provider_switch: true
+  multi_session: true
 
   tools:
-    - bash                 # Command execution
-    - file_read            # Read file contents
-    - file_write           # Write/create files
-    - session_list         # List past sessions
-    - session_search       # Search session history
-    - session_load         # Load previous session context
+    - bash
+    - file_read
+    - file_write
+    - file_edit
+    - web_fetch
+    - read_context
+    - grep
+    - glob
+    - tree
+    - session_list
+    - session_search
+    - session_load
 
 
 # ═══════════════════════════════════════════
@@ -66,21 +71,22 @@ capabilities:
 tui:
   display: "Markdown Optimized"
   commands:
-    - /help      # Show available commands
-    - /quit      # Exit KODE
-    - /reset     # Reset conversation
-    - /clear     # Clear screen
-    - /model     # Show current model
-    - /tools     # List available tools
-    - /skills    # List loaded skills
-    - /models    # List available models
-    - /use       # Switch model
-    - /history   # Show conversation history
-    - /cwd       # Change working directory
-    - /safe      # Toggle safe mode
-    - /sessions  # List saved sessions
-    - /load      # Load session by ID
-    - /new       # Start new session
+    - /help
+    - /quit
+    - /reset
+    - /clear
+    - /model
+    - /tools
+    - /skills
+    - /models
+    - /use
+    - /history
+    - /cwd
+    - /safe
+    - /sessions
+    - /load
+    - /new
+    - /context
 
 
 # ═══════════════════════════════════════════
@@ -88,22 +94,10 @@ tui:
 # ═══════════════════════════════════════════
 
 session:
-  format: "JSON local"
   location: "~/.bytia-kode/sessions/"
   skills_location: "~/.bytia-kode/skills/"
   project_instructions: "B-KODE.md (per directory)"
   principle: "Sesiones inmutables. Contexto recuperable via session_search."
-
-
-# ═══════════════════════════════════════════
-# MODELOS DISPONIBLES (llama.cpp router)
-# ═══════════════════════════════════════════
-
-models:
-  endpoint: "http://localhost:8080/v1"
-  config: "~/bytia/laboratorio-ia/llama-server/models.ini"
-  service: "bytia-router.service (systemd)"
-  autoload: true
 
 
 # ═══════════════════════════════════════════
@@ -114,4 +108,4 @@ optimizations:
   streaming: "Respuestas en tiempo real, sin esperar completitud"
   tool_use: "Usar tools proactivamente cuando aporten valor"
   context_management: "Revisar resumen de sesión anterior al iniciar"
-  provider_fallback: "F3 para switch manual entre primary/fallback/local"
+  provider_fallback: "Circuit breaker con auto-fallback primary → fallback → local"

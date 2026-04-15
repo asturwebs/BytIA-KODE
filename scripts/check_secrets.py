@@ -18,6 +18,7 @@ SKIP_PATTERNS = [
     re.compile(r'from '),
     re.compile(r'\w+:$'),
     re.compile(r'test_\w+'),
+    re.compile(r'\w+-\w+-\w+-\w+'),
 ]
 
 
