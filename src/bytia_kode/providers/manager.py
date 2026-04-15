@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 from bytia_kode.config import ProviderConfig
+from bytia_kode.providers.circuit import CircuitBreaker
 from bytia_kode.providers.client import ProviderClient
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,17 @@ class ProviderManager:
                 "not-needed",
                 config.local_model,
             )
+
+        self._circuits: dict[str, CircuitBreaker] = {"primary": CircuitBreaker()}
+        if self._fallback:
+            self._circuits["fallback"] = CircuitBreaker()
+        if self._local:
+            self._circuits["local"] = CircuitBreaker()
+        self._priority_order = ["primary"]
+        if self._fallback:
+            self._priority_order.append("fallback")
+        if self._local:
+            self._priority_order.append("local")
 
     async def auto_detect_model(self) -> bool:
         """If primary model is 'auto', detect loaded model from router.
@@ -79,15 +91,47 @@ class ProviderManager:
             await self._local.close()
 
     def list_available(self) -> list[str]:
-        """Return list of configured provider names."""
-        available = ["primary"]
-        if self._fallback:
-            available.append("fallback")
-        if self._local:
-            available.append("local")
-        return available
+        """Return list of provider names with healthy circuits."""
+        return [name for name in self._priority_order if self._circuits[name].is_available]
 
     def set_model(self, provider: str, model: str):
         """Update model for a provider at runtime."""
         client = self.get(provider)
         client.model = model
+
+    def get_healthy(self, preferred: str = "primary") -> tuple[ProviderClient, str]:
+        """Return (client, name) of first available provider.
+
+        Order: preferred -> rest by priority. If all OPEN -> returns preferred as last resort.
+        """
+        preferred_cb = self._circuits.get(preferred)
+        if preferred_cb and preferred_cb.is_available:
+            return self.get(preferred), preferred
+
+        for name in self._priority_order:
+            if name == preferred:
+                continue
+            cb = self._circuits.get(name)
+            if cb and cb.is_available:
+                return self.get(name), name
+
+        logger.warning("All providers in OPEN state — using %s as last resort", preferred)
+        return self.get(preferred), preferred
+
+    def report_success(self, provider: str) -> None:
+        cb = self._circuits.get(provider)
+        if cb:
+            cb.record_success()
+
+    def report_failure(self, provider: str) -> None:
+        cb = self._circuits.get(provider)
+        if cb:
+            cb.record_failure()
+            if cb.state == "open":
+                logger.warning("Circuit OPEN for provider '%s'", provider)
+
+    def get_status(self) -> dict[str, dict]:
+        return {
+            name: {"state": cb.state, "failures": cb._failure_count}
+            for name, cb in self._circuits.items()
+        }
