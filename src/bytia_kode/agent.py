@@ -23,8 +23,11 @@ from bytia_kode.tools.session import SessionListTool, SessionLoadTool, SessionSe
 
 logger = logging.getLogger(__name__)
 CORE_IDENTITY_PACKAGE = "bytia_kode.prompts"
+KERNEL_DEFAULT = "kernel.default.yaml"
+RUNTIME_DEFAULT = "runtime.default.yaml"
 KERNEL_RESOURCE = "bytia.kernel.yaml"
 RUNTIME_RESOURCE = "bytia.runtime.kode.yaml"
+USER_PROMPTS_DIR = Path.home() / ".bytia-kode" / "prompts"
 MAX_CONTEXT_TOKENS = 131072  # ~128k tokens default (Gemma 4 26B supports 256k)
 
 _FAMILY_MAP = {
@@ -48,10 +51,54 @@ def _load_yaml_resource(filename: str) -> dict[str, Any]:
     return payload
 
 
+def _load_yaml_file(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        with path.open("rb") as fh:
+            payload = yaml.safe_load(fh)
+    except yaml.YAMLError as exc:
+        logger.warning("Invalid YAML in %s: %s", path, exc)
+        return None
+    if not isinstance(payload, dict) or not payload:
+        return None
+    return payload
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    merged = dict(base)
+    for key, value in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def load_identity() -> tuple[dict[str, Any], dict[str, Any]]:
-    kernel = _load_yaml_resource(KERNEL_RESOURCE)
-    runtime = _load_yaml_resource(RUNTIME_RESOURCE)
-    logger.info("BytIA OS loaded: kernel=%s + runtime=%s", KERNEL_RESOURCE, RUNTIME_RESOURCE)
+    kernel_path = USER_PROMPTS_DIR / KERNEL_RESOURCE
+    runtime_path = USER_PROMPTS_DIR / RUNTIME_RESOURCE
+    if kernel_path.exists():
+        kernel = _load_yaml_file(kernel_path)
+        if kernel:
+            default = _load_yaml_resource(KERNEL_DEFAULT)
+            kernel = _deep_merge(default, kernel)
+            logger.info("BytIA OS: user kernel override loaded from %s", kernel_path)
+        else:
+            kernel = _load_yaml_resource(KERNEL_DEFAULT)
+    else:
+        kernel = _load_yaml_resource(KERNEL_DEFAULT)
+    if runtime_path.exists():
+        runtime = _load_yaml_file(runtime_path)
+        if runtime:
+            default = _load_yaml_resource(RUNTIME_DEFAULT)
+            runtime = _deep_merge(default, runtime)
+            logger.info("BytIA OS: user runtime override loaded from %s", runtime_path)
+        else:
+            runtime = _load_yaml_resource(RUNTIME_DEFAULT)
+    else:
+        runtime = _load_yaml_resource(RUNTIME_DEFAULT)
+    logger.info("BytIA OS loaded: kernel v%s + runtime v%s", kernel.get("version", "?"), runtime.get("version", "?"))
     return kernel, runtime
 
 
