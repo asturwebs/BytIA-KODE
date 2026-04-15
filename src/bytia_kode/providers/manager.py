@@ -102,15 +102,11 @@ class ProviderManager:
     def get_healthy(self, preferred: str = "primary") -> tuple[ProviderClient, str]:
         """Return (client, name) of first available provider.
 
-        Order: preferred -> rest by priority. If all OPEN -> returns preferred as last resort.
+        Always walks priority order from the top — this lets circuit breakers
+        naturally recover: a HALF_OPEN primary will be tried before fallback.
+        Falls back to the requested provider as last resort if all circuits are OPEN.
         """
-        preferred_cb = self._circuits.get(preferred)
-        if preferred_cb and preferred_cb.is_available:
-            return self.get(preferred), preferred
-
         for name in self._priority_order:
-            if name == preferred:
-                continue
             cb = self._circuits.get(name)
             if cb and cb.is_available:
                 return self.get(name), name

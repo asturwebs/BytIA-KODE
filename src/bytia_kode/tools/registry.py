@@ -41,7 +41,7 @@ def set_workspace_root(root: Path) -> None:
     _WORKSPACE_ROOT = root.resolve()
 
 _DEFAULT_BINARIES = {
-    "ls", "pwd", "echo", "git", "grep", "find", "mkdir", "touch",
+    "ls", "pwd", "echo", "git", "grep", "find", "mkdir", "rmdir", "touch",
     "mv", "cp", "rm", "wc", "date", "chmod",
     "curl", "wget", "scp", "ssh",
     "uv", "python", "python3", "pip", "pip3",
