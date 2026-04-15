@@ -209,6 +209,18 @@
 - [ ] System prompt caching optimizado
 - [ ] Memoria entre sesiones (recordar decisiones previas)
 
+## v0.7.2 — Installer Interactivo
+
+**Objetivo:** El instalador `curl | bash` guía al usuario para configurar lo necesario antes de primer uso.
+
+- [ ] Prompt interactivo para provider URL, API key y modelo durante la instalación
+- [ ] Validación de conectividad contra el provider antes de continuar
+- [ ] Detección automática de modelos disponibles via `/v1/models`
+- [ ] Opción de configurar Telegram bot token durante install
+- [ ] Generación del override de identidad (`~/.bytia-kode/prompts/bytia.kernel.yaml`) con datos del usuario
+- [ ] `--non-interactive` flag para CI/automatización (usa `.env.example` como ahora)
+- [ ] Resumen final con config aplicada y siguiente paso claro
+
 ## v1.0.0 — Producción
 
 **Objetivo:** Release estable para uso diario.
