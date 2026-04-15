@@ -1,9 +1,9 @@
-# BytIA KODE v0.7.0
+# BytIA KODE
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.7.0-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-130%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.7.1-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-110%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -36,11 +36,19 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.7.0`
+> Release actual: `0.7.1`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+### Novedades en v0.7.1 — Circuit Breaker Hardening
+
+- **Reasoning leak fixed** — `<reasoning>` tags ya no se almacenan en el historial de mensajes.
+- **Fallback notification** — TUI muestra "Switched to: Fallback" en tiempo real durante cambios de provider.
+- **Circuit breaker recovery** — `get_healthy()` recorre prioridad completa. Primary se reintenta automáticamente tras 60s.
+- **Security fix** — `rmdir` añadido al BashTool allowlist. Previene bypass vía `file_write` + `python script.py`.
+- **No duplicate messages** — Notificación única desde chunk handler, sin duplicados del watcher reactivo.
 
 ### Novedades en v0.7.0 — Circuit Breaker y Provider Resilience
 
@@ -65,7 +73,7 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 - **Sistema de memoria persistente** — Directorio `~/.bytia-kode/memoria/` con 4 categorías (procedimientos, contexto, tecnología, decisiones) + index auto-generable. Skill `memory-manager` para almacenar, buscar, indexar y recuperar conocimiento entre sesiones.
 - **Trusted paths** — `_resolve_workspace_path()` ahora acepta directorios confiados además del workspace. `~/.bytia-kode/` es trusted por defecto, permitiendo al agente gestionar su memoria desde cualquier proyecto sin comprometer la sandbox del código del usuario.
-- **Allowlist expandida** — BashTool: 27 binarios permitidos (antes 13). Nuevos: `mv`, `cp`, `rm`, `head`, `tail`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `pip`, `pip3`.
+- **Allowlist expandida** — BashTool: binarios permitidos ampliados. Nuevos: `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `pip`, `pip3`. (`head` y `tail` fueron eliminados en v0.6.0, `rmdir` añadido en v0.7.1; total actual: 25)
 - **EXTRA_BINARIES configurable** — Variables de entorno para expandir la allowlist sin modificar código. `EXTRA_BINARIES=graphify` en `.env`.
 - **Skill graphify** — Análisis de código con knowledge graphs (tree-sitter). Requiere `uv tool install graphifyy`.
 
@@ -290,9 +298,9 @@ Pulsa `F2` para cambiar entre los 19 temas disponibles (12 oscuros + 7 claros, p
 | `session_list` | Listar sesiones guardadas | Solo lectura |
 | `session_load` | Cargar contexto de sesión pasada | Solo lectura |
 | `session_search` | Buscar sesiones por título | Solo lectura |
-| `grep` | GrepTool | Búsqueda regex en archivos | v0.6.0 |
-| `glob` | GlobTool | Pattern matching de archivos | v0.6.0 |
-| `tree` | TreeTool | Jerarquía de directorios | v0.6.0 |
+| `grep` | Búsqueda regex en archivos | v0.6.0 |
+| `glob` | Pattern matching de archivos | v0.6.0 |
+| `tree` | Jerarquía de directorios | v0.6.0 |
 
 Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.
 
