@@ -1,5 +1,23 @@
 # BytIA KODE - Development Log
 
+## 2026-04-15 - Sesión 24: Circuit Breaker y Provider Resilience (v0.7.0)
+
+### Contexto
+
+Implementación del patrón Circuit Breaker para que el agente pueda cambiar automáticamente de provider cuando el primario falla, sin intervención del usuario.
+
+### Novedades
+
+1. **CircuitBreaker** — Clase con 3 estados (CLOSED/OPEN/HALF_OPEN), threshold configurable (default: 3 fallos), auto-recuperación tras 60s.
+2. **ProviderManager.get_healthy()** — Devuelve el primer provider disponible por prioridad (primary→fallback→local). Si todos están OPEN, devuelve el preferido como último recurso.
+3. **Agent auto-fallback** — Si el provider falla durante `chat()`, se reporta el fallo al circuit breaker y se reintenta con el siguiente provider disponible.
+4. **System messages** — TUI y Telegram muestran aviso informativo cuando se cambia de provider.
+
+### Tests
+
+- 24 tests nuevos: 8 unitarios CircuitBreaker + 7 ProviderManager health + 3 Agent fallback + 6 existentes arreglados
+- Total: 130 tests pasando
+
 ## 2026-04-12 - Sesión 23: Panic Buttons, Seguridad y Auto-Skills (v0.6.0)
 
 ### Contexto
