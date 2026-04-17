@@ -1,5 +1,61 @@
 # BytIA KODE - Development Log
 
+## Session 25 — 2026-04-17 — B-KODE.md Rewrite + Security Hardening
+
+**Scope:** Complete rewrite of agent initialization docs, security audit of public repo, and intercom reorganization.
+
+### B-KODE.md Rewrite
+
+Previous B-KODE.md (71 lines, ~15% coverage) was missing critical information for Kode agent initialization:
+- **2 errors:** documented non-existent `memory_store/search/index/read` tools; intercom Claw path was oversimplified
+- **9 missing sections:** identity YAML system, 11 registered tools, bash allowlist, circuit breaker, streaming protocol, sessions SQLite WAL, TUI commands/keybindings, Telegram commands, audio/TTS, env variables
+
+Rewrote to ~180 lines (~90% coverage). All 11 tools documented, identity two-layer architecture explained, 17 env vars with defaults.
+
+Also updated CLAUDE.md with 13 non-obvious gotchas from DEVLOG and claude-mem investigation (reasoning leak fix, circuit breaker recovery, dev wrapper vs uv tool install, B-KODE.md walk-up gotcha, symlink sync, etc.).
+
+### Security Audit — Public Repo Cleanup
+
+Audited entire repo for private data exposure:
+- **Removed:** 4 hardcoded `/home/asturwebs/` paths in B-KODE.md
+- **Removed:** VPS IP `46.224.65.42` and SSH port from intercom section
+- **Removed:** `.claude/settings.local.json` from git tracking (added to .gitignore)
+- **Generalized:** paths in `docs/PLAN-memory-manager-B-KODE.md` and `docs/superpowers/plans/2026-04-15-circuit-breaker.md`
+- **Created:** `SECURITY.md` with reporting policy, response timeline, security model documentation
+
+### Dependabot Patches
+
+- pytest 9.0.2 → 9.0.3 (tmpdir vulnerability)
+- cryptography 46.0.6 → 46.0.7 (buffer overflow)
+- Dismissed diskcache alert (false positive — not a dependency)
+
+### GitHub Issues
+
+- **Closed #1** (Panic Buttons) — feature complete since v0.6.0, remaining edge cases moved to #3
+- **Opened #3** — Telegram /stop handler, AgentCancelledError, cancel tests
+
+### Intercom Reorganization
+
+Moved `~/bytia-intercom/` → `~/.bytia-kode/intercom/`:
+- Kode can now access intercom via existing trusted path (`~/.bytia-kode/`)
+- Updated 6 scripts (send, check, read, ack, notify, sync) with new default paths
+- Updated `agent-intercom` SKILL.md (7 path references)
+- Historical messages in sent/ and inbox/ preserved as-is (M09: immutability)
+- Added Intercom Skill Package to ROADMAP v0.8.0
+
+### Commits (4)
+
+| Commit | Description |
+|--------|-------------|
+| `bf29afa` | docs: rewrite B-KODE.md with complete agent initialization data |
+| `dd7eacd` | fix: remove private paths and VPS IP from public repo |
+| `86420cd` | docs: add SECURITY.md with reporting policy and security model |
+| `016687a` | fix: patch Dependabot alerts — pytest 9.0.3, cryptography 46.0.7 |
+
+### Agents Used
+
+3 parallel investigation agents: claude-mem search (42 observations), DEVLOG/ROADMAP/docs analysis, B-KODE.md audit against codebase.
+
 ## Session 24 — 2026-04-15 — Circuit Breaker Hardening (v0.7.1)
 
 **Scope:** Fix 5 bugs found during live TUI testing of circuit breaker + fallback system.
