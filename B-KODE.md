@@ -24,7 +24,7 @@ Usuario puede sobreescribir la identidad en `~/.bytia-kode/prompts/bytia.kernel.
 | Config | `~/.bytia-kode/.env` |
 | Tema | `~/.bytia-kode/theme.json` |
 | User prompts | `~/.bytia-kode/prompts/` |
-| Intercom | `/home/asturwebs/bytia-intercom/` |
+| Intercom | `~/.bytia-kode/intercom/` |
 
 ## Tools Registradas (11)
 
@@ -194,15 +194,17 @@ Aislamiento por `chat_id`. Fail-secure: sin `TELEGRAM_ALLOWED_USERS` configurado
 
 Respuestas con botón 🔊. Voz: `es-MX-DaliaNeural` vía `edge-tts`, reproducción con `mpv`. Requiere `edge-tts` instalado como tool (`uv tool install edge-tts`) y `mpv` en el sistema.
 
-## Protocolo Intercom
+## Protocolo Intercom (opt-in)
 
-- **Tu inbox:** `/home/asturwebs/bytia-intercom/inbox/kode/`
+Intercom permite comunicación entre agentes BytIA. Configuración: crear `~/.bytia-kode/intercom/` con subdirectorios `inbox/` y `outbox/`.
+
+- **Tu inbox:** `~/.bytia-kode/intercom/inbox/kode/`
 - **NUNCA leas** de `inbox/claude/` ni `inbox/claw/`
-- **Enviar a Claude:** copiar `.md` a `/home/asturwebs/bytia-intercom/inbox/claude/`
+- **Enviar a Claude:** copiar `.md` a `~/.bytia-kode/intercom/inbox/claude/`
 - **Enviar a Claw:** usar `send.sh` (SCP por túnel al VPS), NO solo copiar a outbox
 - **ACK:** renombrar mensaje a `.ack` después de leerlo
 - **Telegram:** usar `$TELEGRAM_BOT_TOKEN` del entorno (NUNCA hardcodear tokens)
-- **Check inbox:** `ls /home/asturwebs/bytia-intercom/inbox/kode/*.md | grep -v '\.ack$'`
+- **Check inbox:** `ls ~/.bytia-kode/intercom/inbox/kode/*.md | grep -v '\.ack$'`
 
 ## Config — Variables de Entorno
 

@@ -96,7 +96,7 @@ class TestCircuitBreakerStates:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest tests/test_circuit_breaker.py -v`
+Run: `cd <project-root> && uv run pytest tests/test_circuit_breaker.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'bytia_kode.providers.circuit'`
 
 ---
@@ -160,13 +160,13 @@ class CircuitBreaker:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest tests/test_circuit_breaker.py -v`
+Run: `cd <project-root> && uv run pytest tests/test_circuit_breaker.py -v`
 Expected: 8 tests PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/asturwebs/bytia/proyectos/BytIA-KODE
+cd <project-root>
 git add src/bytia_kode/providers/circuit.py tests/test_circuit_breaker.py
 git commit -m "feat: add CircuitBreaker class with state transitions and recovery"
 ```
@@ -257,7 +257,7 @@ class TestProviderManagerHealth:
 
 - [ ] **Step 7: Run tests to verify they fail**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest tests/test_provider_health.py -v`
+Run: `cd <project-root> && uv run pytest tests/test_provider_health.py -v`
 Expected: FAIL — `AttributeError: 'ProviderManager' object has no attribute 'get_healthy'`
 
 ---
@@ -341,18 +341,18 @@ Modify `list_available` to filter by circuit state:
 
 - [ ] **Step 9: Run tests to verify they pass**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest tests/test_provider_health.py -v`
+Run: `cd <project-root> && uv run pytest tests/test_provider_health.py -v`
 Expected: 8 tests PASS
 
 - [ ] **Step 10: Run all existing tests to verify no regression**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest -v`
+Run: `cd <project-root> && uv run pytest -v`
 Expected: All 114 tests PASS (106 existing + 8 new circuit breaker)
 
 - [ ] **Step 11: Commit**
 
 ```bash
-cd /home/asturwebs/bytia/proyectos/BytIA-KODE
+cd <project-root>
 git add src/bytia_kode/providers/manager.py tests/test_provider_health.py
 git commit -m "feat: ProviderManager circuit breaker integration with get_healthy()"
 ```
@@ -450,7 +450,7 @@ class TestProviderFallback:
 
 - [ ] **Step 13: Run tests to verify they fail**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest tests/test_agentic_loop.py::TestProviderFallback -v`
+Run: `cd <project-root> && uv run pytest tests/test_agentic_loop.py::TestProviderFallback -v`
 Expected: FAIL — Agent still uses `get()` not `get_healthy()`
 
 ---
@@ -531,18 +531,18 @@ So the code looks like:
 
 - [ ] **Step 15: Run fallback tests to verify they pass**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest tests/test_agentic_loop.py::TestProviderFallback -v`
+Run: `cd <project-root> && uv run pytest tests/test_agentic_loop.py::TestProviderFallback -v`
 Expected: 3 tests PASS
 
 - [ ] **Step 16: Run all tests to verify no regression**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest -v`
+Run: `cd <project-root> && uv run pytest -v`
 Expected: All tests PASS
 
 - [ ] **Step 17: Commit**
 
 ```bash
-cd /home/asturwebs/bytia/proyectos/BytIA-KODE
+cd <project-root>
 git add src/bytia_kode/agent.py tests/test_agentic_loop.py
 git commit -m "feat: Agent automatic provider fallback with circuit breaker"
 ```
@@ -593,13 +593,13 @@ Insert BEFORE it:
 
 - [ ] **Step 20: Run all tests to verify no regression**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest -v`
+Run: `cd <project-root> && uv run pytest -v`
 Expected: All tests PASS
 
 - [ ] **Step 21: Commit**
 
 ```bash
-cd /home/asturwebs/bytia/proyectos/BytIA-KODE
+cd <project-root>
 git add src/bytia_kode/tui.py src/bytia_kode/telegram/bot.py
 git commit -m "feat: TUI and Telegram system messages for provider fallback"
 ```
@@ -680,13 +680,13 @@ Implementación del patrón Circuit Breaker para que el agente pueda cambiar aut
 
 - [ ] **Step 26: Final full test run**
 
-Run: `cd /home/asturwebs/bytia/proyectos/BytIA-KODE && uv run pytest -v`
+Run: `cd <project-root> && uv run pytest -v`
 Expected: All 123 tests PASS
 
 - [ ] **Step 27: Commit version bump and docs**
 
 ```bash
-cd /home/asturwebs/bytia/proyectos/BytIA-KODE
+cd <project-root>
 git add pyproject.toml ROADMAP.md CHANGELOG.md DEVLOG.md
 git commit -m "docs: v0.7.0 release — circuit breaker for provider auto-fallback"
 ```

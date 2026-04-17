@@ -26,4 +26,5 @@ patch_*.py
 .pkg-wheel-test/
 CONTEXT.md
 CLAUDE.md
+.claude/settings.local.json
 temp_audio/

@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.7.0 (Alpha estable)
+## Estado actual: v0.7.1 (Alpha estable)
 
 ### Completado
 
@@ -208,6 +208,12 @@
 - [ ] Memoria vectorial con FAISS/ChromaDB (búsqueda semántica)
 - [ ] System prompt caching optimizado
 - [ ] Memoria entre sesiones (recordar decisiones previas)
+- [ ] **Intercom como Skill Package** — sistema genérico de addons:
+  - `/setup-intercom` comando TUI que crea `~/.bytia-kode/intercom/` + instala skill
+  - Skill package auto-contenido: SKILL.md + scripts + plantillas de directorio
+  - Validación de conectividad (local + VPS/remote)
+  - Publicar como ejemplo de extensibilidad del sistema de skills
+  - Base para futuros addons: Slack bridge, Discord bridge, etc.
 
 ## v0.7.2 — Installer Interactivo
 
