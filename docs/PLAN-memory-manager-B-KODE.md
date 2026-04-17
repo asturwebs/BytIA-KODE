@@ -9,8 +9,8 @@ Crear un sistema de memoria persistente que permita a Kode almacenar, buscar y r
 ### Sandbox (PROBLEMA CRÍTICO)
 
 `_resolve_workspace_path()` sandboxea contra `Path.cwd()`:
-- CWD = `/home/asturwebs/proyectos/mi-proyecto/` → `~/.bytia-kode/memoria/` BLOQUEADO
-- CWD = `/home/asturwebs/` → `~/.bytia-kode/memoria/` PERMITIDO
+- CWD = `/home/user/projects/my-project/` → `~/.bytia-kode/memoria/` BLOQUEADO
+- CWD = `/home/user/` → `~/.bytia-kode/memoria/` PERMITIDO
 
 **Solución:** Añadir `data_dir` como trusted path en `_resolve_workspace_path()`, igual que `SkillLoader.save_skill()` ya escribe fuera del sandbox. La `data_dir` es un directorio propio del agente, no código del usuario.
 
