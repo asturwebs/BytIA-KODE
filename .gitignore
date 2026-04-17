@@ -25,4 +25,5 @@ fix_*.py
 patch_*.py
 .pkg-wheel-test/
 CONTEXT.md
+CLAUDE.md
 temp_audio/
