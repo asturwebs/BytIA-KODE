@@ -247,3 +247,186 @@
 local = ["llama-cpp-python>=0.3"]
 memory = ["sentence-transformers>=4.0", "faiss-cpu>=1.11"]
 ```
+
+---
+
+## Inspirado en oh-my-pi / pi-mono (2026-04-18)
+
+> Análisis comparativo: [oh-my-pi](https://github.com/can1357/oh-my-pi) v14.1.2 (3.1k estrellas, fork de [pi-mono](https://github.com/badlogic/pi-mono) por Mario Zechner)
+
+### v0.8.0 — Hashline Edits + LSP básico
+
+**Hashline Edits** (inspirado en oh-my-pi)
+- [ ] Anchors por hash de contenido en vez de `str_replace`
+- [ ] Hash corto (4-6 chars) generado desde contenido de línea
+- [ ] Rechazar ediciones si hash no coincide (archivo cambió desde última lectura)
+- [ ] Benchmark: medir tasa de éxito antes/después
+- **Por qué:** x10 mejora en modelos débiles, +5pp en modelos fuertes. `str_replace` es la fuente #1 de fallos.
+- **Ref:** [oh-my-pi — Hashline Edits](https://github.com/can1357/oh-my-pi#-hashline-edits)
+
+**LSP Integration básico** (inspirado en oh-my-pi)
+- [ ] Protocolo LSP client sobre stdio (Python, TypeScript, Rust mínimo)
+- [ ] Operaciones: `diagnostics`, `definition`, `references`, `hover`
+- [ ] Integración como tool en el registry (`lsp` tool)
+- [ ] Diagnósticos automáticos post-escritura
+- **Por qué:** Retroalimentación inmediata sobre errores sin compilar. oh-my-pi tiene 11 operaciones y 40+ lenguajes.
+- **Ref:** [oh-my-pi — LSP Integration](https://github.com/can1357/oh-my-pi#-lsp-integration-language-server-protocol)
+
+### v0.9.0 — Model Roles + Subagentes
+
+**Model Roles** (inspirado en oh-my-pi)
+- [ ] Roles configurables: `default`, `fast` (smol), `deep` (slow), `plan`, `commit`
+- [ ] Config en `.env`: `MODEL_DEFAULT`, `MODEL_FAST`, `MODEL_DEEP`, etc.
+- [ ] Ciclado de roles con keybinding en TUI (Ctrl+P / Alt+P)
+- [ ] Auto-selección de rol según tarea
+- **Por qué:** Separar modelos por rol optimiza coste y calidad. B-KODE ya tiene circuit breaker, faltan roles.
+- **Ref:** [oh-my-pi — Model Roles](https://github.com/can1357/oh-my-pi#-model-roles)
+
+**Subagentes / Task Tool** (inspirado en oh-my-pi)
+- [ ] Framework de subagentes con ejecución paralela
+- [ ] Agentes base: `explore`, `plan`, `review`
+- [ ] Comunicación vía cola de resultados, streaming al TUI
+- [ ] Aislamiento opcional con git worktrees
+- [ ] Tool `task` en el registry
+- **Por qué:** Paralelizar exploración de codebase = respuestas más rápidas. oh-my-pi tiene 6 agentes.
+- **Ref:** [oh-my-pi — Task Tool](https://github.com/can1357/oh-my-pi#-task-tool-subagent-system)
+
+### v0.10.0 — TTSR + Contexto inteligente
+
+**TTSR — Time Traveling Streamed Rules** (inspirado en oh-my-pi)
+- [ ] Reglas con patrón regex que vigilan el stream de output
+- [ ] Inyección just-in-time: patrón match → abort → inyectar regla → reintentar
+- [ ] Zero upfront cost: 0 tokens hasta que son relevantes
+- [ ] One-shot por sesión: cada regla solo dispara una vez
+- [ ] Definición en YAML: `ttsr_trigger: "patrón_regex"`
+- **Por qué:** Las reglas de estilo/corrección queman tokens siempre. TTSR las hace gratuitas hasta necesidad real.
+- **Ref:** [oh-my-pi — TTSR](https://github.com/can1357/oh-my-pi#-time-traveling-streamed-rules-ttsr)
+
+**Universal Config Discovery** (inspirado en oh-my-pi)
+- [ ] Detectar config de múltiples tools: `.claude/`, `.cursor/`, `.gemini/`, `.codex/`
+- [ ] Merge de CLAUDE.md, AGENTS.md, .cursorrules en contexto unificado
+- [ ] Atribución: mostrar origen de cada config
+- **Por qué:** Aprovechar configs que el usuario ya tenga. oh-my-pi detecta 8 tools.
+- **Ref:** [oh-my-pi — Universal Config Discovery](https://github.com/can1357/oh-my-pi#-universal-config-discovery)
+
+### v0.11.0 — Experiencia de desarrollo
+
+**Commit Tool** (inspirado en oh-my-pi)
+- [ ] Commits convencionales con análisis de cambios
+- [ ] `git diff` + `git log` como tools del registry
+- [ ] Detección de cambios multi-concern y split en commits atómicos
+- [ ] Validación: sin filler words, formato convencional
+- [ ] Comando `/commit` en TUI
+- **Ref:** [oh-my-pi — Commit Tool](https://github.com/can1357/oh-my-pi#-commit-tool-ai-powered-git-commits)
+
+**Python REPL Tool** (inspirado en oh-my-pi)
+- [ ] Kernel IPython persistente con output streaming
+- [ ] Prelude helpers: file I/O, search, line operations
+- [ ] Tool `python` en el registry
+- **Por qué:** El tool `bash` ejecuta Python como subproceso. Kernel persistente = más rápido + mantiene estado.
+- **Ref:** [oh-my-pi — Python Tool](https://github.com/can1357/oh-my-pi#-python-tool-ipython-kernel)
+
+**Interactive Code Review** (inspirado en oh-my-pi)
+- [ ] Comando `/review` (branch diff, uncommitted, commit específico)
+- [ ] Findings estructurados con prioridad (P0-P3)
+- [ ] Veredicto: approve / request-changes / comment
+- **Ref:** [oh-my-pi — Interactive Code Review](https://github.com/can1357/oh-my-pi#-interactive-code-review)
+
+### v0.12.0 — Infraestructura y extensibilidad
+
+**SDK / Programmatic API** (inspirado en pi-mono + oh-my-pi)
+- [ ] API Python para embeber B-KODE en otras aplicaciones
+- [ ] `create_agent_session()`, suscripción a eventos, control de modelo/tools
+- [ ] Modo RPC sobre stdin/stdout para integración multi-lenguaje
+- **Por qué:** pi-mono expone SDK nativo. oh-my-pi tiene RPC mode. Abre puerta a web UI, integraciones.
+
+**Hooks System** (inspirado en oh-my-pi)
+- [ ] Lifecycle hooks: `pre_tool_call`, `post_tool_call`, `pre_response`, `post_response`
+- [ ] Definición en Python: `~/.bytia-kode/hooks/`
+- [ ] Capacidad de bloquear/modificar tool calls y responses
+
+**MCP Client nativo** (inspirado en oh-my-pi)
+- [ ] Conexión a MCP servers vía stdio/HTTP como client
+- [ ] Auto-descubrimiento de tools MCP y registro en tool registry
+- [ ] Configuración en `.bytia-kode/mcp.json`
+
+### v0.13.0 — TUI avanzado
+
+**Session Branching** (inspirado en oh-my-pi)
+- [ ] Árbol de sesión con branching desde cualquier mensaje
+- [ ] Navegación tipo `/tree` con búsqueda
+- [ ] Labels/bookmarks en puntos clave
+
+**Persistent Prompt History** (inspirado en oh-my-pi)
+- [ ] Historial de prompts en SQLite (cross-sesión)
+- [ ] Búsqueda con Ctrl+R estilo reverse-i-search
+
+**Session Export** (inspirado en oh-my-pi)
+- [ ] Export a HTML con syntax highlighting
+- [ ] Comando `/export [path]`
+- [ ] Compartir sesiones como gists
+
+**`@file` References** (inspirado en oh-my-pi)
+- [ ] Type `@` para fuzzy-search archivos del proyecto
+- [ ] Respects `.gitignore`
+- [ ] Contenido del archivo inyectado inline en el prompt
+- **Por qué:** Productividad enorme. No más copy-paste de archivos. oh-my-pi y Claude Code lo tienen.
+- **Complejidad:** Baja — fuzzy search + file read + inyección en prompt
+
+**Path Completion con Tab** (inspirado en oh-my-pi)
+- [ ] Autocompletar rutas relativas, `../`, `~/` con Tab
+- [ ] Integración con `PromptTextArea`
+- **Por qué:** QoL básico que todo coding agent tiene. B-KODE no lo tiene.
+- **Complejidad:** Media — requiere interceptar Tab en PromptTextArea y resolver paths
+
+**Powerline Footer** (inspirado en oh-my-pi)
+- [ ] Footer informativo: modelo activo + cwd + git branch/status + tokens + context %
+- [ ] Actualización en tiempo real durante streaming
+- **Por qué:** oh-my-pi muestra todo esto en una línea. Nuestro StatusBar actual es mínimo.
+- **Complejidad:** Media — reemplazar Footer estático con widget reactivo
+
+**Auto Session Titles** (inspirado en oh-my-pi)
+- [ ] Título automático basado en primer mensaje del usuario
+- [ ] Mostrar en `/sessions` list y welcome screen
+- **Por qué:** Sesiones sin título son inútiles para buscar. oh-my-pi usa el commit model para generar títulos.
+- **Complejidad:** Baja — tomar primeras N palabras del primer mensaje, o pedir al modelo que genere un título
+
+**Welcome Screen** (inspirado en oh-my-pi)
+- [ ] Pantalla de bienvenida: logo + tips + sesiones recientes seleccionables
+- [ ] Reemplazar el banner estático actual
+- **Por qué:** Primera impresión. oh-my-pi muestra sesiones recientes y tips. Nosotros solo un banner.
+- **Complejidad:** Media — nuevo screen con lista navegable
+
+**Grouped Tool Display** (inspirado en oh-my-pi)
+- [ ] Tool calls consecutivos del mismo tipo (ej: 5 reads) mostrados como compact tree
+- [ ] Expand/collapse individual o global
+- **Por qué:** Un agente explorando un codebase genera 10-20 reads seguidos. Ahora ocupa toda la pantalla. oh-my-pi los agrupa en un árbol compacto.
+- **Complejidad:** Media — detectar secuencias en mount() y reemplazar por widget compacto
+
+### v0.14.0 — Multi-canal y observabilidad
+
+**Stats Dashboard** (inspirado en oh-my-pi)
+- [ ] Dashboard local de uso: requests, coste, cache rate, tokens/s
+- [ ] Datos por provider, modelo, sesión
+- [ ] Comando `/stats` en TUI
+
+**Multi-Credential Support** (inspirado en oh-my-pi)
+- [ ] Round-robin de API keys para distribuir carga
+- [ ] Fallback automático entre credenciales al hitting rate limits
+- [ ] Hashing consistente (FNV-1a) para asignación estable por sesión
+
+### Ideas futuras sin versión (oh-my-pi / pi-mono)
+
+| Idea | Origen | Complejidad |
+|------|--------|-------------|
+| Browser tool con stealth (Puppeteer) | oh-my-pi | Alta |
+| SSH tool con conexiones persistentes | oh-my-pi | Media |
+| Image generation (Gemini/OpenRouter) | oh-my-pi | Baja |
+| Web UI components | pi-mono | Alta |
+| Slack bot (pi-mom equivalente) | pi-mono | Media |
+| vLLM pod manager | pi-mono | Alta |
+| AST tools (ast-grep integration) | oh-my-pi | Media |
+| Sampling controls (topP, topK, minP) | oh-my-pi | Baja |
+| File reference con `@path` | oh-my-pi | Baja |
+| Todo tool integrado | oh-my-pi | Media |
+| Ask tool (preguntas estructuradas al usuario) | oh-my-pi | Baja |
