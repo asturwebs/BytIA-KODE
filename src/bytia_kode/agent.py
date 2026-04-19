@@ -28,7 +28,7 @@ RUNTIME_DEFAULT = "runtime.default.yaml"
 KERNEL_RESOURCE = "bytia.kernel.yaml"
 RUNTIME_RESOURCE = "bytia.runtime.kode.yaml"
 USER_PROMPTS_DIR = Path.home() / ".bytia-kode" / "prompts"
-MAX_CONTEXT_TOKENS = 131072  # ~128k tokens default (Gemma 4 26B supports 256k)
+MAX_CONTEXT_TOKENS = 262144  # ~200k tokens default (Gemma 4 26B supports 256k)
 
 _FAMILY_MAP = {
     "gemma": "Google", "glm": "Zhipu AI", "llama": "Meta",
