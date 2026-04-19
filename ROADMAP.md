@@ -2,6 +2,64 @@
 
 ## Estado actual: v0.7.1 (Alpha estable)
 
+---
+
+## HOTFIX v0.7.2 — Agent Reliability (URGENTE)
+
+> **Fuente:** Auditoría sesión `tui_cd8638f8` (2026-04-19) — `docs/SESSION_AUDIT_tui_cd8638f8.md`
+> **Problema:** Bucle de 70+ mensajes (~42% de sesión) por desconocimiento de limitaciones del sandbox.
+> **Impacto:** Agente no es confiable para proyectos multi-directorio sin estos fixes.
+
+### P0 — Bloqueante (impide uso productivo fuera de CWD)
+
+- [ ] **FIX-1: Bash Tool Limitations en System Prompt**
+  - Añadir sección `tool_constraints` a `runtime.default.yaml` documentando lo que `bash` NO soporta (pipes, redirects, chains, brace expansion, shell builtins)
+  - Incluir patrones permitidos y protocolo de escalación
+  - **Archivo:** `src/bytia_kode/prompts/runtime.default.yaml`
+  - **Espera reducir:** ~90% de errores de bash por desconocimiento
+
+- [ ] **FIX-2: Self-Loop Detection (LoopDetector)**
+  - Clase `LoopDetector` en `agent.py`: contador de fallos consecutivos, ventana deslizante de 5 intentos
+  - Si 3+ fallos consecutivos → inyectar mensaje de sistema forzando escalación al usuario
+  - Mensaje automático: "He intentado esta operación N veces sin éxito. Ejecuta: `comando`"
+  - **Archivo:** `src/bytia_kode/agent.py`
+  - **Espera reducir:** 100% de bucles >3 iteraciones
+
+### P1 — Alta prioridad (mejora robustez)
+
+- [ ] **FIX-3: Tool Error Memory por Sesión**
+  - Diccionario en memoria que registra patrones de comandos bloqueados por security policy
+  - Antes de ejecutar un tool call, verificar si el patrón ya fue rechazado
+  - Evitar reintentar comandos con `|`, `&&`, `>` tras primer rechazo
+  - **Archivo:** `src/bytia_kode/agent.py`
+
+- [ ] **FIX-4: Workspace Context Awareness**
+  - Inyectar en system prompt dinámico: CWD actual, paths escribibles, paths confiados, limitaciones de sandbox
+  - El agente debe saber ANTES de intentar escribir que no puede salir del CWD
+  - **Archivo:** `src/bytia_kode/agent.py` + `src/bytia_kode/tools/registry.py`
+
+### P2 — Mejora de experiencia
+
+- [ ] **FIX-5: Proactive Escalation Threshold**
+  - Tras N fallos con herramientas, generar mensaje automático con comando que el usuario pueda ejecutar manualmente
+  - N propuesto: 3 fallos consecutivos con el mismo tool
+  - **Archivo:** `src/bytia_kode/agent.py`
+
+- [ ] **FIX-6: Post-Generation Workspace Validation**
+  - Tras batch de escrituras, verificar que archivos están dentro del árbol del proyecto actual
+  - Alertar si se detectan archivos fuera de contexto (ej: proyecto Astro en repo Python)
+  - **Archivo:** `src/bytia_kode/tools/registry.py`
+
+### Tests requeridos para cerrar hotfix
+
+- [ ] Test: LoopDetector detecta bucle tras 3 fallos consecutivos
+- [ ] Test: LoopDetector no dispara con fallos intermitentes
+- [ ] Test: Tool Error Memory bloquea patrón previamente rechazado
+- [ ] Test: Bash tool limitations presentes en system prompt generado
+- [ ] Test: Workspace context awareness inyectado en SP dinámico
+
+---
+
 ### Completado
 
 **v0.1.0 — Fundamentos**
