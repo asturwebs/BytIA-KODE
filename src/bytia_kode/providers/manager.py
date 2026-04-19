@@ -17,10 +17,14 @@ class ProviderManager:
         self.config = config
         self._primary = ProviderClient(config.base_url, config.api_key, config.model)
         self._fallback: ProviderClient | None = None
+        self._minimax: ProviderClient | None = None
         self._local: ProviderClient | None = None
 
         if config.fallback_url and config.fallback_key:
             self._fallback = ProviderClient(config.fallback_url, config.fallback_key, config.fallback_model)
+
+        if config.minimax_url and config.minimax_key:
+            self._minimax = ProviderClient(config.minimax_url, config.minimax_key, config.minimax_model)
 
         if config.local_url:
             self._local = ProviderClient(
@@ -32,11 +36,15 @@ class ProviderManager:
         self._circuits: dict[str, CircuitBreaker] = {"primary": CircuitBreaker()}
         if self._fallback:
             self._circuits["fallback"] = CircuitBreaker()
+        if self._minimax:
+            self._circuits["minimax"] = CircuitBreaker()
         if self._local:
             self._circuits["local"] = CircuitBreaker()
         self._priority_order = ["primary"]
         if self._fallback:
             self._priority_order.append("fallback")
+        if self._minimax:
+            self._priority_order.append("minimax")
         if self._local:
             self._priority_order.append("local")
 
@@ -64,11 +72,15 @@ class ProviderManager:
         return self._fallback
 
     @property
+    def minimax(self) -> ProviderClient | None:
+        return self._minimax
+
+    @property
     def local(self) -> ProviderClient | None:
         return self._local
 
     def get(self, name: str = "primary") -> ProviderClient:
-        """Get provider by name: primary, fallback, local."""
+        """Get provider by name: primary, fallback, minimax, local."""
         match name:
             case "primary":
                 return self._primary
@@ -76,6 +88,10 @@ class ProviderManager:
                 if not self._fallback:
                     raise ValueError("No fallback provider configured")
                 return self._fallback
+            case "minimax":
+                if not self._minimax:
+                    raise ValueError("No minimax provider configured")
+                return self._minimax
             case "local":
                 if not self._local:
                     raise ValueError("No local provider configured")
@@ -87,6 +103,8 @@ class ProviderManager:
         await self._primary.close()
         if self._fallback:
             await self._fallback.close()
+        if self._minimax:
+            await self._minimax.close()
         if self._local:
             await self._local.close()
 

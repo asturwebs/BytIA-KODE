@@ -857,6 +857,8 @@ class BytIAKODEApp(App):
         table.add_row("Primary", self.config.provider.base_url, self.config.provider.model)
         if self.config.provider.fallback_url:
             table.add_row("Fallback", self.config.provider.fallback_url, self.config.provider.fallback_model)
+        if self.config.provider.minimax_url and self.config.provider.minimax_key:
+            table.add_row("MiniMax", self.config.provider.minimax_url, self.config.provider.minimax_model)
         if self.config.provider.local_url:
             table.add_row("Local", self.config.provider.local_url, self.config.provider.local_model or "-")
         chat = self.query_one("#chat-area", VerticalScroll)
@@ -933,7 +935,7 @@ class BytIAKODEApp(App):
         self._skill_save_lines = []
 
     def _provider_display_name(self, provider: str) -> str:
-        names = {"primary": "Primary", "fallback": "Fallback", "local": "Local"}
+        names = {"primary": "Primary", "fallback": "Fallback", "minimax": "MiniMax", "local": "Local"}
         return names.get(provider, provider)
 
     def action_switch_provider(self) -> None:

@@ -34,6 +34,11 @@ class ProviderConfig:
     local_url: str = field(default_factory=lambda: _env("LOCAL_BASE_URL", "http://localhost:11434/v1"))
     local_model: str = field(default_factory=lambda: _env("LOCAL_MODEL", "gemma4:26b"))
 
+    # MiniMax
+    minimax_url: str = field(default_factory=lambda: _env("MINIMAX_BASE_URL", "https://api.minimax.io/v1"))
+    minimax_key: str = field(default_factory=lambda: _env("MINIMAX_API_KEY"))
+    minimax_model: str = field(default_factory=lambda: _env("MINIMAX_MODEL", "MiniMax-M2.7"))
+
 
 @dataclass
 class TelegramConfig:
