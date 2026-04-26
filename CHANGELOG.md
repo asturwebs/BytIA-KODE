@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.7.2] - 2026-04-26
+
+### Added
+
+- **DeepSeek V4 provider**: 5th provider slot with OpenAI-compatible endpoint (`api.deepseek.com`). Models: `deepseek-v4-flash` (default, fast MoE) and `deepseek-v4-pro` (thinking/reasoning). Configurable context limit via `DEEPSEEK_MAX_CONTEXT` env var (default 1M tokens). Priority 4 in chain: primary → fallback → minimax → deepseek → local.
+- **Provider pinning (sticky)**: F3 manual provider selection now pins to the chosen provider. Agent uses pinned provider exclusively — no auto-fallback on failure. Unpin by switching back to Primary with F3. Auto-fallback (circuit breaker + priority walk) still works when no pin is set.
+- **Context-aware provider switching**: Context limit updates on every F3 provider switch. DeepSeek gets configured limit (1M), others get agent default (262k), primary delegates to router polling.
+
+### Fixed
+
+- **`/model` table missing providers**: Hardcoded provider list in `_show_model_info()` now includes DeepSeek.
+- **`_provider_display_name` missing**: Added "deepseek" → "DeepSeek" mapping.
+- **Stale context on provider switch**: Switching from DeepSeek (1M ctx) to another provider no longer keeps the 1M limit. Each provider properly resets ctx.
+- **Claude Code settings.json model override conflict**: `ANTHROPIC_DEFAULT_{SONNET,OPUS,HAIKU}_MODEL` GLM overrides in settings.json were overriding process env vars from provider aliases. Moved GLM model vars to `claude-zai` and `claude-zai-yolo` aliases explicitly. Each alias now controls its own models.
+- **DeepSeek 400 Bad Request after tool calls**: `reasoning_content` from DeepSeek responses is now stored in `Message` and passed back in subsequent requests. Without this, DeepSeek rejects requests where the previous assistant turn included tool calls but `reasoning_content` was missing. Affects `ProviderResponse`, `Message`, `SessionStore` schema, and agent message persistence.
+
+### Changed
+
+- **Agent error handling**: Pinned provider failures now yield error and stop (user switches manually). Non-pinned failures still auto-fallback via circuit breaker (unchanged behavior).
+- **`get_healthy()`**: Returns pinned provider unconditionally when set. Priority walk only used when no pin.
+- **`.zshrc` aliases**: `claude-ds` added (DeepSeek Anthropic-compatible endpoint). `claude-zai` and `claude-zai-yolo` now carry explicit GLM model vars. `~/.bytia-banner` updated with new provider.
+
+### Tests
+
+- 130 passed — no regressions.
+
+---
+
 ## [0.7.1] - 2026-04-15
 
 ### Fixed

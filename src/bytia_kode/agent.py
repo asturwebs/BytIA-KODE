@@ -522,6 +522,14 @@ class Agent:
                 error_message = _format_chat_error(exc)
                 logger.error("Agent chat failure on '%s': %s", provider, error_message)
                 self.providers.report_failure(provider)
+                if self.providers.pinned:
+                    self.messages.append(Message(role="assistant", content=f"[Error: {error_message}]"))
+                    if self._current_session_id:
+                        self._session_store.append_message(
+                            self._current_session_id, role="assistant", content=f"[Error: {error_message}]",
+                        )
+                    yield ("error", error_message)
+                    return
                 remaining = [n for n in self.providers._priority_order
                              if n != provider
                              and self.providers._circuits.get(n)
@@ -551,10 +559,12 @@ class Agent:
 
             msg_count_before = len(self.messages)
             stored_content = response_text or "(sin respuesta de texto)"
+            reasoning_to_store = reasoning_text if reasoning_text else None
             self.messages.append(Message(
                 role="assistant",
                 content=stored_content,
                 tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
+                reasoning_content=reasoning_to_store,
             ))
 
             if self._current_session_id:
@@ -562,6 +572,7 @@ class Agent:
                     self._current_session_id,
                     role="assistant", content=stored_content,
                     tool_calls=[tc.model_dump() for tc in tool_calls_accum] if tool_calls_accum else None,
+                    reasoning_content=reasoning_to_store,
                 )
                 if msg_count_before == 0 and sanitized_message:
                     self._session_store.update_title(
@@ -629,7 +640,6 @@ class Agent:
 
     def _load_messages_from_store(self, session_id: str) -> list[Message]:
         """Convert stored dicts back to Message objects."""
-        """Convert stored dicts back to Message objects."""
         rows = self._session_store.load_messages(session_id)
         messages = []
         for row in rows:
@@ -639,6 +649,7 @@ class Agent:
                 tool_calls=row.get("tool_calls"),
                 tool_call_id=row.get("tool_call_id"),
                 name=row.get("name"),
+                reasoning_content=row.get("reasoning_content"),
             ))
         return messages
 

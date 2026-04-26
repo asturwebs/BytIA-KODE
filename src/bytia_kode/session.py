@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS messages (
     tool_calls TEXT DEFAULT NULL,
     tool_call_id TEXT DEFAULT NULL,
     name TEXT DEFAULT NULL,
+    reasoning_content TEXT DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 );
@@ -120,6 +121,10 @@ class SessionStore:
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
+            try:
+                conn.execute("ALTER TABLE messages ADD COLUMN reasoning_content TEXT DEFAULT NULL")
+            except Exception:
+                pass
 
     # ── Session Lifecycle ────────────────────────────────────────────────────────
 
@@ -140,7 +145,7 @@ class SessionStore:
     def append_message(
         self, session_id: str, role: str, content: str | None = None,
         tool_calls: list[dict] | None = None, tool_call_id: str | None = None,
-        name: str | None = None,
+        name: str | None = None, reasoning_content: str | None = None,
     ) -> None:
         """Append a message to a session. Atomic: INSERT + UPDATE metadata in one transaction.
 
@@ -151,13 +156,13 @@ class SessionStore:
             with self._connect() as conn:
                 conn.execute(
                     """INSERT INTO messages
-                       (session_id, seq_num, role, content, tool_calls, tool_call_id, name)
+                       (session_id, seq_num, role, content, tool_calls, tool_call_id, name, reasoning_content)
                        VALUES (
                            ?,
                            COALESCE((SELECT MAX(seq_num) FROM messages WHERE session_id = ?), 0) + 1,
-                           ?, ?, ?, ?, ?
+                           ?, ?, ?, ?, ?, ?
                        )""",
-                    (session_id, session_id, role, content, tc_json, tool_call_id, name),
+                    (session_id, session_id, role, content, tc_json, tool_call_id, name, reasoning_content),
                 )
                 conn.execute(
                     """UPDATE sessions
@@ -187,7 +192,7 @@ class SessionStore:
         """Load all messages from a session, ordered by seq_num."""
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT role, content, tool_calls, tool_call_id, name "
+                "SELECT role, content, tool_calls, tool_call_id, name, reasoning_content "
                 "FROM messages WHERE session_id = ? ORDER BY seq_num",
                 (session_id,),
             ).fetchall()
@@ -203,6 +208,8 @@ class SessionStore:
                 msg["tool_call_id"] = row[3]
             if row[4]:
                 msg["name"] = row[4]
+            if row[5]:
+                msg["reasoning_content"] = row[5]
             messages.append(msg)
         return messages
 

@@ -1,5 +1,124 @@
 # BytIA KODE - Development Log
 
+## Session 27 — 2026-04-26 — DeepSeek reasoning_content Fix (v0.7.2)
+
+**Scope:** Fix DeepSeek 400 Bad Request when tool calls follow reasoning. Store and re-send `reasoning_content` per DeepSeek API requirement.
+
+### Problem
+
+DeepSeek's API requires that when an assistant message contains `reasoning_content` and `tool_calls`, the `reasoning_content` must be passed back in all subsequent requests. B-KODE was discarding `reasoning_content` after streaming, causing 400 errors on the next turn whenever DeepSeek used tools after reasoning.
+
+### Root Cause
+
+Three gaps in the message pipeline:
+1. **`ProviderResponse`**: No `reasoning_content` field — parsed from stream but discarded after yield
+2. **`Message`**: No `reasoning_content` field — agent accumulated `reasoning_text` but never stored it
+3. **`SessionStore`**: No `reasoning_content` column — not persisted, lost on session reload
+
+### Fix
+
+| File | Change |
+|------|--------|
+| `providers/client.py` | `Message` + `ProviderResponse` get `reasoning_content: str \| None = None`. `chat()` extracts it from response JSON. |
+| `agent.py` | `reasoning_text` stored in `Message.reasoning_content`. Persisted to session via `append_message`. Loaded on session restore via `_load_messages_from_store`. |
+| `session.py` | Schema: `reasoning_content TEXT DEFAULT NULL` column. `ALTER TABLE ADD COLUMN` migration for existing DBs. `append_message` / `load_messages` updated. |
+
+### Design Decisions
+
+- **`exclude_none=True` compatibility**: `Message.model_dump(exclude_none=True)` only serializes `reasoning_content` when it has a value. Non-DeepSeek providers never see the field.
+- **Silent ALTER TABLE**: Migration wrapped in try/except — existing databases get the new column automatically, new databases get it from schema.
+- **No TUI changes**: `reasoning_content` is transparent to the TUI. It's already yielding `("reasoning", data)` chunks for display in ThinkingBlock. The change only affects what gets stored and sent back to the API.
+
+### Testing
+
+- 130 passed — no regressions
+- Live test in TUI: DeepSeek (deepseek-v4-flash) with 4 tool calls + 13 lines of reasoning, no 400 errors
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/bytia_kode/providers/client.py` | +`reasoning_content` field on `Message` and `ProviderResponse` + extraction in `chat()` |
+| `src/bytia_kode/agent.py` | Store `reasoning_to_store` in `Message` + persist to session + load from session |
+| `src/bytia_kode/session.py` | Schema column + ALTER TABLE migration + `append_message`/`load_messages` updated |
+| `pyproject.toml` | Version bump 0.7.1 → 0.7.2 |
+| `CHANGELOG.md` | Added reasoning_content fix to [0.7.2] |
+
+---
+
+## Session 26 — 2026-04-26 — DeepSeek Provider + Sticky Pinning + Claude Code Multi-Provider
+
+**Scope:** DeepSeek V4 integration in B-KODE and Claude Code, provider pinning architecture, context-aware switching, settings.json model override fix.
+
+### DeepSeek V4 Provider (B-KODE)
+
+Added DeepSeek as 5th provider slot in ProviderManager with OpenAI-compatible endpoint:
+
+- **config.py**: 4 new fields — `deepseek_url`, `deepseek_key`, `deepseek_model`, `deepseek_max_context` (default 1M tokens)
+- **manager.py**: New `deepseek` slot, circuit breaker, priority 4 (primary → fallback → minimax → deepseek → local)
+- **tui.py**: DeepSeek row in `/model` table (was hardcoded, missing new provider), display name in `_provider_display_name`
+- **.env / .env.example**: `DEEPSEEK_BASE_URL`, `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL=deepseek-v4-flash`, `DEEPSEEK_MAX_CONTEXT=1000000`
+
+DeepSeek API docs reviewed:
+- OpenAI-compatible: `https://api.deepseek.com` (B-KODE uses this)
+- Anthropic-compatible: `https://api.deepseek.com/anthropic` (Claude Code uses this)
+- Models: `deepseek-v4-flash` (fast, 284B/13B MoE), `deepseek-v4-pro` (thinking, 1.6T/49B)
+- Thinking mode: `reasoning_effort` param + `thinking: {type: "enabled"}` in OpenAI format
+- `[1m]` suffix for thinking budget only applies to Anthropic endpoint
+
+### Provider Pinning (Sticky)
+
+Implemented manual provider selection that sticks until user changes it:
+
+- **`ProviderManager._pinned`**: When user presses F3 to switch provider, it gets pinned
+- **`get_healthy()`**: If pinned, always returns pinned provider (ignores circuit state). No auto-fallback on failure.
+- **`agent.py`**: If pinned provider fails, yields error and stops — doesn't auto-switch. Only auto-fallbacks when NOT pinned (original behavior preserved).
+- **Rationale**: User is always at the terminal for now. Auto-fallback to dead primary was worse than showing the error. Circuit breaker auto-recovery stays in roadmap for v0.8 (unattended agents).
+
+### Context-Aware Provider Switching
+
+Each provider now properly sets context limit on switch:
+
+- **`_on_provider_changed()`**: On F3 switch, calls `update_context_limit()` with provider-specific value
+- **`get_context_limit()`**: DeepSeek = configurable via `DEEPSEEK_MAX_CONTEXT` (default 1M). Others = agent default (262k). Primary = 0 (router polling handles it, 5s interval)
+- **Import**: Added `MAX_CONTEXT_TOKENS` to tui.py imports from agent.py
+- **Fixes**: Context no longer stays at 1M when switching from DeepSeek back to Z.ai; no longer shows stale router ctx (131k) when on cloud provider
+
+### Claude Code Multi-Provider Setup
+
+Added `claude-ds` alias and fixed model override conflicts:
+
+- **`.zshrc.secrets`**: `DEEPSEEK_API_KEY` added
+- **`.zshrc`**: `claude-ds()` function with Anthropic-compatible endpoint, `deepseek-v4-pro[1m]` for Opus/Sonnet, `deepseek-v4-flash` for Haiku/Subagent, `CLAUDE_CODE_EFFORT_LEVEL=max`
+- **settings.json fix**: Removed `ANTHROPIC_DEFAULT_{SONNET,OPUS,HAIKU}_MODEL` GLM overrides. These were overriding process env vars from aliases (settings.json env > process env vars in Claude Code). Moved GLM models to `claude-zai` and `claude-zai-yolo` aliases explicitly.
+- **`.bytia-banner`**: Added `claude-ds` line in CLIs section
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/bytia_kode/config.py` | +4 DeepSeek fields |
+| `src/bytia_kode/providers/manager.py` | DeepSeek slot + `_pinned` + sticky `get_healthy()` + `get_context_limit()` |
+| `src/bytia_kode/agent.py` | Pin-aware error handling (pinned → stop, not pinned → auto-fallback) |
+| `src/bytia_kode/tui.py` | `/model` table + display name + pin/unpin + ctx reset on switch + `MAX_CONTEXT_TOKENS` import |
+| `.env` | DeepSeek config (4 vars) |
+| `.env.example` | DeepSeek template |
+| `~/.zshrc` | `claude-ds`, updated `claude-zai`/`claude-zai-yolo` with GLM model vars |
+| `~/.zshrc.secrets` | `DEEPSEEK_API_KEY` |
+| `~/.claude/settings.json` | Removed 3 model overrides |
+| `~/.bytia-banner` | `claude-ds` line |
+
+### Tests
+
+130 passed — no regressions. All existing circuit breaker and fallback tests continue to pass with original (non-pinned) behavior.
+
+### Roadmap Items (Deferred to v0.8)
+
+- **Smart circuit breaker**: When pinned provider fails, auto-fallback to next healthy provider instead of stopping (for unattended agent sessions)
+- **Session event log**: Store tool calls, bash commands, provider/model/theme changes in session as structured events (current: only user input + model output)
+
+---
+
 ## Session 25 — 2026-04-17 — B-KODE.md Rewrite + Security Hardening
 
 **Scope:** Complete rewrite of agent initialization docs, security audit of public repo, and intercom reorganization.

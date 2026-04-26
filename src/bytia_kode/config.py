@@ -39,6 +39,12 @@ class ProviderConfig:
     minimax_key: str = field(default_factory=lambda: _env("MINIMAX_API_KEY"))
     minimax_model: str = field(default_factory=lambda: _env("MINIMAX_MODEL", "MiniMax-M2.7"))
 
+    # DeepSeek
+    deepseek_url: str = field(default_factory=lambda: _env("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
+    deepseek_key: str = field(default_factory=lambda: _env("DEEPSEEK_API_KEY"))
+    deepseek_model: str = field(default_factory=lambda: _env("DEEPSEEK_MODEL", "deepseek-v4-flash"))
+    deepseek_max_context: int = field(default_factory=lambda: int(_env("DEEPSEEK_MAX_CONTEXT", "1000000")))
+
 
 @dataclass
 class TelegramConfig:

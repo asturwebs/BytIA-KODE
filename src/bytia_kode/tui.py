@@ -27,7 +27,7 @@ from bytia_kode import __version__
 from rich import box
 
 from bytia_kode.config import load_config
-from bytia_kode.agent import Agent
+from bytia_kode.agent import Agent, MAX_CONTEXT_TOKENS
 from bytia_kode.providers.client import Message
 from bytia_kode.audio import play_speech, is_playing, stop
 
@@ -536,7 +536,16 @@ class BytIAKODEApp(App):
     def _on_provider_changed(self, old_provider: str, new_provider: str) -> None:
         self.query_one(ActivityIndicator)._refresh()
         if new_provider == "primary":
+            self.agent.providers.pin(None)
+            self.agent.update_context_limit(MAX_CONTEXT_TOKENS)
             self.run_worker(self._auto_detect_model, exclusive=True)
+        else:
+            self.agent.providers.pin(new_provider)
+            limit = self.agent.providers.get_context_limit(new_provider)
+            if limit > 0:
+                self.agent.update_context_limit(limit)
+            else:
+                self.agent.update_context_limit(MAX_CONTEXT_TOKENS)
 
     async def _auto_detect_model(self) -> None:
         """Auto-detect loaded model from router on startup/provider switch."""
@@ -859,6 +868,8 @@ class BytIAKODEApp(App):
             table.add_row("Fallback", self.config.provider.fallback_url, self.config.provider.fallback_model)
         if self.config.provider.minimax_url and self.config.provider.minimax_key:
             table.add_row("MiniMax", self.config.provider.minimax_url, self.config.provider.minimax_model)
+        if self.config.provider.deepseek_url and self.config.provider.deepseek_key:
+            table.add_row("DeepSeek", self.config.provider.deepseek_url, self.config.provider.deepseek_model)
         if self.config.provider.local_url:
             table.add_row("Local", self.config.provider.local_url, self.config.provider.local_model or "-")
         chat = self.query_one("#chat-area", VerticalScroll)
@@ -935,7 +946,7 @@ class BytIAKODEApp(App):
         self._skill_save_lines = []
 
     def _provider_display_name(self, provider: str) -> str:
-        names = {"primary": "Primary", "fallback": "Fallback", "minimax": "MiniMax", "local": "Local"}
+        names = {"primary": "Primary", "fallback": "Fallback", "minimax": "MiniMax", "deepseek": "DeepSeek", "local": "Local"}
         return names.get(provider, provider)
 
     def action_switch_provider(self) -> None:
