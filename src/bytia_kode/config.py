@@ -64,6 +64,10 @@ class AppConfig:
     extra_binaries: set[str] = field(default_factory=lambda: {
         b.strip() for b in _env("EXTRA_BINARIES").split(",") if b.strip()
     })
+    # Grammar (Structured Chain-of-Thought via GBNF)
+    grammar_enabled: bool = field(default_factory=lambda: _env("GRAMMAR_MODE", "off").lower() in ("on", "true", "1"))
+    grammar_file: str = field(default_factory=lambda: _env("GRAMMAR_FILE", ""))
+
     llm_temperature: float = field(default_factory=lambda: float(_env("LLM_TEMPERATURE", "0.3")))
     llm_max_tokens: int = field(default_factory=lambda: int(_env("LLM_MAX_TOKENS", "8192")))
     llm_timeout: float = field(default_factory=lambda: float(_env("LLM_TIMEOUT", "120")))

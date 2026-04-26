@@ -195,18 +195,29 @@ class ActivityIndicator(Static):
         except Exception:
             pass
 
+        grammar_info = ""
+        try:
+            if self.app.grammar_mode:
+                client = self.app.agent.providers.get(self.app.active_provider)
+                if getattr(client, "supports_grammar", False):
+                    grammar_info = " | [bold green]G[/]"
+                else:
+                    grammar_info = " | [dim]G[/]"
+        except Exception:
+            pass
+
         if self._status == "ready":
-            self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {a}]\u25cf Ready{model_info}{grammar_info}{ctx_info}[/]")
         elif self._status == "thinking":
-            self.update(f"  [bold {w}]\u25d0 Thinking...{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {w}]\u25d0 Thinking...{model_info}{grammar_info}{ctx_info}[/]")
         elif self._status == "tool":
-            self.update(f"  [bold {a}]\u2699 {self._detail}{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {a}]\u2699 {self._detail}{model_info}{grammar_info}{ctx_info}[/]")
         elif self._status == "error":
             self.update(f"  [bold {e}]\u2717 Error[/]")
         elif self._status == "skill":
-            self.update(f"  [bold {w}]\u270e {self._detail}{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {w}]\u270e {self._detail}{model_info}{grammar_info}{ctx_info}[/]")
         else:
-            self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {a}]\u25cf Ready{model_info}{grammar_info}{ctx_info}[/]")
 
 
 class ThinkingBlock(Static):
@@ -384,6 +395,7 @@ class CommandMenuScreen(ModalScreen):
         ("\U0001f4c1  List available models", "show_models"),
         ("\U0001f4ac  Show input history", "show_history"),
         ("\u26a1  Toggle safe mode", "toggle_safe_mode"),
+        ("\U0001f9e9  Toggle structured CoT", "toggle_grammar"),
         ("\U0001f9e0  Toggle reasoning", "toggle_reasoning"),
         ("\U0001f3a8  Change theme", "change_theme"),
         ("\u21c4  Switch provider", "switch_provider"),
@@ -425,6 +437,7 @@ class BytIAKODEApp(App):
         Binding("ctrl+s", "show_skills", "List skills", show=False),
         Binding("ctrl+d", "toggle_reasoning", "Reasoning", show=False),
         Binding("ctrl+e", "toggle_safe_mode", "Safe mode", show=False),
+        Binding("ctrl+g", "toggle_grammar", "Grammar", show=False),
         Binding("ctrl+x", "copy_last_code", "Copy code", show=False),
         Binding("ctrl+shift+c", "copy_last_response", "Copy response", show=False),
         Binding("f2", "change_theme", "Theme", show=False, priority=True),
@@ -438,6 +451,7 @@ class BytIAKODEApp(App):
     is_processing: reactive[bool] = reactive(False)
     msg_count: reactive[int] = reactive(0)
     safe_mode: reactive[bool] = reactive(True)
+    grammar_mode: reactive[bool] = reactive(False)
     active_provider: reactive[str] = reactive("primary")
 
     def __init__(self, **kwargs):
@@ -499,6 +513,7 @@ class BytIAKODEApp(App):
         self.watch(self, "active_provider", self._on_provider_changed)
 
         self.agent.set_session(source="tui")
+        self.grammar_mode = self.config.grammar_enabled
 
         self.run_worker(self._auto_detect_model, exclusive=True, group="model_detect")
         self.run_worker(self._poll_router_info, exclusive=True, group="router_poll")
@@ -795,6 +810,24 @@ class BytIAKODEApp(App):
                 "\n".join(f"  {i+1}. {h}" for i, h in enumerate(lines))
                 or "No history."
             )
+        elif cmd.startswith("/grammar"):
+            parts = cmd_raw.split(maxsplit=1)
+            if len(parts) > 1:
+                sub = parts[1].lower()
+                if sub in ("on", "true", "1"):
+                    self.action_toggle_grammar(True)
+                elif sub in ("off", "false", "0"):
+                    self.action_toggle_grammar(False)
+                elif sub == "status":
+                    state = "ON" if self.grammar_mode else "OFF"
+                    self._add_system_message(
+                        f"Structured CoT grammar: {state}\n"
+                        "Only active when provider supports it (llama.cpp localhost)."
+                    )
+                else:
+                    self._add_system_message("Usage: /grammar [on|off|status]")
+            else:
+                self.action_toggle_grammar()
         elif cmd == "/safe":
             self.action_toggle_safe_mode()
         elif cmd == "/session":
@@ -842,6 +875,7 @@ class BytIAKODEApp(App):
             ("/skills save <name>", "Create skill", ""),
             ("/skills show <name>", "Show skill content", ""),
             ("/skills verify <name>", "Mark skill verified", ""),
+            ("/grammar [on|off]", "Toggle structured CoT", "Ctrl+G"),
             ("/safe", "Toggle safe mode", "Ctrl+E"),
             ("", "Toggle reasoning view", "Ctrl+D"),
             ("/models", "List local models", ""),
@@ -1088,6 +1122,28 @@ class BytIAKODEApp(App):
             self._add_rich_message(Text("Safe mode: ON", style="bold green"))
         else:
             self._add_rich_message(Text("Safe mode: OFF", style="bold yellow"))
+
+    def action_toggle_grammar(self, force: bool | None = None):
+        new_state = self.agent.toggle_grammar(force)
+        self.grammar_mode = new_state
+        if new_state:
+            grammar_name = (self.agent.grammar or "").split("\n")[0] if self.agent.grammar else "?"
+            self._add_rich_message(Text(
+                f"Structured CoT grammar: ON ({grammar_name})", style="bold green"
+            ))
+            provider = self._provider_name()
+            try:
+                client = self.agent.providers.get(self.active_provider)
+                if not getattr(client, "supports_grammar", False):
+                    self._add_rich_message(Text(
+                        f"Note: provider '{provider}' does not support grammar. "
+                        "Switch to main provider (F3) for grammar support.",
+                        style="bold yellow",
+                    ))
+            except Exception:
+                pass
+        else:
+            self._add_rich_message(Text("Structured CoT grammar: OFF", style="bold yellow"))
 
     def action_toggle_reasoning(self):
         blocks = self.query(ThinkingBlock)

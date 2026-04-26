@@ -7,8 +7,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.7.1-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-110%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.7.3-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-128%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -452,6 +452,10 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para los criterios de validación.
 
 - **Pedro Luis Cuevas Villarrubia** (AsturWebs) `<pedro@asturwebs.es>`
 - **BytIA** v12.3.0 — coautoría operativa — BytIA OS RFC-001
+
+## Inspiración
+
+La funcionalidad de *Structured Chain-of-Thought* (v0.7.3) está inspirada por el trabajo de [andthattoo/structured-cot](https://github.com/andthattoo/structured-cot) — grammar-constrained CoT via GBNF, zero training, 22× compresión de tokens de razonamiento. Agradecimiento a su autor por publicar este hallazgo en abierto.
 
 ## Licencia
 

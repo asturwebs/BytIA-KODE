@@ -1,0 +1,12 @@
+# BytIA P22: Capability Self-Assessment Protocol
+# Structured self-evaluation before accepting or declining a task.
+# Forces the model to explicitly declare context, knowledge gaps, and confidence.
+# Each rule MUST be on a single line.
+
+root ::= think code
+think ::= "<think>\n" "CTX: " yesno "KNOWN: " line "GAPS: " line "CONF: " level "CALL: " decision "</think>\n\n"
+yesno ::= "YES" | "NO"
+level ::= "HIGH" | "MED" | "LOW" | "NO"
+decision ::= "ACCEPT" | "DECLINE" | "WARN"
+line ::= [^\n]+ "\n"
+code ::= [\x09\x0A\x0D\x20-\x7E]+
