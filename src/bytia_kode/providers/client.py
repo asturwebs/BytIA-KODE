@@ -21,6 +21,7 @@ class Message(BaseModel):
     tool_calls: list[dict] | None = None
     tool_call_id: str | None = None
     name: str | None = None
+    reasoning_content: str | None = None
 
 
 class ToolCall(BaseModel):
@@ -39,6 +40,7 @@ class ProviderResponse(BaseModel):
     tool_calls: list[ToolCall] | None = None
     finish_reason: str | None = None
     usage: dict | None = None
+    reasoning_content: str | None = None
 
 
 class ProviderClient:
@@ -143,6 +145,7 @@ class ProviderClient:
             tool_calls=tool_calls or None,
             finish_reason=choice.get("finish_reason") if isinstance(choice, dict) else None,
             usage=data.get("usage") if isinstance(data, dict) else None,
+            reasoning_content=message.get("reasoning_content"),
         )
 
     async def chat_stream(

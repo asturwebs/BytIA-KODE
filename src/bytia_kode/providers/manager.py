@@ -11,13 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class ProviderManager:
-    """Manages multiple provider clients with fallback."""
+    """Manages multiple provider clients with fallback + manual pinning."""
 
     def __init__(self, config: ProviderConfig):
         self.config = config
         self._primary = ProviderClient(config.base_url, config.api_key, config.model)
         self._fallback: ProviderClient | None = None
         self._minimax: ProviderClient | None = None
+        self._deepseek: ProviderClient | None = None
         self._local: ProviderClient | None = None
 
         if config.fallback_url and config.fallback_key:
@@ -25,6 +26,9 @@ class ProviderManager:
 
         if config.minimax_url and config.minimax_key:
             self._minimax = ProviderClient(config.minimax_url, config.minimax_key, config.minimax_model)
+
+        if config.deepseek_url and config.deepseek_key:
+            self._deepseek = ProviderClient(config.deepseek_url, config.deepseek_key, config.deepseek_model)
 
         if config.local_url:
             self._local = ProviderClient(
@@ -38,6 +42,8 @@ class ProviderManager:
             self._circuits["fallback"] = CircuitBreaker()
         if self._minimax:
             self._circuits["minimax"] = CircuitBreaker()
+        if self._deepseek:
+            self._circuits["deepseek"] = CircuitBreaker()
         if self._local:
             self._circuits["local"] = CircuitBreaker()
         self._priority_order = ["primary"]
@@ -45,8 +51,19 @@ class ProviderManager:
             self._priority_order.append("fallback")
         if self._minimax:
             self._priority_order.append("minimax")
+        if self._deepseek:
+            self._priority_order.append("deepseek")
         if self._local:
             self._priority_order.append("local")
+
+        self._pinned: str | None = None
+
+    @property
+    def pinned(self) -> str | None:
+        return self._pinned
+
+    def pin(self, provider: str | None) -> None:
+        self._pinned = provider
 
     async def auto_detect_model(self) -> bool:
         """If primary model is 'auto', detect loaded model from router.
@@ -76,11 +93,15 @@ class ProviderManager:
         return self._minimax
 
     @property
+    def deepseek(self) -> ProviderClient | None:
+        return self._deepseek
+
+    @property
     def local(self) -> ProviderClient | None:
         return self._local
 
     def get(self, name: str = "primary") -> ProviderClient:
-        """Get provider by name: primary, fallback, minimax, local."""
+        """Get provider by name: primary, fallback, minimax, deepseek, local."""
         match name:
             case "primary":
                 return self._primary
@@ -92,6 +113,10 @@ class ProviderManager:
                 if not self._minimax:
                     raise ValueError("No minimax provider configured")
                 return self._minimax
+            case "deepseek":
+                if not self._deepseek:
+                    raise ValueError("No deepseek provider configured")
+                return self._deepseek
             case "local":
                 if not self._local:
                     raise ValueError("No local provider configured")
@@ -105,6 +130,8 @@ class ProviderManager:
             await self._fallback.close()
         if self._minimax:
             await self._minimax.close()
+        if self._deepseek:
+            await self._deepseek.close()
         if self._local:
             await self._local.close()
 
@@ -120,10 +147,12 @@ class ProviderManager:
     def get_healthy(self, preferred: str = "primary") -> tuple[ProviderClient, str]:
         """Return (client, name) of first available provider.
 
-        Always walks priority order from the top — this lets circuit breakers
-        naturally recover: a HALF_OPEN primary will be tried before fallback.
-        Falls back to the requested provider as last resort if all circuits are OPEN.
+        If pinned, always return pinned provider (sticky — no auto-fallback).
+        When no pin, walks priority order from the top with circuit breaker.
         """
+        if self._pinned:
+            return self.get(self._pinned), self._pinned
+
         for name in self._priority_order:
             cb = self._circuits.get(name)
             if cb and cb.is_available:
@@ -149,3 +178,11 @@ class ProviderManager:
             name: {"state": cb.state, "failures": cb._failure_count}
             for name, cb in self._circuits.items()
         }
+
+    def get_context_limit(self, provider: str) -> int:
+        """Return configured context limit for a provider. 0 = use default/router."""
+        match provider:
+            case "deepseek":
+                return self.config.deepseek_max_context
+            case _:
+                return 0
