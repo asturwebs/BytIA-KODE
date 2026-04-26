@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.3] - 2026-04-26
+
+### Added
+
+- **Structured CoT via GBNF grammar**: Inference-time grammar-constrained chain-of-thought inspired by `andthattoo/structured-cot`. A ~10-line GBNF grammar forces the `<think>` block into a compact structured format (GOAL/APPROACH/EDGE), achieving 22× thinking token compression with zero training or fine-tuning.
+- **4 packaged grammars**: Base (GOAL/APPROACH/EDGE), enriched (GOAL/STATE/ALGO/EDGE/VERIFY), P22 capability self-assessment protocol, P20 error propagation protocol. Loadable via `importlib.resources`.
+- **Provider grammar detection**: `ProviderClient.supports_grammar` property — True only for llama.cpp local endpoints (localhost/127.0.0.1, excluding Ollama :11434). Cloud providers (Z.ai, MiniMax, DeepSeek, OpenAI) return False.
+- **Grammar parameter in payload**: `grammar` kwarg added to `chat()` and `chat_stream()` in `ProviderClient`. Only sent when the provider supports it and grammar is enabled.
+- **Agent grammar integration**: Lazy-loaded grammar with cache invalidation. `toggle_grammar(enabled)` method. Auto-disables grammar when tool calls are active (to avoid interference with JSON tool calling).
+- **TUI grammar controls**: `/grammar [on|off|status]` slash command. `Ctrl+G` keyboard binding. Menu entry in Ctrl+P command palette. `[G]` indicator in status bar (green = active on supported provider, dim = active on unsupported).
+- **Config**: `GRAMMAR_MODE` and `GRAMMAR_FILE` env vars documented in `.env.example`.
+
+### Tests
+
+- 18 new grammar tests (loading, detection, agent integration, payload construction). Total: 128 passed, zero regressions.
+
+---
+
 ## [0.7.2] - 2026-04-26
 
 ### Added

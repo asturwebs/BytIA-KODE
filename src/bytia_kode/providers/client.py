@@ -53,6 +53,24 @@ class ProviderClient:
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
 
+    @property
+    def supports_grammar(self) -> bool:
+        """True if the provider endpoint supports GBNF grammar parameter.
+
+        Currently only llama.cpp server (localhost/127.0.0.1) supports this.
+        Ollama (:11434) does NOT support grammar in /v1/chat/completions.
+        Cloud providers (OpenAI, Z.ai, MiniMax, DeepSeek) do not support it.
+        """
+        url = self.base_url.lower()
+        if ":11434" in url:
+            return False
+        if "localhost" in url or "127.0.0.1" in url:
+            return True
+        non_supporting = ["z.ai", "minimax", "deepseek", "openrouter", "api.openai", "openai.com"]
+        if any(domain in url for domain in non_supporting):
+            return False
+        return False
+
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
@@ -95,6 +113,7 @@ class ProviderClient:
         temperature: float = 0.3,
         max_tokens: int = 8192,
         stream: bool = False,
+        grammar: str | None = None,
     ) -> ProviderResponse:
         """Send a chat completion request."""
         if stream:
@@ -111,6 +130,8 @@ class ProviderClient:
         }
         if tools:
             payload["tools"] = [t.model_dump() for t in tools]
+        if grammar:
+            payload["grammar"] = grammar
 
         logger.debug(f"-> {self.model} | {len(messages)} msgs | tools={len(tools) if tools else 0}")
 
@@ -154,6 +175,7 @@ class ProviderClient:
         tools: list[ToolDef] | None = None,
         temperature: float = 0.3,
         max_tokens: int = 8192,
+        grammar: str | None = None,
     ) -> AsyncIterator[tuple[str, str | list[ToolCall]]]:
         """Stream a chat completion with tool call and reasoning support.
 
@@ -173,6 +195,8 @@ class ProviderClient:
         }
         if tools:
             payload["tools"] = [t.model_dump() for t in tools]
+        if grammar:
+            payload["grammar"] = grammar
 
         tool_calls_acc: dict[int, dict] = {}
 
