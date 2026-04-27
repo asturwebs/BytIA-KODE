@@ -101,6 +101,29 @@ session:
 
 
 # ═══════════════════════════════════════════
+# RESTRICCIONES DE HERRAMIENTAS (FIX-1 v0.7.3)
+# ═══════════════════════════════════════════
+
+tool_constraints:
+  bash:
+    blocked_operators:
+      - "| (pipe) — usa grep, glob, tree tools nativas en su lugar"
+      - "> >> < (redirección) — usa file_write o file_edit"
+      - "&& || ; (encadenamiento) — ejecuta comandos por separado"
+      - "$() `` (subshell) — no disponible, usa tools individuales"
+      - "<< (here-doc) — no disponible"
+    allowed: "Solo binarios de la allowlist (~25). Sin shell interpretado (subprocess.exec)."
+    tip: "Si necesitas buscar en archivos, usa grep tool. Para listar, tree/glob. Para leer, file_read."
+  file_read:
+    tip: "Usa parámetros offset/limit. Mejor que cat/head/tail en bash (que están bloqueados)."
+  file_write:
+    tip: "Sandbox a CWD + trusted paths (~/.bytia-kode/, ~/bytia/)."
+  file_edit:
+    tip: "Usa search/replace. Para archivos nuevos, file_write."
+  web_fetch:
+    tip: "Solo HTTP/HTTPS. Sin autenticación."
+
+# ═══════════════════════════════════════════
 # OPTIMIZACIONES
 # ═══════════════════════════════════════════
 
