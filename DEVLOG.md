@@ -1,5 +1,58 @@
 # BytIA KODE - Development Log
 
+## Session 28 — 2026-04-27 — Structured CoT Grammar Exploration (reverted)
+
+**Scope:** Full exploration of GBNF grammar-constrained Chain-of-Thought for B-KODE. Inspired by `andthattoo/structured-cot` (22× thinking token compression). Integrated, tested, and ultimately **reverted** — incompatible with agentic tool use.
+
+### What We Built & Reverted
+
+- 4 GBNF grammars (base, enriched, P22, P20 protocols)
+- `ProviderClient.supports_grammar` property
+- `grammar` parameter in `chat()`/`chat_stream()` payloads
+- Agent: lazy loading, toggle, 2-pass grammar+tools approach
+- TUI: `/grammar` command, `Ctrl+G`, `[G]` indicator
+- 18 grammar tests
+- Full v0.7.3 release published to GitHub
+
+### What Stayed
+
+| Component | Why |
+|---|---|
+| `supports_grammar` on `ProviderClient` | Provider capability detection pattern, zero overhead |
+| `llama-update.sh` | Engine auto-update with weekly cron |
+| llama.cpp b8946 | 98 commits of improvements (grammar/autoparser/CUDA fixes) |
+| check_secrets skip patterns | `reasoning_content` + `.gbnf` patterns, less false positives |
+| git tag b8944→b8946 backup | Fast rollback if needed |
+
+### Root Cause: Why Grammar Failed
+
+1. **llama-server rejects grammar+tools in same request** — hard limitation, documented in source: "Cannot use custom grammar constraints with tools"
+2. **2-pass approach breaks** — grammar iteration stores assistant message with `reasoning_content`; next iteration with tools triggers "prefill incompatible with enable_thinking" (400)
+3. **Without tools, agent hallucinates** — model writes pseudo tool calls as text instead of executing real ones
+4. **Grammar sampler inhibited during reasoning** (fix #20970 in llama.cpp) — reasoning is free-form even with grammar, only content is constrained
+
+### Key Findings
+
+- GBNF grammar works perfectly for **non-agentic** generation (direct LLM calls without tools)
+- The structured-cot paper tested on HumanEval+/LiveCodeBench — pure code generation, zero tool use
+- Grammar reduces thinking tokens ~22× on supported benchmarks, but at 118 t/s on local RTX 4090 this is irrelevant — 25s vs 1.2s saving
+- The `reasoning-format=deepseek` + grammar interaction is complex: grammar applies to raw output, server splits into reasoning/content channels
+- `supports_grammar` detection pattern is valuable infrastructure for future provider capability checks
+
+### Reference
+
+- Paper: `andthattoo/structured-cot` — https://github.com/andthattoo/structured-cot
+- llama.cpp PR #20223/#20970 — grammar sampler inhibited during reasoning
+- llama.cpp PR #21870 — reasoning budget skip when no budget
+- Our analysis doc was in `docs/structured-cot-analysis.md` (deleted with revert)
+
+### Files Net Change
+
+v0.7.2 → v0.7.3 → v0.7.2: 0 net lines (full revert)
+Kept: `supports_grammar` (+12 lines client.py), check_secrets patterns (+3 lines)
+
+---
+
 ## Session 27 — 2026-04-26 — DeepSeek reasoning_content Fix (v0.7.2)
 
 **Scope:** Fix DeepSeek 400 Bad Request when tool calls follow reasoning. Store and re-send `reasoning_content` per DeepSeek API requirement.
