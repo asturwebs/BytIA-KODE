@@ -7,7 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SK_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]{10,}")
 HIGH_ENTROPY_PATTERN = re.compile(r"\b[A-Za-z0-9_\-=/+]{30,}\b")
-SKIP_FILES = {'.env.example', 'uv.lock', 'ROADMAP.md', 'DEVLOG.md', 'CHANGELOG.md'}
+SKIP_FILES = {'.env.example', 'uv.lock', 'ROADMAP.md', 'CHANGELOG.md'}
+SKIP_DIRS = {'docs/devlog/'}
 SKIP_PATTERNS = [
     re.compile(r'https?://'),
     re.compile(r'file://'),
@@ -58,6 +59,9 @@ def main() -> None:
         if not path.is_file():
             continue
         if path.name in SKIP_FILES:
+            continue
+        rel = str(path.relative_to(ROOT))
+        if any(rel.startswith(d) for d in SKIP_DIRS):
             continue
         try:
             text = path.read_text(encoding='utf-8')
