@@ -352,6 +352,66 @@ class Agent:
                         total += self.estimate_tokens(tc.get("function", {}).get("arguments", ""))
         return total
 
+    def _parse_text_tool_calls(self, text: str) -> list:
+        """Parse pseudo tool calls from model text output (GGUF fallback).
+
+        Detects patterns like: bash(command=\"...\"), file_read(path=\"...\")
+        by finding tool_name( followed by key=\"value\" pairs and matching parens.
+        """
+        import re as _re
+        from bytia_kode.providers.client import ToolCall
+
+        parsed = []
+        known = self.tools._tools.keys()
+        tool_names = "|".join(known)
+
+        # Find tool_name( ... ) with balanced parens
+        pattern = _re.compile(rf'\b({"|".join(known)})\s*\(')
+        for m in pattern.finditer(text):
+            tool_name = m.group(1)
+            start = m.end()
+            # Find matching closing paren
+            depth = 1
+            end = start
+            in_quotes = False
+            quote_char = None
+            while end < len(text) and depth > 0:
+                ch = text[end]
+                if in_quotes:
+                    if ch == '\\' and end + 1 < len(text):
+                        end += 1
+                    elif ch == quote_char:
+                        in_quotes = False
+                else:
+                    if ch in '\'"':
+                        in_quotes = True
+                        quote_char = ch
+                    elif ch == '(':
+                        depth += 1
+                    elif ch == ')':
+                        depth -= 1
+                end += 1
+
+            if depth != 0:
+                continue
+
+            inner = text[start:end - 1]
+            # Extract key="value" pairs
+            args = {}
+            kv_pattern = _re.compile(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"')
+            for km in kv_pattern.finditer(inner):
+                key = km.group(1)
+                val = km.group(2).replace('\\"', '"').replace('\\n', '\n')
+                args[key] = val
+
+            if args:
+                parsed.append(ToolCall(
+                    id=f"txt_{len(parsed)}",
+                    function={"name": tool_name, "arguments": json.dumps(args)},
+                ))
+
+        return parsed
+
     async def _manage_context(self, provider_client) -> None:
         """Compress old messages when context exceeds 75% of max.
 
@@ -608,6 +668,12 @@ class Agent:
                     self._session_store.update_title(
                         self._current_session_id, sanitized_message[:80],
                     )
+
+            # ── Fallback: parse pseudo tool calls from text (GGUF models) ──
+            if not tool_calls_accum and response_text:
+                parsed = self._parse_text_tool_calls(response_text)
+                if parsed:
+                    tool_calls_accum = parsed
 
             if not tool_calls_accum:
                 self.providers.report_success(provider)
