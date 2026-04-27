@@ -53,6 +53,16 @@ class ProviderClient:
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
 
+    @property
+    def supports_grammar(self) -> bool:
+        """True if this provider supports GBNF grammar constraints."""
+        url = self.base_url.lower()
+        if ":11434" in url:
+            return False
+        if "localhost" in url or "127.0.0.1" in url:
+            return True
+        return False
+
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
