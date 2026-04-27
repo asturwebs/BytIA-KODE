@@ -552,16 +552,12 @@ class Agent:
 
             try:
                 _grammar = None
-                _send_tools = tool_defs if tool_defs else None
-                if hasattr(type(provider_client), 'supports_grammar') and provider_client.supports_grammar:
-                    has_tool_calls = bool(self.messages and self.messages[-1].tool_calls)
-                    if not has_tool_calls:
-                        _grammar = self.grammar
-                        _send_tools = None  # Backend rejects grammar with tools
+                if not tool_defs and hasattr(type(provider_client), 'supports_grammar') and provider_client.supports_grammar:
+                    _grammar = self.grammar
 
                 async for chunk_type, data in provider_client.chat_stream(
                     messages=all_messages,
-                    tools=_send_tools,
+                    tools=tool_defs if tool_defs else None,
                     temperature=self.config.llm_temperature,
                     max_tokens=self.config.llm_max_tokens,
                     grammar=_grammar,
