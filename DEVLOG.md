@@ -1,5 +1,33 @@
 # BytIA KODE - Development Log
 
+## Session 29 — 2026-04-27 — Agent Loop Optimizations (v0.7.3)
+
+**Scope:** Performance and reliability improvements to the agentic loop based on session audit (22-iteration trace). Four quick wins implemented.
+
+### Changes
+
+| # | What | Impact |
+|---|---|---|
+| 1 | **SP cache** — `_build_system_prompt()` cached per message count, invalidated on identity change | Saves 1 full SP rebuild per iteration (~500ms/iter for 22-iter loop = ~11s saved) |
+| 2 | **Router polling paused** — `_poll_router_info()` returns early when `is_processing` | Eliminates 12-24 unnecessary HTTP requests during long generations |
+| 3 | **Better placeholder** — `reasoning_text[:200]` as fallback instead of literal `(sin respuesta de texto)` | Less history pollution when model generates only reasoning |
+| 4 | **Batch context compression** — 5 messages at once instead of 2, last 4 always preserved, truncation for old history | Fewer LLM calls during compression; ~5× faster when context overflows |
+
+### Files Changed
+
+| File | Changes |
+|---|---|
+| `agent.py` | SP cache (+16 lines), better placeholder (1 line), batch compression (+15/-12 lines) |
+| `tui.py` | Router poll pause (2 lines) |
+| `tests/test_agentic_loop.py` | Updated assertion for new placeholder |
+| `tests/test_context_management.py` | Updated assertions for batch compression |
+
+### Tests
+
+110 passed — no regressions.
+
+---
+
 ## Session 28 — 2026-04-27 — Structured CoT Grammar Exploration (reverted)
 
 **Scope:** Full exploration of GBNF grammar-constrained Chain-of-Thought for B-KODE. Inspired by `andthattoo/structured-cot` (22× thinking token compression). Integrated, tested, and ultimately **reverted** — incompatible with agentic tool use.

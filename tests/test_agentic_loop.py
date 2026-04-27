@@ -96,7 +96,7 @@ class TestAgenticLoopTermination:
             collected.append(chunk)
 
         assert len(agent.messages) == 2
-        assert agent.messages[1].content == "(sin respuesta de texto)"
+        assert agent.messages[1].content == "Solo pensando..."
 
     @pytest.mark.asyncio
     async def test_cancellation_saves_partial_and_exits(self, agent):

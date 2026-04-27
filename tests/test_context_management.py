@@ -63,9 +63,8 @@ class TestManageContext:
             Message(role="assistant", content="keep"),
         ]
         await agent._manage_context(mock_provider)
-        assert mock_provider.chat.call_count >= 1
         assert len(agent.messages) < 6
-        assert any("[Previous conversation summarized]" in (m.content or "") for m in agent.messages)
+        assert any("Conversación resumida" in (m.content or "") for m in agent.messages)
 
     @pytest.mark.asyncio
     async def test_preserves_recent_messages(self, agent, mock_provider):

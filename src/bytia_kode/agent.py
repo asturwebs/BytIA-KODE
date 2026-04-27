@@ -162,6 +162,8 @@ class Agent:
         self._identity_dirty = True
         self._bkode_path, self._bkode_content = self._load_bkode()
         self._initialized = False
+        self._sp_cache: str | None = None
+        self._sp_cache_msg_count: int = 0
         self.on_tool_call: list = []  # callbacks: fn(tool_name: str)
         self.on_tool_done: list = []  # callbacks: fn(tool_name: str, output: str, error: bool)
         self.on_subprocess: list = []  # callbacks: fn(process: asyncio.subprocess.Process | None)
@@ -249,6 +251,10 @@ class Agent:
         return payload
 
     def _build_system_prompt(self) -> str:
+        msg_count = len(self.messages)
+        if self._sp_cache is not None and not self._identity_dirty and msg_count == self._sp_cache_msg_count:
+            return self._sp_cache
+
         if self._identity_dirty:
             kernel_raw, runtime_raw = self._identity_raw
             kernel = self._apply_template_vars(kernel_raw)
@@ -285,7 +291,10 @@ class Agent:
         session_context = self._get_previous_session_summary()
         if session_context:
             parts.append(session_context)
-        return "\n\n".join(parts)
+        result = "\n\n".join(parts)
+        self._sp_cache = result
+        self._sp_cache_msg_count = msg_count
+        return result
 
     def _get_previous_session_summary(self, source: str | None = None) -> str:
         """Build a compact summary of the most recent past session for context continuity.
@@ -345,32 +354,44 @@ class Agent:
         """Compress old messages when context exceeds 75% of max.
 
         Strategy:
-        1. If dynamic ctx_size available from router, use it; else use _max_context_tokens.
-        2. When threshold exceeded, summarize oldest messages using the model itself.
-        3. System messages are never summarized.
-        4. Fallback to truncation if summarization fails.
+        1. Keep last 4 non-system messages intact (recent context).
+        2. Batch-compress older messages 5 at a time.
+        3. Truncate very old messages without LLM; use LLM only for recent context.
         """
         threshold = int(self._max_context_tokens * 0.75)
-        while self._estimate_tokens() > threshold and len(self.messages) > 4:
-            candidates = [m for m in self.messages if m.role != "system"]
-            if len(candidates) < 2:
+        max_iters = 10
+
+        for _ in range(max_iters):
+            if self._estimate_tokens() <= threshold or len(self.messages) <= 4:
                 break
 
-            old = candidates[:2]
-            summary = await self._summarize_messages(old, provider_client)
+            # Keep last 4 non-system messages untouched
+            non_system = [(i, m) for i, m in enumerate(self.messages) if m.role != "system"]
+            if len(non_system) <= 4:
+                break
+
+            # Compress oldest batch (before last 4 non-system messages)
+            batch_indices = [i for i, _ in non_system[:-4][:5]]
+            if not batch_indices:
+                break
+
+            batch = [self.messages[i] for i in batch_indices]
+            msg_pos = max(batch_indices)
+
+            if msg_pos < len(self.messages) // 2:
+                snippet = "; ".join(
+                    (m.content or "")[:60] for m in batch
+                )
+                summary = f"[historial antiguo: {snippet}...]"
+            else:
+                summary = await self._summarize_messages(batch, provider_client)
+
             summary_msg = Message(
                 role="system",
-                content=f"[Previous conversation summarized] {summary}",
+                content=f"[Conversación resumida] {summary}",
             )
 
-            old_indices = []
-            for msg in old:
-                try:
-                    old_indices.append(self.messages.index(msg))
-                except ValueError:
-                    continue
-
-            for idx in sorted(old_indices, reverse=True):
+            for idx in sorted(batch_indices, reverse=True):
                 self.messages.pop(idx)
 
             self.messages.insert(0, summary_msg)
@@ -558,7 +579,7 @@ class Agent:
                 break
 
             msg_count_before = len(self.messages)
-            stored_content = response_text or "(sin respuesta de texto)"
+            stored_content = response_text or reasoning_text[:200] or "(sin respuesta de texto)"
             reasoning_to_store = reasoning_text if reasoning_text else None
             self.messages.append(Message(
                 role="assistant",
