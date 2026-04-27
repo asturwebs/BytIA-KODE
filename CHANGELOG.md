@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.3] - 2026-04-27
+
+### Changed
+
+- **SP cache**: system prompt cached per message count, avoids double rebuild per iteration (~500ms/iter saved).
+- **Router polling**: paused during agent processing to eliminate unnecessary HTTP requests.
+- **Placeholder**: reasoning text used as fallback instead of literal `(sin respuesta de texto)`, reducing history pollution.
+- **Batch compression**: 5 messages at once (was 2), last 4 non-system messages always preserved, truncation for very old history.
+
+### Tests
+
+- 110 passed — no regressions (4 test assertions updated for new behavior).
+
+---
+
+
 ## [0.7.2] - 2026-04-26
 
 ### Added

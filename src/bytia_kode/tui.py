@@ -562,6 +562,8 @@ class BytIAKODEApp(App):
 
     async def _poll_router_info(self) -> None:
         """Poll router every 5s for model changes and real ctx metrics. Backoff on failures."""
+        if self.is_processing:
+            return
         try:
             client = self.agent.providers.get(self.active_provider)
             info = await client.get_router_info()
