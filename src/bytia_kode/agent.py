@@ -21,11 +21,6 @@ from bytia_kode.skills.loader import SkillLoader
 from bytia_kode.tools.registry import ToolRegistry, ToolResult
 from bytia_kode.tools.session import SessionListTool, SessionLoadTool, SessionSearchTool
 
-try:
-    from bytia_kode.prompts.grammars import get_grammar as _get_packaged_grammar
-except ModuleNotFoundError:
-    _get_packaged_grammar = None
-
 logger = logging.getLogger(__name__)
 CORE_IDENTITY_PACKAGE = "bytia_kode.prompts"
 KERNEL_DEFAULT = "kernel.default.yaml"
@@ -34,7 +29,6 @@ KERNEL_RESOURCE = "bytia.kernel.yaml"
 RUNTIME_RESOURCE = "bytia.runtime.kode.yaml"
 USER_PROMPTS_DIR = Path.home() / ".bytia-kode" / "prompts"
 MAX_CONTEXT_TOKENS = 262144  # ~200k tokens default (Gemma 4 26B supports 256k)
-DEFAULT_GRAMMAR = "think_goal_approach_edge.gbnf"
 
 _FAMILY_MAP = {
     "gemma": "Google", "glm": "Zhipu AI", "llama": "Meta",
@@ -185,50 +179,6 @@ class Agent:
         self.tools.register(SessionListTool(self._session_store))
         self.tools.register(SessionLoadTool(self._session_store))
         self.tools.register(SessionSearchTool(self._session_store))
-
-        # Grammar (Structured CoT)
-        self._grammar_cache: str | None = None
-        self._grammar_loaded: bool = False
-
-    def _load_grammar(self) -> str | None:
-        """Load GBNF grammar from file or packaged default. Returns None if disabled."""
-        if not self.config.grammar_enabled:
-            return None
-        grammar_path = self.config.grammar_file
-        if grammar_path:
-            path = Path(grammar_path)
-            if path.is_absolute() and path.exists():
-                return path.read_text(encoding="utf-8").strip()
-            data_path = self.config.data_dir / "grammars" / grammar_path
-            if data_path.exists():
-                return data_path.read_text(encoding="utf-8").strip()
-            logger.warning("Grammar file not found: %s", grammar_path)
-            return None
-        if _get_packaged_grammar is not None:
-            try:
-                return _get_packaged_grammar(DEFAULT_GRAMMAR)
-            except FileNotFoundError:
-                logger.warning("Default grammar not found: %s", DEFAULT_GRAMMAR)
-                return None
-        return None
-
-    @property
-    def grammar(self) -> str | None:
-        """Current GBNF grammar string, lazy-loaded with cache."""
-        if not self._grammar_loaded:
-            self._grammar_cache = self._load_grammar()
-            self._grammar_loaded = True
-        return self._grammar_cache
-
-    def toggle_grammar(self, enabled: bool | None = None) -> bool:
-        """Toggle grammar mode. Returns new state."""
-        if enabled is not None:
-            self.config.grammar_enabled = enabled
-        else:
-            self.config.grammar_enabled = not self.config.grammar_enabled
-        self._grammar_cache = None
-        self._grammar_loaded = False
-        return self.config.grammar_enabled
 
     def update_context_limit(self, ctx_size: int) -> None:
         """Update max context tokens from router info (dynamic ctx_size)."""
@@ -551,16 +501,11 @@ class Agent:
             tool_calls_accum: list = []
 
             try:
-                _grammar = None
-                if not tool_defs and hasattr(type(provider_client), 'supports_grammar') and provider_client.supports_grammar:
-                    _grammar = self.grammar
-
                 async for chunk_type, data in provider_client.chat_stream(
                     messages=all_messages,
                     tools=tool_defs if tool_defs else None,
                     temperature=self.config.llm_temperature,
                     max_tokens=self.config.llm_max_tokens,
-                    grammar=_grammar,
                 ):
                     if self._cancel_event.is_set():
                         yield "\n[interrupted]"

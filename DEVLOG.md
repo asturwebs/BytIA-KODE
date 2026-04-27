@@ -1,37 +1,5 @@
 # BytIA KODE - Development Log
 
-## Session 28 — 2026-04-26 — Structured CoT Grammar (v0.7.3)
-
-**Scope:** Integrate GBNF grammar-constrained Chain-of-Thought (inspired by `andthattoo/structured-cot`) as opt-in feature. Zero training, zero fine-tuning — just a grammar file applied at inference time.
-
-### Summary
-
-- **4 new GBNF grammars** in `src/bytia_kode/prompts/grammars/`: base (GOAL/APPROACH/EDGE), enriched (GOAL/STATE/ALGO/EDGE/VERIFY), P22 capability assessment, P20 error propagation
-- **`ProviderClient.supports_grammar`** property — detects llama.cpp local endpoints (only localhost supports it; Ollama, Z.ai, MiniMax, DeepSeek, OpenAI don't)
-- **`grammar` parameter** in `chat()` and `chat_stream()` payloads — only sent when active
-- **Agent integration**: lazy-loaded grammar with cache, toggle method, auto-disable when tools are active
-- **TUI**: `/grammar [on|off|status]` command, `Ctrl+G` binding, menu entry, `[G]` indicator in status bar (green=support, dim=unsupported provider)
-- **Config**: `GRAMMAR_MODE` and `GRAMMAR_FILE` env vars
-- **18 new tests**, 128 total, zero regressions
-
-### Background
-
-The `structured-cot` paper demonstrated 22× thinking token compression on HumanEval+ using a ~10-line GBNF grammar that forces the `<think>` block into a compact structured format (GOAL/APPROACH/EDGE). Our llama-router on `:8080` supports the grammar parameter natively. This integration adds grammar as an opt-in layer that auto-disables during tool calls.
-
-### Files Changed
-
-| File | Change |
-|------|--------|
-| `src/bytia_kode/prompts/grammars/*.gbnf` (×4) | New |
-| `src/bytia_kode/prompts/grammars/__init__.py` | New |
-| `src/bytia_kode/config.py` | +6 lines: `grammar_enabled`, `grammar_file` |
-| `src/bytia_kode/providers/client.py` | +25 lines: `supports_grammar`, `grammar` param |
-| `src/bytia_kode/agent.py` | +45 lines: `_load_grammar`, `grammar` prop, `toggle_grammar` |
-| `src/bytia_kode/tui.py` | +60 lines: cmd, binding, menu, indicator |
-| `tests/test_grammar.py` | New: 18 tests |
-| `.env.example` | +6 lines: `GRAMMAR_*` vars |
-| `pyproject.toml` | Version 0.7.2 → 0.7.3 |
-
 ## Session 27 — 2026-04-26 — DeepSeek reasoning_content Fix (v0.7.2)
 
 **Scope:** Fix DeepSeek 400 Bad Request when tool calls follow reasoning. Store and re-send `reasoning_content` per DeepSeek API requirement.
