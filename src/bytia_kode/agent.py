@@ -164,6 +164,8 @@ class Agent:
         self._initialized = False
         self._sp_cache: str | None = None
         self._sp_cache_msg_count: int = 0
+        self._last_tool_key: str = ""
+        self._same_tool_count: int = 0
         self.on_tool_call: list = []  # callbacks: fn(tool_name: str)
         self.on_tool_done: list = []  # callbacks: fn(tool_name: str, output: str, error: bool)
         self.on_subprocess: list = []  # callbacks: fn(process: asyncio.subprocess.Process | None)
@@ -579,8 +581,15 @@ class Agent:
                 break
 
             msg_count_before = len(self.messages)
-            stored_content = response_text or reasoning_text[:200] or "(sin respuesta de texto)"
             reasoning_to_store = reasoning_text if reasoning_text else None
+
+            if tool_calls_accum:
+                stored_content = "[procesando herramientas...]"
+            elif response_text:
+                stored_content = response_text
+            else:
+                stored_content = reasoning_text[:200] if reasoning_text else "(sin respuesta de texto)"
+
             self.messages.append(Message(
                 role="assistant",
                 content=stored_content,
@@ -606,6 +615,30 @@ class Agent:
 
             if self._cancel_event.is_set():
                 break
+
+            # ── Loop detection: same tool + same args 3× in a row ──
+            tool_key = json.dumps(
+                [(tc.function.get("name"), tc.function.get("arguments"))
+                 for tc in tool_calls_accum],
+                sort_keys=True,
+            )
+            if tool_key == self._last_tool_key:
+                self._same_tool_count += 1
+            else:
+                self._last_tool_key = tool_key
+                self._same_tool_count = 1
+
+            if self._same_tool_count >= 3:
+                self.messages.append(Message(
+                    role="system",
+                    content=(
+                        "Has repetido la misma herramienta 3 veces sin progreso. "
+                        "Resume lo que sabes AHORA y responde al usuario. "
+                        "NO llames más herramientas."
+                    ),
+                ))
+                yield "\n[loop detectado — forzando respuesta]"
+                continue
 
             await self._handle_tool_calls(tool_calls_accum)
         else:
