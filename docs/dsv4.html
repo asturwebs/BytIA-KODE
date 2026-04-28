@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="https://i.imgur.com/iOPDuaI.png" type="image/x-icon">
+    <title>DeepSeek V4</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400&display=swap">
+    <style>
+        :root {
+            --bg-primary: #fdfbf7;
+            --bg-code: #2e2a2d;
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b6b6b;
+            --accent: #8b7355;
+            --accent-light: #b09a7e;
+            --border: #e8e3dc;
+            --link: #5d7a8a;
+            --link-hover: #3d5a6a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Crimson Pro', serif;
+            line-height: 1.75;
+            color: var(--text-primary);
+            background-color: var(--bg-primary);
+            font-size: 18px;
+            font-weight: 400;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .book-container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            min-height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            margin-bottom: 5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            display: block;
+            width: 60px;
+            height: 1px;
+            background: var(--accent-light);
+            margin: 3rem auto 0;
+            opacity: 0.5;
+        }
+
+        header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 300;
+            font-size: 2.5rem;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+        }
+
+        header a {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: all 0.3s ease;
+            letter-spacing: 0.03em;
+        }
+
+        header a:hover {
+            color: var(--accent);
+            border-bottom-color: var(--accent-light);
+        }
+
+        main {
+            padding: 0;
+        }
+
+        article {
+            margin-bottom: 4rem;
+        }
+
+        article > p:first-of-type::first-letter {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 4.2em;
+            font-weight: 300;
+            float: left;
+            line-height: 0.85;
+            margin: 0.05em 0.15em 0 0;
+            color: var(--accent);
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 400;
+            color: var(--text-primary);
+            margin-top: 3rem;
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.02em;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            text-align: center;
+            margin-top: 4rem;
+            margin-bottom: 2.5rem;
+            font-weight: 300;
+            position: relative;
+        }
+
+        h2::before {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 1px;
+            background: var(--accent-light);
+            margin: 0 auto 1.5rem;
+            opacity: 0.6;
+        }
+
+        h3 {
+            font-size: 1.4rem;
+            margin-top: 2.5rem;
+        }
+
+        p {
+            margin: 1.5rem 0;
+            line-height: 1.85;
+            text-align: justify;
+            hyphens: auto;
+        }
+
+        .separator {
+            text-align: center;
+            margin: 3rem auto;
+            color: var(--accent-light);
+            opacity: 0.6;
+            font-size: 1rem;
+            letter-spacing: 0.5em;
+        }
+
+        /* Math rendering styles */
+        .katex-display {
+            margin: 2rem 0;
+            padding: 1.25rem 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            background: linear-gradient(135deg, rgba(139, 115, 85, 0.02) 0%, rgba(176, 154, 126, 0.03) 100%);
+            border-radius: 4px;
+            position: relative;
+        }
+
+
+        .katex-display > .katex {
+            padding: 0 1rem;
+        }
+
+        .katex {
+            font-size: 1.05em;
+            color: var(--text-primary);
+        }
+
+        /* Inline math styling */
+        .katex:not(.katex-display .katex) {
+            padding: 0 0.1em;
+        }
+
+        /* Better math scrolling on mobile */
+        .katex-display::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .katex-display::-webkit-scrollbar-track {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .katex-display::-webkit-scrollbar-thumb {
+            background: var(--accent-light);
+            border-radius: 2px;
+        }
+
+        /* Math error styling */
+        .katex-error {
+            color: #c75050;
+            font-size: 0.85em;
+            background: rgba(199, 80, 80, 0.08);
+            padding: 0.2em 0.5em;
+            border-radius: 3px;
+        }
+
+        /* Equation numbering container */
+        .math-block {
+            position: relative;
+            margin: 2rem 0;
+        }
+
+        /* Fraction and large operator improvements */
+        .katex .frac-line {
+            border-bottom-width: 0.06em;
+        }
+
+        .katex .mord.text {
+            font-family: 'Crimson Pro', serif;
+        }
+
+        pre[class*="language-"] {
+            border-radius: 4px;
+            margin: 2.5rem 0;
+            padding: 1.75rem;
+            background: var(--bg-code);
+            border: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        code[class*="language-"] {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            font-weight: 300;
+        }
+
+        :not(pre) > code {
+            font-family: 'JetBrains Mono', monospace;
+            background: #f5f1eb;
+            padding: 0.2em 0.5em;
+            border-radius: 3px;
+            font-size: 0.88em;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            font-weight: 400;
+        }
+
+        a {
+            color: var(--link);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(93, 122, 138, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        a:hover {
+            color: var(--link-hover);
+            border-bottom-color: var(--link-hover);
+        }
+
+        blockquote {
+            margin: 2.5rem 0 2.5rem 1rem;
+            padding: 0.25rem 0 0.25rem 1.5rem;
+            border-left: 1px solid var(--accent-light);
+            position: relative;
+        }
+
+        blockquote p {
+            font-style: italic;
+            color: var(--text-secondary);
+            margin: 0;
+            line-height: 1.8;
+        }
+
+        ul, ol {
+            margin: 1.5rem 0;
+            padding-left: 2rem;
+        }
+
+        li {
+            margin: 0.75rem 0;
+            line-height: 1.75;
+        }
+
+        footer {
+            margin-top: 6rem;
+            padding-top: 2rem;
+            text-align: center;
+            position: relative;
+        }
+
+        footer::before {
+            content: '';
+            display: block;
+            width: 60px;
+            height: 1px;
+            background: var(--accent-light);
+            margin: 0 auto 2rem;
+            opacity: 0.5;
+        }
+
+        .footer-ornament {
+            color: var(--accent-light);
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .chapter-backdrop {
+            position: absolute;
+            top: -4rem;
+            left: -8vw;
+            width: 60vw;
+            max-width: 550px;
+            pointer-events: none;
+            z-index: 0;
+            overflow: visible;
+        }
+
+        .chapter-backdrop img {
+            width: 100%;
+            height: auto;
+            opacity: 0.085;
+            filter: saturate(0) contrast(1.4);
+            transform: rotate(-8deg);
+        }
+
+
+        @media (max-width: 768px) {
+            body {
+                font-size: 17px;
+            }
+
+            .book-container {
+                padding: 3rem 1.5rem;
+            }
+
+            header h1 {
+                font-size: 2rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+            }
+
+            article > p:first-of-type::first-letter {
+                font-size: 3.5em;
+            }
+
+            pre[class*="language-"] {
+                padding: 1.25rem;
+                margin: 2rem -0.5rem;
+            }
+
+        }
+
+        @media (max-width: 480px) {
+            body {
+                font-size: 16px;
+            }
+
+            .book-container {
+                padding: 2rem 1rem;
+            }
+
+            header {
+                margin-bottom: 3rem;
+            }
+
+            header h1 {
+                font-size: 1.75rem;
+            }
+
+            .katex {
+                font-size: 0.95em;
+            }
+
+            .katex-display {
+                margin: 1.5rem -0.5rem;
+                padding: 1rem 0.5rem;
+                border-radius: 0;
+            }
+
+            .chapter-backdrop {
+                width: 80vw;
+                left: -12vw;
+                top: -2rem;
+            }
+
+        }
+
+        @media print {
+            body {
+                background: white;
+                font-size: 12pt;
+            }
+
+            .book-container {
+                max-width: 100%;
+            }
+
+            a {
+                color: inherit;
+                border-bottom: none;
+            }
+
+            .katex-display {
+                background: none;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="chapter-backdrop"><img src="images/whale.png" alt="" aria-hidden="true"></div>
+    <div class="book-container">
+        <header>
+            <h1>DeepSeek-V4</h1>
+            <div>
+                <a href="https://x.com/arjunkocher" target="_blank">arjun</a>
+            </div>
+        </header>
+
+        <main>
+            <article id="content">
+                <!-- Markdown content will be rendered here -->
+            </article>
+        </main>
+
+        <footer>
+            <div class="footer-ornament">✦</div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked@5.0.2/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/copy-tex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script>
+        // Math protection: preserve math expressions before markdown processing
+        function protectMath(text) {
+            const mathBlocks = [];
+            let counter = 0;
+            
+            // Protect display math ($$...$$) first - handle multiline
+            text = text.replace(/\$\$([\s\S]*?)\$\$/g, (match, content) => {
+                const placeholder = `%%MATH_DISPLAY_${counter}%%`;
+                mathBlocks.push({ placeholder, content: content.trim(), display: true });
+                counter++;
+                return placeholder;
+            });
+            
+            // Protect inline math ($...$) - but not currency like $5
+            text = text.replace(/\$([^\$\n]+?)\$/g, (match, content) => {
+                // Skip if it looks like currency (number right after $)
+                if (/^\d/.test(content.trim())) return match;
+                const placeholder = `%%MATH_INLINE_${counter}%%`;
+                mathBlocks.push({ placeholder, content: content.trim(), display: false });
+                counter++;
+                return placeholder;
+            });
+            
+            return { text, mathBlocks };
+        }
+        
+        // Restore math after markdown processing
+        function restoreMath(html, mathBlocks) {
+            mathBlocks.forEach(({ placeholder, content, display }) => {
+                try {
+                    const rendered = katex.renderToString(content, {
+                        displayMode: display,
+                        throwOnError: false,
+                        errorColor: '#c75050',
+                        trust: true,
+                        strict: false,
+                        output: 'htmlAndMathml',
+                        macros: {
+                            "\\m": "\\mathbf",
+                            "\\R": "\\mathbb{R}",
+                            "\\N": "\\mathbb{N}",
+                            "\\Z": "\\mathbb{Z}",
+                            "\\E": "\\mathbb{E}",
+                            "\\P": "\\mathbb{P}",
+                            "\\argmin": "\\operatorname{arg\\,min}",
+                            "\\argmax": "\\operatorname{arg\\,max}",
+                            "\\softmax": "\\operatorname{softmax}",
+                            "\\sign": "\\operatorname{sign}",
+                            "\\Tr": "\\operatorname{Tr}",
+                            "\\rank": "\\operatorname{rank}",
+                            "\\diag": "\\operatorname{diag}",
+                            "\\grad": "\\nabla"
+                        }
+                    });
+                    html = html.replace(placeholder, rendered);
+                } catch (e) {
+                    console.warn('Math rendering error:', e, content);
+                    html = html.replace(placeholder, `<span class="katex-error">${content}</span>`);
+                }
+            });
+            return html;
+        }
+
+        marked.setOptions({
+            breaks: false,
+            gfm: true,
+            smartypants: false
+        });
+
+        const renderer = new marked.Renderer();
+
+        renderer.paragraph = function(text) {
+            // Don't wrap if it's just a math placeholder
+            if (/^%%MATH_DISPLAY_\d+%%$/.test(text.trim())) {
+                return text;
+            }
+            return '<p>' + text + '</p>';
+        };
+
+        renderer.code = function(code, language) {
+            const validLanguage = language || 'text';
+            return `<pre><code class="language-${validLanguage}">${code}</code></pre>`;
+        };
+
+        marked.use({ renderer });
+
+        async function renderMarkdown() {
+            try {
+                const response = await fetch('V4.md');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                let markdown = await response.text();
+                
+                // Step 1: Protect math expressions
+                const { text: protectedText, mathBlocks } = protectMath(markdown);
+                
+                // Step 2: Parse markdown (math is protected)
+                let html = marked.parse(protectedText);
+                
+                // Step 3: Restore and render math
+                html = restoreMath(html, mathBlocks);
+                
+                // Step 4: Clean up extra <br> tags around math blocks
+                html = html.replace(/<br>\s*(<span class="katex-display">)/g, '$1');
+                html = html.replace(/(<\/span>)\s*<br>/g, '$1');
+                
+                document.getElementById('content').innerHTML = html;
+
+                // Syntax highlighting
+                Prism.highlightAll();
+                
+            } catch (error) {
+                console.error('Error loading or rendering markdown:', error);
+                document.getElementById('content').innerHTML = `<p>Error loading content: ${error.message}</p>`;
+            }
+        }
+
+        renderMarkdown();
+    </script>
+</body>
+</html>
