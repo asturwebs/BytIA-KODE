@@ -561,11 +561,17 @@ class BytIAKODEApp(App):
     _max_poll_interval: float = 60.0
 
     async def _poll_router_info(self) -> None:
-        """Poll router every 5s for model changes and real ctx metrics. Backoff on failures."""
+        """Poll router every 5s for model changes and real ctx metrics. Backoff on failures.
+
+        Only polls local providers (llama.cpp router). Cloud APIs (DeepSeek, MiniMax, Z.ai)
+        are skipped — their /v1/models endpoint returns model lists, not router metrics.
+        """
         if self.is_processing:
             return
         try:
             client = self.agent.providers.get(self.active_provider)
+            if not client.is_local:
+                return
             info = await client.get_router_info()
             if info.get("model") and info["model"] != client.model:
                 client.model = info["model"]
