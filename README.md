@@ -7,8 +7,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.7.3-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-110%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.7.4-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-130%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -41,11 +41,29 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.7.1`
+> Release actual: `0.7.4`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+### Novedades en v0.7.4 — Provider Resilience Hotfixes
+
+- **DeepSeek V4 thinking mode** — `reasoning_content` incluido en todos los mensajes tras tool calls. Adiós al error 400.
+- **Streaming timeout** — 60s por chunk. Si un provider deja de responder sin error, se detecta y se hace failover en lugar de colgarse.
+- **Cloud polling fix** — Solo el router local recibe polling cada 5s. APIs cloud (DeepSeek, MiniMax, Z.ai) ya no son acosadas con requests inútiles.
+
+### Novedades en v0.7.3 — Agent Loop Optimizations
+
+- **SP cache** — system prompt cacheado por número de mensajes (~500ms ahorrados por iteración).
+- **Router polling** — pausado durante procesamiento del agente.
+- **Batch compression** — 5 mensajes comprimidos a la vez, últimos 4 siempre preservados.
+
+### Novedades en v0.7.2 — DeepSeek V4 Provider
+
+- **DeepSeek V4** — 5º provider: `deepseek-v4-flash` (MoE rápido) y `deepseek-v4-pro` (thinking/reasoning).
+- **Provider pinning** — F3 fija el provider manualmente. Sin auto-fallback en modo pinned.
+- **Context-aware switching** — Límite de contexto actualizado en cada cambio de provider.
 
 ### Novedades en v0.7.1 — Circuit Breaker Hardening
 
