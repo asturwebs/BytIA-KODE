@@ -1,6 +1,14 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.7.3 (Alpha estable)
+## Estado actual: v0.7.4 (Alpha estable)
+
+---
+
+## v0.7.4 — Provider Resilience Hotfixes (COMPLETADO)
+
+- [x] **DeepSeek V4 thinking mode** — `_ensure_deepseek_reasoning()` parchea mensajes con reasoning_content tras tool calls
+- [x] **Streaming timeout** — `_stream_with_timeout()` con 60s por chunk, detecta providers zombie
+- [x] **Cloud polling fix** — `_poll_router_info()` solo para providers locales (localhost)
 
 ---
 
@@ -279,7 +287,7 @@
 
 ### Tests
 
-- [x] 110 tests pasando — sin regresiones
+- [x] 130 tests pasando — sin regresiones
 
 ## v0.8.0 — Memoria y Conocimiento
 
