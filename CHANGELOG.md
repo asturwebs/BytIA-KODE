@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.4] - 2026-04-28
+
+### Fixed
+
+- **DeepSeek V4 error 400**: `reasoning_content` ahora se incluye en todos los mensajes `assistant` posteriores a un tool call cuando se usa DeepSeek en thinking mode. El flag `_has_had_tool_calls` (antes muerto) se activa correctamente y `_ensure_deepseek_reasoning()` parchea los mensajes antes de enviarlos a la API.
+- **Streaming timeout (silent hang)**: `_stream_with_timeout()` envuelve el iterador SSE con `asyncio.wait_for()` por chunk (60s). Si el provider deja de emitir datos sin cerrar la conexión, se lanza `TimeoutError` en lugar de colgarse indefinidamente.
+- **Cloud API polling storm**: `_poll_router_info()` ahora verifica `client.is_local` antes de llamar a `get_router_info()`. Solo el router local (localhost) recibe polling cada 5s. APIs cloud (DeepSeek, MiniMax, Z.ai) se saltan — su endpoint `/v1/models` no expone métricas de llama.cpp.
+
+### Added
+
+- `ProviderClient.is_local`: nueva propiedad que detecta si el provider es un servidor local (localhost/127.0.0.1).
+- `Agent._stream_with_timeout()`: wrapper de iterador async con timeout por chunk.
+- `Agent._ensure_deepseek_reasoning()`: parchea mensajes para cumplir requisitos de DeepSeek thinking mode.
+
 ## [0.7.3] - 2026-04-27
 
 ### Changed

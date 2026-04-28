@@ -54,14 +54,17 @@ class ProviderClient:
         self._client: httpx.AsyncClient | None = None
 
     @property
+    def is_local(self) -> bool:
+        """True if this provider is a local server (llama.cpp router, Ollama, etc.)."""
+        url = self.base_url.lower()
+        return "localhost" in url or "127.0.0.1" in url
+
+    @property
     def supports_grammar(self) -> bool:
         """True if this provider supports GBNF grammar constraints."""
-        url = self.base_url.lower()
-        if ":11434" in url:
+        if ":11434" in url.lower():
             return False
-        if "localhost" in url or "127.0.0.1" in url:
-            return True
-        return False
+        return self.is_local
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:

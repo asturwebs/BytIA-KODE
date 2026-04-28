@@ -21,6 +21,7 @@ Registro diario de sesiones de desarrollo. Cada día tiene su propio archivo en 
 | 2026-04-17 | S28: B-KODE.md Rewrite + Security Hardening | [`2026-04-17.md`](docs/devlog/2026-04-17.md) |
 | 2026-04-26 | S29: DeepSeek Provider + Sticky Pinning + Claude Code M, S30: DeepSeek reasoning_content Fix (v0.7.2) | [`2026-04-26.md`](docs/devlog/2026-04-26.md) |
 | 2026-04-27 | S31: Structured CoT Grammar Exploration (reverted), S32: Agent Loop Optimizations (v0.7.3), S33: Agent Loop Stagnation Fixes, S34: Fix Validation: 65% Iteration Reduction | [`2026-04-27.md`](docs/devlog/2026-04-27.md) |
+| 2026-04-28 | S35: Provider Resilience Hotfixes (v0.7.4) | [`2026-04-28.md`](docs/devlog/2026-04-28.md) |
 
 ## Formato
 

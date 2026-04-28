@@ -166,6 +166,8 @@ class Agent:
         self._sp_cache_msg_count: int = 0
         self._last_tool_key: str = ""
         self._same_tool_count: int = 0
+        self._tool_error_memory: dict[str, dict[str, str]] = {}
+        self._has_had_tool_calls: bool = False
         self.on_tool_call: list = []  # callbacks: fn(tool_name: str)
         self.on_tool_done: list = []  # callbacks: fn(tool_name: str, output: str, error: bool)
         self.on_subprocess: list = []  # callbacks: fn(process: asyncio.subprocess.Process | None)
@@ -183,6 +185,36 @@ class Agent:
         self.tools.register(SessionListTool(self._session_store))
         self.tools.register(SessionLoadTool(self._session_store))
         self.tools.register(SessionSearchTool(self._session_store))
+
+        self._reset_tool_flag()
+
+    def _reset_tool_flag(self) -> None:
+        """Scan messages for tool_calls to restore _has_had_tool_calls flag.
+
+        DeepSeek V4 in thinking mode requires reasoning_content in ALL turns after a tool call.
+        See https://api-docs.deepseek.com/guides/thinking_mode
+        """
+        had_tool = False
+        for msg in reversed(self.messages):
+            if msg.role == "assistant" and msg.tool_calls:
+                had_tool = True
+                break
+        self._has_had_tool_calls = had_tool
+
+    def _ensure_deepseek_reasoning(self, messages: list[Message]) -> list[Message]:
+        """Patch messages for DeepSeek V4 thinking mode compatibility.
+
+        After any tool call, ALL assistant messages in the conversation history
+        must include reasoning_content (even if empty string). Otherwise DeepSeek
+        returns 400: "The reasoning_content in the thinking mode must be passed
+        back to the API."
+        """
+        if not self._has_had_tool_calls:
+            return messages
+        for msg in messages:
+            if msg.role == "assistant" and msg.reasoning_content is None:
+                msg.reasoning_content = ""
+        return messages
 
     def update_context_limit(self, ctx_size: int) -> None:
         """Update max context tokens from router info (dynamic ctx_size)."""
@@ -485,6 +517,21 @@ class Agent:
         )
         return fallback
 
+    async def _stream_with_timeout(self, stream, timeout: float = 60.0):
+        """Wrap async iterator with per-chunk timeout.
+
+        If no chunk arrives within `timeout` seconds, raises TimeoutError.
+        Prevents silent hangs when provider SSE stream goes zombie.
+        """
+        while True:
+            try:
+                chunk = await asyncio.wait_for(stream.__anext__(), timeout=timeout)
+                yield chunk
+            except StopAsyncIteration:
+                break
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Provider stopped responding for {timeout:.0f}s") from None
+
     async def _handle_tool_calls(self, tool_calls) -> None:
         for tool_call in tool_calls:
             fn = tool_call.function if isinstance(tool_call.function, dict) else {}
@@ -516,6 +563,7 @@ class Agent:
                 ))
                 continue
 
+            self._has_had_tool_calls = True
             logger.info("Tool call: %s(%s)", tool_name, arguments)
             for cb in self.on_tool_call:
                 cb(tool_name)
@@ -579,17 +627,20 @@ class Agent:
         for _iteration in range(self.max_iterations):
             self._cancel_event.clear()
             all_messages = [Message(role="system", content=self._build_system_prompt())] + self.messages
+            if "deepseek" in provider.lower():
+                all_messages = self._ensure_deepseek_reasoning(all_messages)
             response_text = ""
             reasoning_text = ""
             tool_calls_accum: list = []
 
             try:
-                async for chunk_type, data in provider_client.chat_stream(
+                stream = provider_client.chat_stream(
                     messages=all_messages,
                     tools=tool_defs if tool_defs else None,
                     temperature=self.config.llm_temperature,
                     max_tokens=self.config.llm_max_tokens,
-                ):
+                )
+                async for chunk_type, data in self._stream_with_timeout(stream, timeout=60.0):
                     if self._cancel_event.is_set():
                         yield "\n[interrupted]"
                         break
@@ -731,6 +782,7 @@ class Agent:
         self._current_session_id = session_id
         self.messages = messages
         self._persisted_count = len(self.messages)
+        self._reset_tool_flag()
         logger.info("Session loaded: %s (%d messages)", session_id, len(messages))
         return True
 
