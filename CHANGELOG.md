@@ -11,7 +11,7 @@
 
 ### Tests
 
-- 110 passed — no regressions (4 test assertions updated for new behavior).
+- 130 passed — no regressions
 
 ---
 
