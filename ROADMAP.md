@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.7.1 (Alpha estable)
+## Estado actual: v0.7.3 (Alpha estable)
 
 ---
 
@@ -12,13 +12,13 @@
 
 ### P0 — Bloqueante (impide uso productivo fuera de CWD)
 
-- [ ] **FIX-1: Bash Tool Limitations en System Prompt**
+- [x] **FIX-1: Bash Tool Limitations en System Prompt**
   - Añadir sección `tool_constraints` a `runtime.default.yaml` documentando lo que `bash` NO soporta (pipes, redirects, chains, brace expansion, shell builtins)
   - Incluir patrones permitidos y protocolo de escalación
   - **Archivo:** `src/bytia_kode/prompts/runtime.default.yaml`
   - **Espera reducir:** ~90% de errores de bash por desconocimiento
 
-- [ ] **FIX-2: Self-Loop Detection (LoopDetector)**
+- [x] **FIX-2: Self-Loop Detection (LoopDetector)**
   - Clase `LoopDetector` en `agent.py`: contador de fallos consecutivos, ventana deslizante de 5 intentos
   - Si 3+ fallos consecutivos → inyectar mensaje de sistema forzando escalación al usuario
   - Mensaje automático: "He intentado esta operación N veces sin éxito. Ejecuta: `comando`"
@@ -52,10 +52,10 @@
 
 ### Tests requeridos para cerrar hotfix
 
-- [ ] Test: LoopDetector detecta bucle tras 3 fallos consecutivos
-- [ ] Test: LoopDetector no dispara con fallos intermitentes
+- [x] Test: LoopDetector detecta bucle tras 3 fallos consecutivos
+- [x] Test: LoopDetector no dispara con fallos intermitentes
 - [ ] Test: Tool Error Memory bloquea patrón previamente rechazado
-- [ ] Test: Bash tool limitations presentes en system prompt generado
+- [x] Test: Bash tool limitations presentes en system prompt generado
 - [ ] Test: Workspace context awareness inyectado en SP dinámico
 
 ---
@@ -258,6 +258,28 @@
 - [x] **System messages** — aviso al usuario cuando se cambia de provider (TUI + Telegram)
 - [x] **report_success / report_failure** — feedback loop del agentic loop al circuit breaker
 - [x] **24 tests nuevos** — 8 CircuitBreaker + 7 ProviderManager + 3 Agent fallback + 6 existentes arreglados
+
+## v0.7.3 — Optimizaciones Agente y Pseudo Tool Calls (COMPLETADO)
+
+### Completado
+
+- [x] **Structured CoT Grammar** — GBNF grammars para Chain-of-Thought estructurado (explorado y revertido por incompatibilidad agentic + tools)
+- [x] **`supports_grammar` property** — patrón de detección de capacidades del provider, zero overhead
+- [x] **llama.cpp b8946** — engine auto-update con weekly cron
+- [x] **SP cache** — system prompt cacheado por message count (~500ms/iter ahorrados)
+- [x] **Router polling pausado** — sin HTTP requests durante procesamiento agente
+- [x] **Placeholder tools** — `[procesando herramientas...]` evita que reasoning se cuele en content
+- [x] **Batch compression** — 5 mensajes de golpe (antes 2), preserva últimos 4 non-system
+- [x] **LoopDetector** — detecta 3 tool calls idénticos consecutivos e inyecta mensaje de sistema
+- [x] **Validación** — 65% menos iteraciones, 73% menos mensajes, 0 leaks de reasoning
+- [x] **Pseudo tool calls GGUF** — parseo de tool calls desde texto plano de modelos GGUF
+- [x] **FIX-1: tool_constraints** — sección en runtime.default.yaml con limitaciones de bash
+- [x] **FIX-2: Self-Loop Detection** — LoopDetector con contador de fallos consecutivos
+- [x] **Renumbering devlog** — sesiones S1-S34 con orden cronológico
+
+### Tests
+
+- [x] 110 tests pasando — sin regresiones
 
 ## v0.8.0 — Memoria y Conocimiento
 

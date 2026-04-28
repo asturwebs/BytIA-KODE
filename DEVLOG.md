@@ -24,12 +24,46 @@ Registro diario de sesiones de desarrollo. Cada día tiene su propio archivo en 
 
 ## Formato
 
-Cada archivo diario contiene una o más entradas de sesión con el formato:
+Cada archivo diario contiene una o más entradas de sesión con **secciones semánticas según el tipo de trabajo**.
+
+### Estructura base (obligatorio)
 
 ```markdown
-# Session N — YYYY-MM-DD — Título
+# Session N — YYYY-MM-DD — Título descriptivo
 
-**Scope:** Descripción breve del alcance.
+**Scope:** Descripción breve del alcance. Qué se hizo, por qué, resultado principal.
 ```
 
-Múltiples sesiones en el mismo día se separan con `---`.
+### Separador entre sesiones
+
+Tres líneas de `---` separadas por un salto:
+
+```markdown
+
+---
+
+---
+
+---
+```
+
+### Secciones semánticas por tipo de sesión
+
+No hay un template único. Cada sesión elige las secciones que mejor describen el trabajo:
+
+| Tipo | Secciones recomendadas |
+|------|----------------------|
+| **Feature / Nueva funcionalidad** | `### Implementación` (descripción), `### Arquitectura` (cambios clave), `### Files Changed` (tabla), `### Tests` |
+| **Bug Fix** | `### Problema` (síntomas + sesión donde se detectó), `### Root Cause` (causa raíz), `### Fix` (qué se cambió y cómo), `### Files Changed` (tabla), `### Tests` |
+| **Experimento / Exploración** | `### What We Built` / `### What We Tried`, `### What Stayed` (lo que se conservó), `### Root Cause: Why It Failed/Worked`, `### Key Findings`, `### Reference` |
+| **Validación / Benchmark** | `### Context` (qué se valida), `### Before vs After` (tabla de métricas), `### What Worked`, `### Remaining Edge Cases` |
+| **Refactor / Limpieza** | `### Cambios`, `### Archivos modificados` (tabla), `### Testing` |
+| **Estándar / Mixto** | La que mejor se adapte. Si hay cambios de archivos, incluir tabla `### Files Changed` |
+
+### Convenios
+
+- **`### Files Changed`**: Tabla con columnas `Archivo | Cambio | Razón`
+- **`### Tests`**: Siempre al final. Indicar número de tests y si hay regresiones. Ej: `142 passed — no regressions`
+- **`### Commits`**: Tabla con `Commit | Descripción` para sesiones con múltiples commits
+- **Los enlaces a sesiones de TUI/Telegram** van con el ID: `` `tui_a1b2c3d4` ``
+- **Idioma**: El `Scope` y títulos en inglés (estándar del proyecto). Contenido interior en el idioma que mejor fluya (español para análisis, inglés para features técnicas)
