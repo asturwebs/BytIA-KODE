@@ -1,6 +1,18 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.7.4 (Alpha estable)
+## Estado actual: v0.7.5 (Alpha estable)
+
+---
+
+## v0.7.5 — Skills System v2.0 (COMPLETADO)
+
+- [x] **Layered skill architecture** — `SkillLoader` con 3 capas: bytia > user > vendor
+- [x] **YAML multiline parser** — `_parse_skill()` maneja `description: >` folded scalars
+- [x] **sync-vendor-skills.sh** — transforma agentskills.io → flat format durante sync
+- [x] **FIX-3: Tool Error Memory** — patrones rechazados no se reintentan (bash, file_write, file_edit)
+- [x] **FIX-4: Workspace Context Awareness** — CWD y sandbox inyectados en system prompt dinámico
+- [x] **Vendor skills auto-update** — reinstala solo cuando cambia la versión del paquete
+- [x] **9 tests nuevos** — 3 loader edge cases + 3 FIX-3 + 3 FIX-4
 
 ---
 
@@ -35,13 +47,13 @@
 
 ### P1 — Alta prioridad (mejora robustez)
 
-- [ ] **FIX-3: Tool Error Memory por Sesión**
+- [x] **FIX-3: Tool Error Memory por Sesión**
   - Diccionario en memoria que registra patrones de comandos bloqueados por security policy
   - Antes de ejecutar un tool call, verificar si el patrón ya fue rechazado
   - Evitar reintentar comandos con `|`, `&&`, `>` tras primer rechazo
   - **Archivo:** `src/bytia_kode/agent.py`
 
-- [ ] **FIX-4: Workspace Context Awareness**
+- [x] **FIX-4: Workspace Context Awareness**
   - Inyectar en system prompt dinámico: CWD actual, paths escribibles, paths confiados, limitaciones de sandbox
   - El agente debe saber ANTES de intentar escribir que no puede salir del CWD
   - **Archivo:** `src/bytia_kode/agent.py` + `src/bytia_kode/tools/registry.py`
@@ -62,9 +74,9 @@
 
 - [x] Test: LoopDetector detecta bucle tras 3 fallos consecutivos
 - [x] Test: LoopDetector no dispara con fallos intermitentes
-- [ ] Test: Tool Error Memory bloquea patrón previamente rechazado
+- [x] Test: Tool Error Memory bloquea patrón previamente rechazado
 - [x] Test: Bash tool limitations presentes en system prompt generado
-- [ ] Test: Workspace context awareness inyectado en SP dinámico
+- [x] Test: Workspace context awareness inyectado en SP dinámico
 
 ---
 
