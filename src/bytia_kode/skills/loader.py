@@ -132,19 +132,29 @@ class SkillLoader:
         lines = content.split("\n")
         in_frontmatter = False
         body_start = 0
+        yaml_continuation = False
 
         for i, line in enumerate(lines):
-            if i == 0 and line.strip() == "---":
+            stripped = line.strip()
+            if i == 0 and stripped == "---":
                 in_frontmatter = True
                 continue
-            if in_frontmatter and line.strip() == "---":
+            if in_frontmatter and stripped == "---":
                 body_start = i + 1
                 break
             if in_frontmatter:
+                if yaml_continuation and (line.startswith("  ") or line.startswith("\t")):
+                    description += " " + stripped
+                    continue
+                yaml_continuation = False
                 if line.startswith("name:"):
                     name = line.split(":", 1)[1].strip().lower()
                 elif line.startswith("description:"):
-                    description = line.split(":", 1)[1].strip()
+                    raw_desc = line.split(":", 1)[1].strip()
+                    if raw_desc == ">":
+                        yaml_continuation = True
+                        continue
+                    description = raw_desc
                 elif line.startswith("trigger:"):
                     trigger = line.split(":", 1)[1].strip()
                 elif line.startswith("verified:"):
