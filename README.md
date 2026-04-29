@@ -7,8 +7,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.7.6-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-142%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.7.7-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-144%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -41,11 +41,20 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.7.6`
+> Release actual: `0.7.7`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+### Novedades en v0.7.7 — Session Audit Fixes
+
+- **Tool Error Memory fix** — Hash normalizado: solo `command`/`path`, no todo el JSON. Antes, mismo comando con diferente `workdir` generaba hash distinto → bypass del memory.
+- **BashTool `df` en allowlist** — Comando read-only para diagnóstico de disco ya disponible directamente.
+- **BashTool error hints** — Mensajes de rechazo incluyen lista de binarios permitidos y hint contextual (`cd` → usar `workdir`).
+- **pytest `testpaths`** — `uv run pytest -q` ahora recoge los 144 tests (antes 116 de 142).
+- **Flaky test fix** — `test_file_write_tool_handles_relative_path` resetea `_WORKSPACE_ROOT` global.
+- **2 tests nuevos**: hash normalization + security policy blocking. Total: 144.
 
 ### Novedades en v0.7.6 — HOTFIX v0.7.2 Cierre + Skills Polish
 

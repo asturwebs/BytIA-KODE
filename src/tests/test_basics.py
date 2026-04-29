@@ -51,9 +51,10 @@ def test_tool_def():
 
 
 def test_file_write_tool_handles_relative_path(tmp_path, monkeypatch):
-    from bytia_kode.tools.registry import FileWriteTool
+    from bytia_kode.tools.registry import FileWriteTool, set_workspace_root
 
     monkeypatch.chdir(tmp_path)
+    set_workspace_root(tmp_path)
     tool = FileWriteTool()
     result = asyncio.run(tool.execute(path="out.txt", content="ok"))
     assert not result.error

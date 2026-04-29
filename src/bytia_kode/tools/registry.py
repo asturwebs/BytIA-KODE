@@ -42,7 +42,7 @@ def set_workspace_root(root: Path) -> None:
 
 _DEFAULT_BINARIES = {
     "ls", "pwd", "echo", "git", "grep", "find", "mkdir", "rmdir", "touch",
-    "mv", "cp", "rm", "wc", "date", "chmod",
+    "mv", "cp", "rm", "wc", "date", "chmod", "df",
     "curl", "wget", "scp", "ssh",
     "uv", "python", "python3", "pip", "pip3",
     "wsl",
@@ -197,8 +197,11 @@ class BashTool(Tool):
 
             command_base = Path(argv[0]).name
             if command_base not in _ALLOWED_BINARIES:
+                hint = ""
+                if command_base == "cd":
+                    hint = " Hint: use the 'workdir' parameter to set the working directory."
                 return ToolResult(
-                    output=f"Security policy violation: command '{command_base}' is not allowed",
+                    output=f"Security policy violation: command '{command_base}' is not allowed.{hint} Allowed: {', '.join(sorted(_ALLOWED_BINARIES))}.",
                     error=True,
                 )
 

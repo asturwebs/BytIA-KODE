@@ -690,7 +690,7 @@ class Agent:
     def _get_tool_error_key(self, tool_name: str, arguments: dict) -> str | None:
         if tool_name not in ("bash", "file_write", "file_edit"):
             return None
-        raw = json.dumps(arguments, sort_keys=True)[:300]
+        raw = arguments.get("command", "") or arguments.get("path", "")
         return hashlib.md5(raw.encode()).hexdigest()[:12]
 
     def _is_tool_pattern_blocked(self, error_key: str) -> bool:
