@@ -292,6 +292,65 @@ def test_skill_loader_all_layers_loaded(tmp_path):
     assert len(skills) == 3
 
 
+def test_skill_loader_multiline_description(tmp_path):
+    """YAML folded scalar 'description: >' is parsed as continuous text."""
+    from bytia_kode.skills.loader import SkillLoader
+
+    skill_dir = tmp_path / "test-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: test-skill\ndescription: >\n  First line of description.\n  Second line continues here.\n  Trigger: something\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+
+    loader = SkillLoader()
+    skill = loader._parse_skill(skill_dir / "SKILL.md", "vendor")
+
+    assert skill is not None
+    assert ">" not in skill.description
+    assert "First line" in skill.description
+    assert "Second line" in skill.description
+
+
+def test_skill_loader_multiline_with_metadata(tmp_path):
+    """description: > with metadata: nesting — parser captures desc, ignores nested fields."""
+    from bytia_kode.skills.loader import SkillLoader
+
+    skill_dir = tmp_path / "meta-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: meta-skill\ndescription: >\n  A skill with metadata nesting.\n  This tests agentskills.io compat.\nlicense: MIT\nmetadata:\n  author: bytia\n  version: \"1.0\"\n  scope: [root]\n  auto_invoke: \"something\"\n---\n\n# Meta Skill\nContent here.\n",
+        encoding="utf-8",
+    )
+
+    loader = SkillLoader()
+    skill = loader._parse_skill(skill_dir / "SKILL.md", "vendor")
+
+    assert skill is not None
+    assert ">" not in skill.description
+    assert "metadata nesting" in skill.description
+    assert "agentskills.io compat" in skill.description
+    assert skill.name == "meta-skill"
+
+
+def test_skill_loader_description_empty_gt(tmp_path):
+    """description: > with no continuation lines yields empty description."""
+    from bytia_kode.skills.loader import SkillLoader
+
+    skill_dir = tmp_path / "empty-desc"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: empty-desc\ndescription: >\ntrigger: test\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+
+    loader = SkillLoader()
+    skill = loader._parse_skill(skill_dir / "SKILL.md", "vendor")
+
+    assert skill is not None
+    assert ">" not in skill.description
+
+
 def test_extra_binaries_merged_from_env(monkeypatch):
     monkeypatch.setenv("EXTRA_BINARIES", "mytool,another")
     from bytia_kode.tools.registry import _DEFAULT_BINARIES, _load_allowed_binaries
