@@ -22,7 +22,7 @@ def _env(key: str, default: str = "") -> str:
 
 def _get_vendor_skills_path() -> Path | None:
     """Get the path to vendored skills in the package."""
-    package_dir = Path(__file__).parent.parent
+    package_dir = Path(__file__).parent
     vendor_path = package_dir / "vendor" / "skills"
     if vendor_path.exists():
         return vendor_path
@@ -125,17 +125,48 @@ class AppConfig:
 
         self._ensure_vendor_skills()
 
+    def _get_package_version(self) -> str:
+        """Get current package version from pyproject.toml."""
+        try:
+            pyproject = Path(__file__).parent.parent.parent / "pyproject.toml"
+            if pyproject.exists():
+                content = pyproject.read_text()
+                for line in content.split("\n"):
+                    if line.strip().startswith("version"):
+                        return line.split("=")[1].strip().strip('"').strip("'")
+        except Exception:
+            pass
+        return "unknown"
+
     def _ensure_vendor_skills(self):
-        """Ensure vendor skills are installed in the skills directory."""
+        """Ensure vendor skills are installed and up-to-date in the skills directory."""
         vendor_target = self.skills_dir / "vendor"
+        vendor_source = _get_vendor_skills_path()
+
+        if not vendor_source or not vendor_source.exists():
+            self.vendor_skills_installed = False
+            return
+
+        version_file = vendor_target / ".vendor-version"
+        current_version = self._get_package_version()
 
         if vendor_target.exists() and any(vendor_target.iterdir()):
-            self.vendor_skills_installed = True
-            return
+            installed_version = ""
+            if version_file.exists():
+                installed_version = version_file.read_text().strip()
 
-        vendor_source = _get_vendor_skills_path()
-        if not vendor_source or not vendor_source.exists():
-            return
+            if installed_version == current_version:
+                self.vendor_skills_installed = True
+                return
+
+        if vendor_target.exists():
+            for item in vendor_target.iterdir():
+                if item.name == ".vendor-version":
+                    continue
+                if item.is_symlink() or item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
 
         vendor_target.mkdir(parents=True, exist_ok=True)
 
@@ -150,6 +181,7 @@ class AppConfig:
                     shutil.rmtree(dest)
             shutil.copytree(item, dest)
 
+        version_file.write_text(current_version)
         self.vendor_skills_installed = True
 
 
