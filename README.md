@@ -7,8 +7,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.7.5-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-133%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.7.6-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-142%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -41,11 +41,20 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.7.5`
+> Release actual: `0.7.6`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+### Novedades en v0.7.6 — HOTFIX v0.7.2 Cierre + Skills Polish
+
+- **FIX-3: Tool Error Memory** — comandos rechazados (bash, file_write, file_edit) no se reintentan. Hash MD5 de args como key.
+- **FIX-4: Workspace Context Awareness** — CWD, sandbox y trusted paths inyectados en system prompt dinámico.
+- **YAML multiline parser** — `description: >` (folded scalar) ahora se parsea correctamente en `_parse_skill()`.
+- **sync-vendor-skills.sh** — nuevo script que transforma formato agentskills.io → flat durante sync.
+- **Vendor skills auto-update** — reinstala solo cuando cambia la versión del paquete.
+- **9 tests nuevos**: 3 loader edge cases + 3 FIX-3 + 3 FIX-4. Total: 142.
 
 ### Novedades en v0.7.5 — Skills System v2.0
 
