@@ -1,10 +1,12 @@
 ---
 name: skills-manager
-description: Gestión del sistema de skills unificado BytIA
-trigger: skills,skill,configurar,importar,registry,autoskills,add-cli,remove-cli
-verified: false
----
-
+description:  Gestión del sistema de skills unificado BytIA.
+  Trigger: skills, skill, configurar, importar, registry.
+license: MIT
+author: bytia
+version: "1.0.0"
+scope: [root]
+auto_invoke: "skills, skill, configurar, importar, registry"
 # BytIA Skills Manager
 
 Sistema unificado de skills para todos los AI assistants del ecosistema BytIA.

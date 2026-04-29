@@ -1,17 +1,13 @@
 ---
 name: bytia-constitution
-description: >
-  BytIA OS v12.3.0 - Identity, Values, Protocols, and Meta-Rules.
+description:  BytIA OS v12.3.0 - Identity, Values, Protocols, and Meta-Rules.
   Wrapper ligero que carga la constitución desde los dos archivos YAML oficiales.
   Trigger: Always (auto-load on ANY context).
 license: MIT
-metadata:
-  author: bytia
-  version: "12.3.0"
-  scope: [root]
-  auto_invoke: "Always"
-allowed-tools: Read, Edit, Write, Glob, Grep, Bash, WebFetch, WebSearch, mcp__plugin_claude-mem_mcp-search__search, mcp__plugin_claude-mem_mcp-search__timeline, mcp__plugin_claude-mem_mcp-search__get_observations, Task
----
+author: bytia
+version: "12.3.0"
+scope: [root]
+auto_invoke: "Always"
 
 # BytIA Constitution — Wrapper
 
