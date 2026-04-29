@@ -325,3 +325,36 @@ class TestToolErrorMemory:
 
         blocked = [m for m in agent.messages if "[blocked]" in (m.content or "")]
         assert len(blocked) == 0  # file_read is not tracked
+
+
+class TestWorkspaceContextInSystemPrompt:
+    """FIX-4: System prompt includes workspace context for sandbox awareness."""
+
+    def test_system_prompt_contains_cwd(self, agent, tmp_path):
+        """The system prompt must contain the current working directory."""
+        agent._identity_dirty = True
+        sp = agent._build_system_prompt()
+
+        assert "Workspace Context" in sp
+        assert str(tmp_path) in sp
+
+    def test_system_prompt_contains_sandbox_warning(self, agent, tmp_path):
+        """The system prompt must mention sandbox constraints."""
+        agent._identity_dirty = True
+        sp = agent._build_system_prompt()
+
+        assert "sandboxed" in sp
+        assert "trusted paths" in sp
+
+    def test_workspace_context_with_trusted_paths(self, agent, tmp_path):
+        """Trusted paths beyond CWD should appear in the system prompt."""
+        from bytia_kode.tools.registry import set_trusted_paths
+
+        trusted = tmp_path / "external"
+        trusted.mkdir()
+        set_trusted_paths([trusted])
+
+        agent._identity_dirty = True
+        sp = agent._build_system_prompt()
+
+        assert str(trusted) in sp

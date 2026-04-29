@@ -315,6 +315,21 @@ class Agent:
 
         return payload
 
+    def _workspace_context_block(self) -> str:
+        from bytia_kode.tools.registry import _TRUSTED_PATHS, _WORKSPACE_ROOT
+
+        workspace = str(_WORKSPACE_ROOT or Path.cwd().resolve())
+        trusted = [str(p) for p in _TRUSTED_PATHS] if _TRUSTED_PATHS else []
+        trusted_lines = "\n".join(f"  - {p}" for p in trusted) if trusted else "  (none)"
+
+        return dedent(f"""\
+            # Workspace Context (auto-injected)
+            - CWD: {workspace}
+            - File tools are sandboxed to CWD and trusted paths
+            - Trusted paths beyond CWD:
+            {trusted_lines}
+            - Commands outside sandbox will be rejected""")
+
     def _build_system_prompt(self) -> str:
         msg_count = len(self.messages)
         if (
@@ -350,6 +365,7 @@ class Agent:
             self._identity_dirty = False
 
         parts = [self._system_prompt]
+        parts.append(self._workspace_context_block())
         if self._bkode_content:
             parts.append(f"# Project Instructions (B-KODE.md)\n\n{self._bkode_content}")
         skill_summary = self.skills.skill_summary()
