@@ -1,4 +1,5 @@
 """Test provider client and core runtime behaviors."""
+
 import asyncio
 from importlib import resources
 
@@ -16,7 +17,13 @@ def test_message_with_tool_calls():
     msg = Message(
         role="assistant",
         content=None,
-        tool_calls=[{"id": "call_1", "type": "function", "function": {"name": "bash", "arguments": '{"command": "ls"}'}}],
+        tool_calls=[
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "bash", "arguments": '{"command": "ls"}'},
+            }
+        ],
     )
     d = msg.model_dump(exclude_none=True)
     assert d["role"] == "assistant"
@@ -32,11 +39,13 @@ def test_tool_result():
 
 
 def test_tool_def():
-    td = ToolDef(function={
-        "name": "test",
-        "description": "A test tool",
-        "parameters": {"type": "object", "properties": {}},
-    })
+    td = ToolDef(
+        function={
+            "name": "test",
+            "description": "A test tool",
+            "parameters": {"type": "object", "properties": {}},
+        }
+    )
     d = td.model_dump()
     assert d["function"]["name"] == "test"
 
@@ -54,7 +63,9 @@ def test_file_write_tool_handles_relative_path(tmp_path, monkeypatch):
 def test_chat_stream_flag_uses_chat_stream_api():
     client = ProviderClient(base_url="https://example.com", api_key="x", model="m")
     with pytest.raises(NotImplementedError):
-        asyncio.run(client.chat(messages=[Message(role="user", content="hi")], stream=True))
+        asyncio.run(
+            client.chat(messages=[Message(role="user", content="hi")], stream=True)
+        )
 
 
 def test_agent_loads_system_prompt_from_package_resource(caplog):
@@ -85,7 +96,9 @@ def test_agent_loads_system_prompt_from_package_resource(caplog):
 def test_load_identity_missing_resource_raises_runtime_error(monkeypatch):
     from bytia_kode import agent as agent_module
 
-    monkeypatch.setattr(agent_module, "CORE_IDENTITY_PACKAGE", "bytia_kode.missing_prompts")
+    monkeypatch.setattr(
+        agent_module, "CORE_IDENTITY_PACKAGE", "bytia_kode.missing_prompts"
+    )
     with pytest.raises(RuntimeError, match="Resource not found"):
         agent_module.load_identity()
 
@@ -107,7 +120,11 @@ def test_bash_tool_runs_allowed_command_async():
 
 
 def test_trusted_paths_allow_write_outside_workspace(tmp_path, monkeypatch):
-    from bytia_kode.tools.registry import FileWriteTool, _resolve_workspace_path, set_trusted_paths
+    from bytia_kode.tools.registry import (
+        FileWriteTool,
+        _resolve_workspace_path,
+        set_trusted_paths,
+    )
 
     trusted = tmp_path / "trusted_data"
     trusted.mkdir()
@@ -122,13 +139,19 @@ def test_trusted_paths_allow_write_outside_workspace(tmp_path, monkeypatch):
     assert resolved.is_relative_to(trusted)
 
     tool = FileWriteTool()
-    result = asyncio.run(tool.execute(path=str(trusted / "subdir" / "file.md"), content="memoria"))
+    result = asyncio.run(
+        tool.execute(path=str(trusted / "subdir" / "file.md"), content="memoria")
+    )
     assert not result.error
     assert "Wrote" in result.output
 
 
 def test_trusted_paths_do_not_bypass_arbitrary_paths(tmp_path, monkeypatch):
-    from bytia_kode.tools.registry import FileWriteTool, _resolve_workspace_path, set_trusted_paths
+    from bytia_kode.tools.registry import (
+        FileWriteTool,
+        _resolve_workspace_path,
+        set_trusted_paths,
+    )
 
     trusted = tmp_path / "trusted_data"
     trusted.mkdir()
@@ -146,18 +169,127 @@ def test_trusted_paths_do_not_bypass_arbitrary_paths(tmp_path, monkeypatch):
 def test_memory_manager_skill_loads(tmp_path, monkeypatch):
     from bytia_kode.skills.loader import SkillLoader
 
-    skill_dir = tmp_path / "skills"
-    skill_dir.mkdir()
+    skill_dir = tmp_path / "skills" / "vendor"
+    skill_dir.mkdir(parents=True)
     (skill_dir / "memory-manager").mkdir()
     (skill_dir / "memory-manager" / "SKILL.md").write_text(
         "---\nname: memory-manager\ndescription: Test memory skill\ntrigger: memory\nverified: false\n---\n\n## Procedure\nDo stuff.\n",
         encoding="utf-8",
     )
 
-    loader = SkillLoader(skill_dirs=[skill_dir])
+    loader = SkillLoader(skills_home=tmp_path / "skills", bytia_home=tmp_path / "bytia")
+    loader.configure_layers()
     skills = loader.load_all()
     assert "memory-manager" in skills
     assert skills["memory-manager"].description == "Test memory skill"
+    assert skills["memory-manager"].source == "vendor"
+
+
+def test_skill_loader_layer_priority(tmp_path):
+    """User layer overrides vendor layer with same skill name."""
+    from bytia_kode.skills.loader import SkillLoader
+
+    skills_home = tmp_path / "skills"
+    skills_home.mkdir()
+
+    vendor_dir = skills_home / "vendor"
+    vendor_dir.mkdir()
+    (vendor_dir / "test-skill").mkdir()
+    (vendor_dir / "test-skill" / "SKILL.md").write_text(
+        "---\nname: test-skill\ndescription: Vendor version\ntrigger: test\nverified: false\n---\n\nVendor content.\n",
+        encoding="utf-8",
+    )
+
+    user_dir = skills_home / "user"
+    user_dir.mkdir()
+    (user_dir / "test-skill").mkdir()
+    (user_dir / "test-skill" / "SKILL.md").write_text(
+        "---\nname: test-skill\ndescription: User version\ntrigger: test\nverified: false\n---\n\nUser content.\n",
+        encoding="utf-8",
+    )
+
+    loader = SkillLoader(skills_home=skills_home, bytia_home=tmp_path / "bytia")
+    skills = loader.load_all()
+
+    assert "test-skill" in skills
+    assert skills["test-skill"].source == "user"
+    assert skills["test-skill"].description == "User version"
+
+
+def test_skill_loader_bytia_layer_highest_priority(tmp_path):
+    """BytIA layer overrides user and vendor layers."""
+    from bytia_kode.skills.loader import SkillLoader
+
+    skills_home = tmp_path / "skills"
+    skills_home.mkdir()
+
+    vendor_dir = skills_home / "vendor"
+    vendor_dir.mkdir()
+    (vendor_dir / "core").mkdir()
+    (vendor_dir / "core" / "SKILL.md").write_text(
+        "---\nname: core\ndescription: Vendor\ntrigger: core\nverified: false\n---\n\nVendor.\n",
+        encoding="utf-8",
+    )
+
+    user_dir = skills_home / "user"
+    user_dir.mkdir()
+    (user_dir / "core").mkdir()
+    (user_dir / "core" / "SKILL.md").write_text(
+        "---\nname: core\ndescription: User\ntrigger: core\nverified: false\n---\n\nUser.\n",
+        encoding="utf-8",
+    )
+
+    bytia_home = tmp_path / "bytia"
+    bytia_dir = bytia_home / "skills"
+    bytia_dir.mkdir(parents=True)
+    (bytia_dir / "core").mkdir()
+    (bytia_dir / "core" / "SKILL.md").write_text(
+        "---\nname: core\ndescription: BytIA\ntrigger: core\nverified: false\n---\n\nBytIA ecosystem.\n",
+        encoding="utf-8",
+    )
+
+    loader = SkillLoader(skills_home=skills_home, bytia_home=bytia_home)
+    skills = loader.load_all()
+
+    assert "core" in skills
+    assert skills["core"].source == "bytia"
+    assert skills["core"].description == "BytIA"
+
+
+def test_skill_loader_all_layers_loaded(tmp_path):
+    """All skills from all layers are available."""
+    from bytia_kode.skills.loader import SkillLoader
+
+    skills_home = tmp_path / "skills"
+    skills_home.mkdir()
+
+    (skills_home / "vendor" / "vendor-skill").mkdir(parents=True)
+    (skills_home / "vendor" / "vendor-skill" / "SKILL.md").write_text(
+        "---\nname: vendor-skill\ndescription: From vendor\ntrigger: vendor\nverified: false\n---\n\n.\n",
+        encoding="utf-8",
+    )
+
+    (skills_home / "user" / "user-skill").mkdir(parents=True)
+    (skills_home / "user" / "user-skill" / "SKILL.md").write_text(
+        "---\nname: user-skill\ndescription: From user\ntrigger: user\nverified: false\n---\n\n.\n",
+        encoding="utf-8",
+    )
+
+    bytia_dir = tmp_path / "bytia" / "skills"
+    bytia_dir.mkdir(parents=True)
+    (bytia_dir / "bytia-skill").mkdir()
+    (bytia_dir / "bytia-skill" / "SKILL.md").write_text(
+        "---\nname: bytia-skill\ndescription: From bytia\ntrigger: bytia\nverified: false\n---\n\n.\n",
+        encoding="utf-8",
+    )
+
+    loader = SkillLoader(skills_home=skills_home, bytia_home=tmp_path / "bytia")
+    skills = loader.load_all()
+
+    assert "vendor-skill" in skills
+    assert "user-skill" in skills
+    assert "bytia-skill" in skills
+    assert len(skills) == 3
 
 
 def test_extra_binaries_merged_from_env(monkeypatch):
@@ -179,12 +311,18 @@ def test_extra_binaries_empty_env_uses_defaults(monkeypatch):
 
 
 def test_file_tools_block_path_traversal(tmp_path, monkeypatch):
-    from bytia_kode.tools.registry import FileReadTool, FileWriteTool, set_workspace_root
+    from bytia_kode.tools.registry import (
+        FileReadTool,
+        FileWriteTool,
+        set_workspace_root,
+    )
 
     monkeypatch.chdir(tmp_path)
     set_workspace_root(tmp_path)
     read_result = asyncio.run(FileReadTool().execute(path="../../etc/passwd"))
-    write_result = asyncio.run(FileWriteTool().execute(path="../../escape.txt", content="no"))
+    write_result = asyncio.run(
+        FileWriteTool().execute(path="../../escape.txt", content="no")
+    )
 
     assert read_result.error
     assert write_result.error
@@ -248,8 +386,6 @@ def test_agent_preserves_history_on_provider_runtime_error():
     assert agent.messages[0].content == "hola"
 
 
-
-
 def test_telegram_bot_chat_hides_internal_errors():
     from bytia_kode.config import AppConfig, ProviderConfig, TelegramConfig
     from bytia_kode.telegram.bot import TelegramBot
@@ -268,22 +404,21 @@ def test_telegram_bot_chat_hides_internal_errors():
 
     class DummyUpdate:
         def __init__(self):
-            self.message = DummyMessage('hola')
+            self.message = DummyMessage("hola")
             self.effective_user = DummyUser(1)
 
     class BrokenAgent:
         async def chat(self, _text: str):
-            raise RuntimeError('stacktrace interno')
-            yield ''
+            raise RuntimeError("stacktrace interno")
+            yield ""
 
     config = AppConfig(
         provider=ProviderConfig(),
-        telegram=TelegramConfig(bot_token='token', allowed_users=['1']),
+        telegram=TelegramConfig(bot_token="token", allowed_users=["1"]),
     )
     bot = TelegramBot(config)
     bot._agents["1"] = BrokenAgent()
     update = DummyUpdate()
 
     asyncio.run(bot._chat(update, None))
-    assert update.message.replies == ['Error interno en el procesamiento']
-
+    assert update.message.replies == ["Error interno en el procesamiento"]

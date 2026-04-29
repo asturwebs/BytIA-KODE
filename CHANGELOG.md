@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.7.5] - 2026-04-29
+
+### Changed
+
+- **Skills System Architecture**: Migrated from flat `~/.bytia-kode/skills/` to layered structure with vendor/user/bytia priorities. Skills are now organized in layers: `bytia/` (ecosystem, highest priority) → `user/` (custom, writable) → `vendor/` (bundled, lowest priority).
+
+### Added
+
+- **Vendor Skills**: Core skills (bytia-constitution, bytia-memory, skills-manager, graphify) are now bundled in `src/bytia_kode/vendor/skills/` and installed automatically.
+- **SkillLoader Layer Support**: `SkillLoader` now supports layered directory scanning with priority-based override (bytia > user > vendor).
+- **Auto-installation of Vendor Skills**: `AppConfig._ensure_vendor_skills()` copies vendor skills on first run or update.
+- **install.sh BytIA Integration**: Installer detects `~/bytia/` ecosystem and offers to create symlink for shared skills.
+- **`get_skill_info()`**: New method to inspect loaded skills and layers.
+
+### Fixed
+
+- **SKILL.md Constant**: Corrected typo `SKILL_FILE = "SKILL_FILE"` → `SKILL_FILE = "SKILL.md"`.
+
+### Security
+
+- **Vendor skills are read-only**: User cannot modify vendor skills directly. Verification copies to user layer first.
+
 ## [0.7.4] - 2026-04-28
 
 ### Fixed

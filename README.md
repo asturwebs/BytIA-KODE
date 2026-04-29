@@ -7,8 +7,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.7.4-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-130%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.7.5-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-133%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -41,11 +41,18 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
 
-> Release actual: `0.7.4`
+> Release actual: `0.7.5`
 >
 > Formato de identidad del sistema: `YAML`
 >
 > Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+
+### Novedades en v0.7.5 — Skills System v2.0
+
+- **Skills System Architecture**: Sistema de skills reescrito con arquitectura de capas (vendor/user/bytia). Prioridad: bytia > user > vendor.
+- **Vendor Skills**: Skills core incluidas en `src/bytia_kode/vendor/skills/`: bytia-constitution, bytia-memory, skills-manager, graphify. Se instalan automáticamente.
+- **Integración BytIA**: Si existe `~/bytia/`, install.sh ofrece crear symlink para compartir skills.
+- **3 tests nuevos**: layer priority, bytia highest priority, all layers loaded.
 
 ### Novedades en v0.7.4 — Provider Resilience Hotfixes
 
@@ -341,16 +348,43 @@ Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.
 
 BytIA KODE incluye un sistema de skills persistente inspirado en [Hermes Agent](https://github.com/hermes-agent/hermes) y el paper [_Terminal Agents Suffice for Enterprise Automation_](https://arxiv.org/abs/2604.00073). Las skills son procedimientos reutilizables que el agente carga en su system prompt.
 
-### Visión (v0.6.0)
+### Arquitectura de Capas
 
-Las skills evolucionarán de instrucciones estáticas a **unidades autónomas** con capacidad de ejecutar tools y scripts propios, e incluso actuar como sub-agentes con system prompt independiente:
+Las skills se organizan en capas con prioridad (alta → baja):
+
+```
+~/.bytia-kode/skills/
+├── bytia/      # Ecosistema BytIA (opcional, si ~/bytia existe)
+├── user/       # Skills creadas por el usuario (writable)
+└── vendor/     # Skills incluidas con KODE (read-only)
+```
+
+| Capa | Prioridad | Writable | Descripción |
+|------|-----------|----------|-------------|
+| `bytia/` | 1 (más alta) | No (symlink) | Ecosistema BytIA compartido con otros assistants |
+| `user/` | 2 | Sí | Skills propias del usuario |
+| `vendor/` | 3 (más baja) | No | Skills core incluidas con KODE |
+
+Capas superiores sobrescriben las inferiores con el mismo nombre.
+
+### Vendor Skills (Core)
+
+KODE incluye por defecto:
+- **bytia-constitution** — Identidad y valores BytIA OS
+- **bytia-memory** — Gestión de memoria entre sesiones
+- **skills-manager** — Gestión del sistema de skills
+- **graphify** — Knowledge graphs de código
+
+### Visión (v0.6.0+)
+
+Las skills evolucionarán de instrucciones estáticas a **unidades autónomas**:
 
 - **Tools dinámicas** — scripts en `skills/<name>/scripts/` auto-registrados como tools del agente
-- **Sub-agentes** — una skill puede definir su propio SP (identidad + instrucciones especializadas) y ejecutarse como agente dedicado
-- **Skills Hub** — instalar skills desde repos GitHub, compartir entre usuarios
-- **`write_skill` tool** — el agente crea skills programáticamente durante la ejecución
+- **Sub-agentes** — una skill puede definir su propio SP y ejecutarse como agente dedicado
+- **Skills Hub** — instalar skills desde repos GitHub
+- **`write_skill` tool** — el agente crea skills programáticamente
 
-### Estructura
+### Estructura Completa
 
 ```
 ~/.bytia-kode/
@@ -367,16 +401,17 @@ Las skills evolucionarán de instrucciones estáticas a **unidades autónomas** 
 │   ├── decisiones/       # ADRs
 │   └── index.md          # Índice auto-generado
 └── skills/
-    ├── skill-creator/
-    │   └── SKILL.md
-    ├── memory-manager/
-    │   └── SKILL.md
-    ├── graphify/
-    │   └── SKILL.md
-    └── my-procedure/
-        ├── SKILL.md
-        ├── references/
-        └── scripts/
+    ├── bytia/           # Symlink a ~/bytia/skills/ (si existe)
+    ├── user/            # Skills propias (writable)
+    │   └── my-procedure/
+    │       ├── SKILL.md
+    │       └── scripts/
+    └── vendor/           # Skills core (read-only, se actualiza con KODE)
+        ├── bytia-constitution/
+        ├── bytia-memory/
+        ├── graphify/
+        └── skills-manager/
+```
 ```
 
 ## Validación y release
