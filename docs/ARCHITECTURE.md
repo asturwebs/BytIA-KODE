@@ -281,19 +281,46 @@ Todas usan `_resolve_workspace_path()` para sandbox y `asyncio.to_thread()` para
 
 ## Skills
 
-- `skills/loader.py` — carga, búsqueda y gestión de skills persistentes
+- `skills/loader.py` — carga, búsqueda y gestión de skills con arquitectura de capas
 
 Skills son procedimientos reutilizables almacenados como archivos SKILL.md con frontmatter YAML (compatible agentskills.io).
 
-**Directorio:** `~/.bytia-kode/skills/<skill-name>/SKILL.md`
+### Arquitectura de Capas
 
-**Capacidades actuales:**
+```
+~/.bytia-kode/skills/
+├── bytia/      # ~/bytia/skills/ (si existe) — prioridad más alta
+├── user/       # Skills propias del usuario — writable
+└── vendor/     # Skills core incluidas con KODE — read-only
+```
 
-- `load_all()`: escanea directorios y parsea SKILL.md files
-- `save_skill()`: crea nueva skill con frontmatter auto-generado
+| Capa | Prioridad | Writable | Descripción |
+|------|-----------|----------|-------------|
+| `bytia/` | 1 (más alta) | No (symlink) | Ecosistema BytIA compartido |
+| `user/` | 2 | Sí | Skills propias del usuario |
+| `vendor/` | 3 (más baja) | No | Skills core de KODE |
+
+Capas superiores sobrescriben las inferiores con el mismo nombre.
+
+### Vendor Skills (Core)
+
+KODE incluye por defecto:
+- `bytia-constitution/` — Identidad y valores BytIA OS
+- `bytia-memory/` — Gestión de memoria entre sesiones
+- `skills-manager/` — Gestión del sistema de skills
+- `graphify/` — Knowledge graphs de código
+
+Located in: `src/bytia_kode/vendor/skills/`
+
+### Capacidades Actuales
+
+- `load_all()`: escanea capas en prioridad (bytia > user > vendor)
+- `save_skill()`: crea nueva skill en user layer con frontmatter auto-generado
 - `get_relevant(query)`: búsqueda por scoring (trigger +3, description +2, content +1)
-- `verify_skill()`: marca como verificada tras validación del usuario
+- `verify_skill()`: marca como verificada (copia a user layer si es vendor)
 - `skill_summary()`: genera resumen para inyección en system prompt
+- `get_skill_info()`: inspecciona skills y capas cargadas
+- `configure_layers()`: crea estructura vendor/user si no existe
 
 **Evolución prevista (v0.8.0):**
 

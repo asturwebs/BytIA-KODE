@@ -4,6 +4,7 @@ set -euo pipefail
 REPO="https://github.com/asturwebs/BytIA-KODE.git"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/BytIA-KODE}"
 BIN_DIR="$HOME/.local/bin"
+KODE_HOME="$HOME/.bytia-kode"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -72,7 +73,7 @@ info "Setting up Python environment..."
 uv sync --quiet
 ok "Virtual environment (.venv)"
 
-# ── Config ────────────────────────────────────────────────────
+# ── Config ───────────────────────────────────────────────────
 
 if [ ! -f ".env" ]; then
     if [ -f ".env.example" ]; then
@@ -100,6 +101,60 @@ ENVEOF
     fi
 else
     ok ".env already exists (preserved)"
+fi
+
+# ── Skills Setup ──────────────────────────────────────────────
+
+info "Setting up skills..."
+
+SKILLS_VENDOR="$INSTALL_DIR/src/bytia_kode/vendor/skills"
+SKILLS_HOME="$KODE_HOME/skills"
+
+mkdir -p "$SKILLS_HOME"
+mkdir -p "$SKILLS_HOME/vendor"
+mkdir -p "$SKILLS_HOME/user"
+
+if [ -d "$SKILLS_VENDOR" ]; then
+    for skill_dir in "$SKILLS_VENDOR"/*/; do
+        [ -d "$skill_dir" ] || continue
+        skill_name=$(basename "$skill_dir")
+        dest="$SKILLS_HOME/vendor/$skill_name"
+        
+        if [ -d "$dest" ] && [ ! -L "$dest" ]; then
+            mv "$dest" "$dest.backup.$(date +%s)" 2>/dev/null || true
+        fi
+        
+        rm -rf "$dest"
+        cp -r "$skill_dir" "$dest"
+        ok "vendor skill: $skill_name"
+    done
+else
+    info "No vendor skills found in package (skipping)"
+fi
+
+ok "Skills directory structure ready"
+
+# ── BytIA Ecosystem Integration ─────────────────────────────
+
+if [ -d "$HOME/bytia/skills" ]; then
+    echo ""
+    info "BytIA ecosystem detected at ~/bytia/"
+    echo ""
+    echo "  BytIA-KODE can integrate with your BytIA skills ecosystem."
+    echo "  This allows you to share skills between BytIA-KODE and other"
+    echo "  AI assistants (Claude Code, Kimi, Gemini, etc.)."
+    echo ""
+    read -p "  Create symlink to ~/bytia/skills? [y/N]: " BYTIA_LINK
+    
+    if [[ "$BYTIA_LINK" =~ ^[Yy]$ ]]; then
+        ln -sfn "$HOME/bytia/skills" "$SKILLS_HOME/bytia"
+        ok "Linked to ~/bytia/skills/"
+    else
+        info "Skipped. You can link manually later:"
+        info "  ln -s ~/bytia/skills ~/.bytia-kode/skills/bytia"
+    fi
+else
+    info "No BytIA ecosystem found (normal for new users)"
 fi
 
 # ── Wrapper script ────────────────────────────────────────────
@@ -145,5 +200,12 @@ printf "    ${CYAN}bkode${RESET}               (add alias: alias bkode='bytia-ko
 printf "    ${CYAN}bytia-kode --bot${RESET}    Start Telegram bot\n"
 echo ""
 printf "  Config: ${YELLOW}$INSTALL_DIR/.env${RESET}\n"
+printf "  Skills: ${YELLOW}$SKILLS_HOME${RESET}\n"
+echo ""
+echo "  Skills layers:"
+echo "    vendor/  — Bundled with KODE (read-only)"
+echo "    user/    — Your custom skills (writable)"
+echo "    bytia/   — BytIA ecosystem (if linked)"
+echo ""
 printf "  Docs:   ${CYAN}https://github.com/asturwebs/BytIA-KODE#readme${RESET}\n"
 echo ""

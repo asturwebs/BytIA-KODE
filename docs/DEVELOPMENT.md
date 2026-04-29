@@ -222,16 +222,52 @@ class SessionMetadata:
 
 ## Crear una Skill
 
-Las skills son procedimientos reutilizables que el agente carga en su system prompt. Se almacenan en `~/.bytia-kode/skills/` (user-space, no se commitean al repo).
+Las skills son procedimientos reutilizables que el agente carga en su system prompt.
 
-### Estructura
+### Arquitectura de Capas
 
 ```
 ~/.bytia-kode/skills/
-├── mi-skill/
-│   ├── SKILL.md          # Instrucciones (requerido)
-│   ├── references/       # Docs adicionales (opcional)
-│   └── scripts/          # Scripts ejecutables (opcional, v0.6.0)
+├── bytia/                      # ~/bytia/skills/ (si existe) — prioridad más alta
+├── user/                       # Skills propias — writable
+│   └── mi-skill/
+│       ├── SKILL.md            # Instrucciones (requerido)
+│       ├── references/          # Docs adicionales (opcional)
+│       └── scripts/            # Scripts ejecutables (opcional, v0.6.0)
+└── vendor/                     # Skills core de KODE — read-only
+    ├── bytia-constitution/
+    ├── bytia-memory/
+    ├── graphify/
+    └── skills-manager/
+```
+
+| Capa | Prioridad | Writable | Uso |
+|------|-----------|----------|-----|
+| `bytia/` | 1 | No | Ecosistema BytIA compartido |
+| `user/` | 2 | **Sí** | Skills propias del usuario |
+| `vendor/` | 3 | No | Skills core de KODE |
+
+**Nota:** User sobrescribe vendor con el mismo nombre. Vendor skills son read-only.
+
+### Añadir Vendor Skills (para contributors)
+
+Las skills core van en `src/bytia_kode/vendor/skills/` y se copian automáticamente:
+
+```bash
+# 1. Crear skill en vendor
+mkdir -p src/bytia_kode/vendor/skills/mi-nueva-skill
+cat > src/bytia_kode/vendor/skills/mi-nueva-skill/SKILL.md << 'EOF'
+---
+name: mi-nueva-skill
+description: Mi skill core
+trigger: trigger, keywords
+verified: false
+---
+
+## Skill content...
+EOF
+
+# 2. Se instala automáticamente en ~/.bytia-kode/skills/vendor/
 ```
 
 ### Formato SKILL.md
@@ -265,7 +301,7 @@ Consejos para el agente.
 - Las skills se buscan con `get_relevant(query)` usando el mensaje del usuario
 - Comandos TUI: `/skills`, `/skills save <name>`, `/skills show <name>`, `/skills verify <name>`
 
-### Visión v0.6.0
+### Visión v0.6.0+
 
 Las skills evolucionarán a unidades autónomas:
 - **Tools dinámicas**: scripts en `scripts/` auto-registrados como tools del agente
