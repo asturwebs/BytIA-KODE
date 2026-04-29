@@ -326,6 +326,55 @@ class TestToolErrorMemory:
         blocked = [m for m in agent.messages if "[blocked]" in (m.content or "")]
         assert len(blocked) == 0  # file_read is not tracked
 
+    @pytest.mark.asyncio
+    async def test_error_memory_hashes_command_only(self, agent):
+        """Same command with different workdir/timeout must produce same hash and be blocked."""
+        from bytia_kode.tools.registry import ToolResult
+
+        async def _execute(name, args, **kw):
+            return ToolResult(output="Security: command chain not allowed", error=True)
+
+        agent.tools.execute = _execute
+
+        tc1 = MagicMock()
+        tc1.id = "tc_010"
+        tc1.function = {"name": "bash", "arguments": '{"command": "cd /tmp && ls", "workdir": "/home"}'}
+
+        tc2 = MagicMock()
+        tc2.id = "tc_011"
+        tc2.function = {"name": "bash", "arguments": '{"command": "cd /tmp && ls", "workdir": "/opt"}'}
+
+        await agent._handle_tool_calls([tc1])
+
+        agent.messages.clear()
+        await agent._handle_tool_calls([tc2])
+
+        blocked = [m for m in agent.messages if "[blocked]" in (m.content or "")]
+        assert len(blocked) == 1, "Same command with different workdir should be blocked by hash"
+
+    @pytest.mark.asyncio
+    async def test_error_memory_blocks_security_policy_rejections(self, agent):
+        """Security policy rejections (pipe, chain, etc.) must be remembered and blocked."""
+        from bytia_kode.tools.registry import ToolResult
+
+        async def _execute(name, args, **kw):
+            return ToolResult(output="Security policy: pipe not allowed in bash tool.", error=True)
+
+        agent.tools.execute = _execute
+
+        tc = MagicMock()
+        tc.id = "tc_020"
+        tc.function = {"name": "bash", "arguments": '{"command": "ls | grep foo"}'}
+
+        await agent._handle_tool_calls([tc])
+
+        agent.messages.clear()
+        await agent._handle_tool_calls([tc])
+
+        blocked = [m for m in agent.messages if "[blocked]" in (m.content or "")]
+        assert len(blocked) == 1
+        assert "pipe not allowed" in blocked[0].content
+
 
 class TestWorkspaceContextInSystemPrompt:
     """FIX-4: System prompt includes workspace context for sandbox awareness."""
