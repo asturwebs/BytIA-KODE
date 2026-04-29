@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import threading
@@ -625,6 +626,19 @@ class Agent:
                 )
                 continue
 
+            error_key = self._get_tool_error_key(tool_name, arguments)
+            if error_key and self._is_tool_pattern_blocked(error_key):
+                prev = self._tool_error_memory.get(tool_name, {}).get(error_key, "")
+                self.messages.append(
+                    Message(
+                        role="tool",
+                        content=f"[blocked] Previously rejected: {prev}",
+                        tool_call_id=tool_call.id,
+                        name=tool_name,
+                    )
+                )
+                continue
+
             self._has_had_tool_calls = True
             logger.info("Tool call: %s(%s)", tool_name, arguments)
             for cb in self.on_tool_call:
@@ -636,6 +650,9 @@ class Agent:
             )
             for cb in self.on_tool_done:
                 cb(tool_name, result.output, result.error)
+            if result.error and error_key:
+                self._tool_error_memory.setdefault(tool_name, {})[error_key] = result.output[:200]
+                logger.debug("Tool error remembered: %s -> %s", error_key, tool_name)
             self.messages.append(
                 Message(
                     role="tool",
@@ -653,6 +670,18 @@ class Agent:
                     tool_call_id=tool_call.id,
                     name=tool_name,
                 )
+
+    def _get_tool_error_key(self, tool_name: str, arguments: dict) -> str | None:
+        if tool_name not in ("bash", "file_write", "file_edit"):
+            return None
+        raw = json.dumps(arguments, sort_keys=True)[:300]
+        return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+    def _is_tool_pattern_blocked(self, error_key: str) -> bool:
+        for tool_errors in self._tool_error_memory.values():
+            if error_key in tool_errors:
+                return True
+        return False
 
     async def chat(
         self, user_message: str, provider: str = "primary"

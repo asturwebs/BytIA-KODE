@@ -252,3 +252,76 @@ class TestProviderFallback:
 
         error_msgs = [c for c in collected if isinstance(c, tuple) and c[0] == "error"]
         assert len(error_msgs) >= 1
+
+
+class TestToolErrorMemory:
+    """FIX-3: Tool Error Memory prevents re-executing rejected tool calls."""
+
+    @pytest.mark.asyncio
+    async def test_blocked_tool_call_skipped(self, agent):
+        """A tool call previously rejected should be skipped with [blocked] message."""
+        from bytia_kode.tools.registry import ToolResult
+
+        tool_call = MagicMock()
+        tool_call.id = "tc_001"
+        tool_call.function = {"name": "bash", "arguments": '{"command": "rm -rf /"}'}
+
+        async def _execute(name, args, **kw):
+            return ToolResult(output="Security: command blocked by policy", error=True)
+
+        agent.tools.execute = _execute
+
+        await agent._handle_tool_calls([tool_call])
+
+        error_msgs = [m for m in agent.messages if m.role == "tool" and "[blocked]" in m.content]
+        assert len(error_msgs) == 0  # first call executes normally
+
+        await agent._handle_tool_calls([tool_call])
+
+        blocked_msgs = [m for m in agent.messages if m.role == "tool" and "[blocked]" in m.content]
+        assert len(blocked_msgs) == 1
+        assert "Previously rejected" in blocked_msgs[0].content
+
+    @pytest.mark.asyncio
+    async def test_different_command_not_blocked(self, agent):
+        """A different command should not be blocked by previous error memory."""
+        from bytia_kode.tools.registry import ToolResult
+
+        async def _execute(name, args, **kw):
+            return ToolResult(output="Security: blocked", error=True)
+
+        agent.tools.execute = _execute
+
+        tc1 = MagicMock()
+        tc1.id = "tc_001"
+        tc1.function = {"name": "bash", "arguments": '{"command": "rm -rf /"}'}
+
+        tc2 = MagicMock()
+        tc2.id = "tc_002"
+        tc2.function = {"name": "bash", "arguments": '{"command": "ls -la"}'}
+
+        await agent._handle_tool_calls([tc1])
+        await agent._handle_tool_calls([tc2])
+
+        blocked = [m for m in agent.messages if "[blocked]" in (m.content or "")]
+        assert len(blocked) == 0  # tc2 is different, not blocked
+
+    @pytest.mark.asyncio
+    async def test_non_dangerous_tool_not_tracked(self, agent):
+        """file_read and grep errors should NOT be remembered (safe to retry)."""
+        from bytia_kode.tools.registry import ToolResult
+
+        async def _execute(name, args, **kw):
+            return ToolResult(output="File not found", error=True)
+
+        agent.tools.execute = _execute
+
+        tc = MagicMock()
+        tc.id = "tc_003"
+        tc.function = {"name": "file_read", "arguments": '{"path": "/no/existe"}'}
+
+        await agent._handle_tool_calls([tc])
+        await agent._handle_tool_calls([tc])
+
+        blocked = [m for m in agent.messages if "[blocked]" in (m.content or "")]
+        assert len(blocked) == 0  # file_read is not tracked
