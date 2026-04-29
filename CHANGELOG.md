@@ -6,6 +6,7 @@
 
 - **Tool Error Memory hash normalization**: `_get_tool_error_key()` now hashes only the `command` field (bash) or `path` field (file_write/file_edit) instead of the full JSON arguments. Previously, same command with different `workdir`/`timeout` produced different hashes, bypassing the error memory and allowing repeated blocked commands.
 - **BashTool allowlist missing `df`**: Added `df` to `_DEFAULT_BINARIES` for disk diagnostics. Previously required `python -c` workarounds.
+- **BashTool allowlist missing `du`, `head`, `tail`**: Added read-only diagnostic/filtering binaries. `du` for disk usage, `head`/`tail` for file inspection.
 - **BashTool error messages lack hints**: Binary rejection messages now include the list of allowed commands and contextual hints (e.g., `cd` → "use workdir parameter"). Reduces agent retry loops from 7+ to 1.
 - **Flaky test `test_file_write_tool_handles_relative_path`**: Test now calls `set_workspace_root()` to reset the global `_WORKSPACE_ROOT`, preventing contamination from earlier tests.
 - **pytest `testpaths` missing**: Added `[tool.pytest.ini_options]` with `testpaths = ["tests", "src/tests"]`. Previously `uv run pytest -q` collected only 116 of 142 tests.

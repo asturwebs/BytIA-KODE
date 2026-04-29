@@ -1,6 +1,28 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.7.5 (Alpha estable)
+## Estado actual: v0.7.7 (Alpha estable)
+
+---
+
+## v0.7.7 — Session Audit Fixes (COMPLETADO)
+
+- [x] **Tool Error Memory hash normalization** — `_get_tool_error_key()` hashea solo `command`/`path`, no JSON completo
+- [x] **BashTool `df`, `du`, `head`, `tail` en allowlist** — binarios read-only para diagnóstico
+- [x] **BashTool error hints** — rechazos incluyen lista de permitidos + hint contextual (`cd` → `workdir`)
+- [x] **pytest testpaths** — `uv run pytest -q` recoge 144 tests (antes 116)
+- [x] **Flaky test fix** — `test_file_write_tool_handles_relative_path` resetea `_WORKSPACE_ROOT`
+- [x] **2 tests nuevos** — hash normalization + security policy blocking. Total: 144.
+
+---
+
+## v0.7.6 — HOTFIX FIX-3/4 + Skills Polish (COMPLETADO)
+
+- [x] **FIX-3: Tool Error Memory** — hash MD5 de args, `[blocked]` en retry
+- [x] **FIX-4: Workspace Context Awareness** — CWD + sandbox + trusted paths en SP
+- [x] **YAML multiline parser** — `description: >` folded scalars
+- [x] **sync-vendor-skills.sh** — transformación agentskills.io → flat
+- [x] **Vendor skills auto-update** — reinstala solo en version change
+- [x] **9 tests nuevos** — 3 loader + 3 FIX-3 + 3 FIX-4. Total: 142.
 
 ---
 
