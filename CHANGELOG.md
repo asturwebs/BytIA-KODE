@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.7.6] - 2026-04-29
+
+### Fixed
+
+- **YAML multiline description parser**: `_parse_skill()` now correctly handles `description: >` folded scalars by accumulating indented continuation lines. Previously, descriptions using agentskills.io format resulted in literal `>` string.
+- **sync-vendor-skills.sh Python heredoc**: Script passed arguments via `python3 - "$args" << 'PYEOF'` instead of bare heredoc without sys.argv.
+- **Secret scanner false positive**: Added `src/bytia_kode/vendor/skills/` to skip dirs (MCP tool names trigger 30-char entropy check).
+
+### Added
+
+- **FIX-3: Tool Error Memory** — `_tool_error_memory` dict (previously declared but unused) now stores MD5 hashes of rejected bash/file_write/file_edit arguments. Same command is skipped with `[blocked]` message on retry. Safe tools (file_read, grep) are not tracked.
+- **FIX-4: Workspace Context Awareness** — `_workspace_context_block()` injects CWD, sandbox constraints, and trusted paths into the dynamic system prompt so the agent knows its boundaries before attempting operations.
+- **sync-vendor-skills.sh** — New script that syncs skills from `~/bytia/skills/` to vendor/ with automatic agentskills.io → flat format transformation. Supports `--list`, `--sync`, and per-skill sync.
+- **Vendor skills auto-update**: `_ensure_vendor_skills()` checks `.vendor-version` file and only reinstalls when package version changes.
+- **9 tests**: 3 loader YAML multiline edge cases, 3 FIX-3 tool error memory, 3 FIX-4 workspace context.
+
+### Changed
+
+- **Vendor skills format**: Restored to flat format after agentskills.io sync corruption. All 4 vendor skills (bytia-constitution, bytia-memory, graphify, skills-manager) now use flat frontmatter compatible with KODE parser.
+
 ## [0.7.5] - 2026-04-29
 
 ### Changed
