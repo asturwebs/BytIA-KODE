@@ -1,16 +1,12 @@
 ---
 name: bytia-memory
-description: >
-  claude-mem v10.6.1 3-Layer workflow for semantic memory retrieval (O13).
+description:  claude-mem v10.6.1 3-Layer workflow for semantic memory retrieval (O13).
   Trigger: When asking about historical context, past sessions, "what did we do before", or "context from previous work".
 license: MIT
-metadata:
-  author: bytia
-  version: "10.6.1"
-  scope: [root]
-  auto_invoke: "Historical queries, past context, 'what did we do before'"
-allowed-tools: mcp__plugin_claude-mem_mcp-search__search, mcp__plugin_claude-mem_mcp-search__timeline, mcp__plugin_claude-mem_mcp-search__get_observations, Read
----
+author: bytia
+version: "10.6.1"
+scope: [root]
+auto_invoke: "Historical queries, past context, 'what did we do before'"
 
 # claude-mem 3-Layer Workflow (O13)
 
@@ -26,7 +22,6 @@ Layer 3: get_observations([IDs]) → Detalles (~500/obs)
 
 PROHIBIDO: `get_observations` sin `search`/`timeline` primero. 10× ahorro de tokens.
 
----
 
 ## LAYER 1: SEARCH
 
@@ -39,7 +34,6 @@ Parámetros útiles:
 - `limit`: Máximo resultados (default: 10)
 - `type`: Filtrar por tipo (opcional)
 
----
 
 ## LAYER 2: TIMELINE
 
@@ -52,7 +46,6 @@ Parámetros útiles:
 - `depth_before`: Items antes del ancla (default: 3)
 - `depth_after`: Items después del ancla (default: 3)
 
----
 
 ## LAYER 3: GET_OBSERVATIONS
 
@@ -63,25 +56,20 @@ Detalles completos. **SOLO** para IDs filtrados en Layers 1-2.
 Parámetros:
 - `ids`: Array de observation IDs
 
----
 
 ## EJEMPLO
 
 ```
 1. search(query="telegram bot architecture", limit=5)
-   → IDs: [1523, 1525, 1528]
 
 2. timeline(anchor=1525, depth_before=2, depth_after=2)
-   → IDs contextuales: [1523, 1524, 1525, 1526, 1527]
 
 3. get_observations(ids=[1523, 1524, 1525, 1526, 1527])
-   → Detalles completos (~2,500 tokens)
 ```
 
 Coste total con 3-layer: ~650 tokens (5 obs)
 Coste sin filtrar: ~10,000 tokens. **Ahorro: 93%**
 
----
 
 ## DECISION TREE
 
@@ -90,10 +78,8 @@ Usuario pregunta sobre contexto histórico?
 ├─ Específico? ("qué decidimos sobre X")
 │   └─ search(query específica, limit=5) → timeline → get_observations
 └─ Amplio? ("en qué trabajamos")
-    └─ search(query amplia, limit=10) → timeline varias anclas → get_observations filtrados
 ```
 
----
 
 ## CITACIÓN
 
@@ -101,7 +87,6 @@ Usuario pregunta sobre contexto histórico?
 Según observación #1525 (2026-01-29), elegimos Arquitectura B para el Telegram Bot.
 ```
 
----
 
 ## QUICK REFERENCE
 
@@ -111,7 +96,6 @@ Según observación #1525 (2026-01-29), elegimos Arquitectura B para el Telegram
 | 2 | `timeline` | Contexto alrededor de IDs | ~50/timeline |
 | 3 | `get_observations` | Detalles completos | ~500/obs |
 
----
 
 ## RECURSOS
 

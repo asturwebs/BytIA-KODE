@@ -1,9 +1,12 @@
 ---
 name: graphify
-description: any input (code, docs, papers, images) → knowledge graph → clustered communities → HTML + JSON + audit report
-trigger: /graphify
----
-
+description:  Convierte código, docs o imágenes en knowledge graph con comunidades clusterizadas.
+  Trigger: /graphify
+license: MIT
+author: bytia
+version: "1.0"
+scope: [codebase, docs, research]
+auto_invoke: "/graphify"
 # /graphify
 
 Turn any folder of files into a navigable knowledge graph with community detection, an honest audit trail, and three outputs: interactive HTML, GraphRAG-ready JSON, and a plain-language GRAPH_REPORT.md.
@@ -64,12 +67,7 @@ Follow these steps in order. Do not skip steps.
 # Detect the correct Python interpreter (handles pipx, venv, system installs)
 GRAPHIFY_BIN=$(which graphify 2>/dev/null)
 if [ -n "$GRAPHIFY_BIN" ]; then
-    PYTHON=$(head -1 "$GRAPHIFY_BIN" | tr -d '#!')
-    case "$PYTHON" in
-        *[!a-zA-Z0-9/_.-]*) PYTHON="python3" ;;
-    esac
 else
-    PYTHON="python3"
 fi
 "$PYTHON" -c "import graphify" 2>/dev/null || "$PYTHON" -m pip install graphifyy -q 2>/dev/null || "$PYTHON" -m pip install graphifyy -q --break-system-packages 2>&1 | tail -3
 # Write interpreter path for all subsequent steps (persists across invocations)
@@ -97,10 +95,6 @@ Replace INPUT_PATH with the actual path the user provided. Do NOT cat or print t
 
 ```
 Corpus: X files · ~Y words
-  code:     N files (.py .ts .go ...)
-  docs:     N files (.md .txt ...)
-  papers:   N files (.pdf ...)
-  images:   N files
 ```
 
 Then act on it:
@@ -133,15 +127,9 @@ import json
 code_files = []
 detect = json.loads(Path('graphify-out/.graphify_detect.json').read_text())
 for f in detect.get('files', {}).get('code', []):
-    code_files.extend(collect_files(Path(f)) if Path(f).is_dir() else [Path(f)])
 
 if code_files:
-    result = extract(code_files)
-    Path('graphify-out/.graphify_ast.json').write_text(json.dumps(result, indent=2))
-    print(f'AST: {len(result[\"nodes\"])} nodes, {len(result[\"edges\"])} edges')
 else:
-    Path('graphify-out/.graphify_ast.json').write_text(json.dumps({'nodes':[],'edges':[],'input_tokens':0,'output_tokens':0}))
-    print('No code files - skipping AST extraction')
 "
 ```
 
@@ -173,7 +161,6 @@ all_files = [f for files in detect['files'].values() for f in files]
 cached_nodes, cached_edges, cached_hyperedges, uncached = check_semantic_cache(all_files)
 
 if cached_nodes or cached_edges or cached_hyperedges:
-    Path('graphify-out/.graphify_cached.json').write_text(json.dumps({'nodes': cached_nodes, 'edges': cached_edges, 'hyperedges': cached_hyperedges}))
 Path('graphify-out/.graphify_uncached.txt').write_text('\n'.join(uncached))
 print(f'Cache: {len(all_files)-len(uncached)} files hit, {len(uncached)} files need extraction')
 "
@@ -212,18 +199,10 @@ Rules:
 - AMBIGUOUS: uncertain - flag for review, do not omit
 
 Code files: focus on semantic edges AST cannot find (call relationships, shared data, arch patterns).
-  Do not re-extract imports - AST already has those.
 Doc/paper files: extract named concepts, entities, citations. Also extract rationale — sections that explain WHY a decision was made, trade-offs chosen, or design intent. These become nodes with `rationale_for` edges pointing to the concept they explain.
 Image files: use vision to understand what the image IS - do not just OCR.
-  UI screenshot: layout patterns, design decisions, key elements, purpose.
-  Chart: metric, trend/insight, data source.
-  Tweet/post: claim as node, author, concepts mentioned.
-  Diagram: components and connections.
-  Research figure: what it demonstrates, method, result.
-  Handwritten/whiteboard: ideas and arrows, mark uncertain readings AMBIGUOUS.
 
 DEEP_MODE (if --mode deep was given): be aggressive with INFERRED edges - indirect deps,
-  shared assumptions, latent couplings. Mark uncertain ones AMBIGUOUS instead of omitting.
 
 Semantic similarity: if two concepts in this chunk solve the same problem or represent the same idea without any structural link (no import, no call, no citation), add a `semantically_similar_to` edge marked INFERRED with a confidence_score reflecting how similar they are (0.6-0.95). Examples:
 - Two functions that both validate user input but never call each other
@@ -238,14 +217,10 @@ Hyperedges: if 3 or more nodes clearly participate together in a shared concept,
 Use sparingly — only when the group relationship adds information beyond the pairwise edges. Maximum 3 hyperedges per chunk.
 
 If a file has YAML frontmatter (--- ... ---), copy source_url, captured_at, author,
-  contributor onto every node from that file.
 
 confidence_score is REQUIRED on every edge - never omit it, never use 0.5 as a default:
 - EXTRACTED edges: confidence_score = 1.0 always
 - INFERRED edges: reason about each edge individually.
-  Direct structural evidence (shared data structure, clear dependency): 0.8-0.9.
-  Reasonable inference with some uncertainty: 0.6-0.7.
-  Weak or speculative: 0.4-0.5. Most edges should be 0.6-0.9, not 0.5.
 - AMBIGUOUS edges: 0.1-0.3
 
 Output exactly this JSON (no other text):
@@ -288,16 +263,8 @@ all_hyperedges = cached.get('hyperedges', []) + new.get('hyperedges', [])
 seen = set()
 deduped = []
 for n in all_nodes:
-    if n['id'] not in seen:
-        seen.add(n['id'])
-        deduped.append(n)
 
 merged = {
-    'nodes': deduped,
-    'edges': all_edges,
-    'hyperedges': all_hyperedges,
-    'input_tokens': new.get('input_tokens', 0),
-    'output_tokens': new.get('output_tokens', 0),
 }
 Path('graphify-out/.graphify_semantic.json').write_text(json.dumps(merged, indent=2))
 print(f'Extraction complete - {len(deduped)} nodes, {len(all_edges)} edges ({len(cached[\"nodes\"])} from cache, {len(new.get(\"nodes\",[]))} new)')
@@ -319,18 +286,10 @@ sem = json.loads(Path('graphify-out/.graphify_semantic.json').read_text())
 seen = {n['id'] for n in ast['nodes']}
 merged_nodes = list(ast['nodes'])
 for n in sem['nodes']:
-    if n['id'] not in seen:
-        merged_nodes.append(n)
-        seen.add(n['id'])
 
 merged_edges = ast['edges'] + sem['edges']
 merged_hyperedges = sem.get('hyperedges', [])
 merged = {
-    'nodes': merged_nodes,
-    'edges': merged_edges,
-    'hyperedges': merged_hyperedges,
-    'input_tokens': sem.get('input_tokens', 0),
-    'output_tokens': sem.get('output_tokens', 0),
 }
 Path('graphify-out/.graphify_extract.json').write_text(json.dumps(merged, indent=2))
 total = len(merged_nodes)
@@ -372,17 +331,9 @@ Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 to_json(G, communities, 'graphify-out/graph.json')
 
 analysis = {
-    'communities': {str(k): v for k, v in communities.items()},
-    'cohesion': {str(k): v for k, v in cohesion.items()},
-    'gods': gods,
-    'surprises': surprises,
-    'questions': questions,
 }
 Path('graphify-out/.graphify_analysis.json').write_text(json.dumps(analysis, indent=2))
 if G.number_of_nodes() == 0:
-    print('ERROR: Graph is empty - extraction produced no nodes.')
-    print('Possible causes: all files were skipped, binary-only corpus, or extraction failed.')
-    raise SystemExit(1)
 print(f'Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(communities)} communities')
 "
 ```
@@ -488,10 +439,7 @@ communities = {int(k): v for k, v in analysis['communities'].items()}
 labels = {int(k): v for k, v in labels_raw.items()}
 
 if G.number_of_nodes() > 5000:
-    print(f'Graph has {G.number_of_nodes()} nodes - too large for HTML viz. Use Obsidian vault instead.')
 else:
-    to_html(G, communities, 'graphify-out/graph.html', community_labels=labels or None)
-    print('graph.html written - open in any browser, no server needed')
 "
 ```
 
@@ -587,12 +535,6 @@ This starts a stdio MCP server that exposes tools: `query_graph`, `get_node`, `g
 To configure in Claude Desktop, add to `claude_desktop_config.json`:
 ```json
 {
-  "mcpServers": {
-    "graphify": {
-      "command": "python3",
-      "args": ["-m", "graphify.serve", "/absolute/path/to/graphify-out/graph.json"]
-    }
-  }
 }
 ```
 
@@ -614,7 +556,6 @@ print_benchmark(result)
 
 Print the output directly in chat. If `total_words <= 5000`, skip silently - the graph value is structural clarity, not token compression, for small corpora.
 
----
 
 ### Step 9 - Save manifest, update cost tracker, clean up, and report
 
@@ -636,15 +577,9 @@ output_tok = extract.get('output_tokens', 0)
 
 cost_path = Path('graphify-out/cost.json')
 if cost_path.exists():
-    cost = json.loads(cost_path.read_text())
 else:
-    cost = {'runs': [], 'total_input_tokens': 0, 'total_output_tokens': 0}
 
 cost['runs'].append({
-    'date': datetime.now(timezone.utc).isoformat(),
-    'input_tokens': input_tok,
-    'output_tokens': output_tok,
-    'files': detect.get('total_files', 0),
 })
 cost['total_input_tokens'] += input_tok
 cost['total_output_tokens'] += output_tok
@@ -661,10 +596,6 @@ Tell the user (omit the obsidian line unless --obsidian was given):
 ```
 Graph complete. Outputs in PATH_TO_DIR/graphify-out/
 
-  graph.html            - interactive graph, open in browser
-  GRAPH_REPORT.md       - audit report
-  graph.json            - raw graph data
-  obsidian/             - Obsidian vault (only if --obsidian was given)
 ```
 
 If graphify saved you time, consider supporting it: https://github.com/sponsors/safishamsi
@@ -686,7 +617,6 @@ If the user says yes, run `/graphify query "[question]"` on the graph and walk t
 
 The graph is the map. Your job after the pipeline is to be the guide.
 
----
 
 ## Interpreter guard for subcommands
 
@@ -694,15 +624,6 @@ Before running any subcommand below (`--update`, `--cluster-only`, `query`, `pat
 
 ```bash
 if [ ! -f graphify-out/.graphify_python ]; then
-    GRAPHIFY_BIN=$(which graphify 2>/dev/null)
-    if [ -n "$GRAPHIFY_BIN" ]; then
-        PYTHON=$(head -1 "$GRAPHIFY_BIN" | tr -d '#!')
-        case "$PYTHON" in *[!a-zA-Z0-9/_.-]*) PYTHON="python3" ;; esac
-    else
-        PYTHON="python3"
-    fi
-    mkdir -p graphify-out
-    "$PYTHON" -c "import sys; open('graphify-out/.graphify_python', 'w').write(sys.executable)"
 fi
 ```
 
@@ -721,8 +642,6 @@ new_total = result.get('new_total', 0)
 print(json.dumps(result, indent=2))
 Path('graphify-out/.graphify_incremental.json').write_text(json.dumps(result))
 if new_total == 0:
-    print('No files changed since last run. Nothing to update.')
-    raise SystemExit(0)
 print(f'{new_total} new/changed file(s) to re-extract.')
 "
 ```
@@ -770,9 +689,6 @@ G_new = build_from_json(new_extraction)
 incremental = json.loads(Path('graphify-out/.graphify_incremental.json').read_text())
 deleted = set(incremental.get('deleted_files', []))
 if deleted:
-    to_remove = [n for n, d in G_existing.nodes(data=True) if d.get('source_file') in deleted]
-    G_existing.remove_nodes_from(to_remove)
-    print(f'Pruned {len(to_remove)} ghost nodes from {len(deleted)} deleted file(s)')
 
 # Merge: new nodes/edges into existing graph
 G_existing.update(G_new)
@@ -799,20 +715,12 @@ new_extract = json.loads(Path('graphify-out/.graphify_extract.json').read_text()
 G_new = build_from_json(new_extract)
 
 if old_data:
-    G_old = json_graph.node_link_graph(old_data, edges='links')
-    diff = graph_diff(G_old, G_new)
-    print(diff['summary'])
-    if diff['new_nodes']:
-        print('New nodes:', ', '.join(n['label'] for n in diff['new_nodes'][:5]))
-    if diff['new_edges']:
-        print('New edges:', len(diff['new_edges']))
 "
 ```
 
 Before the merge step, save the old graph: `cp graphify-out/graph.json graphify-out/.graphify_old.json`
 Clean up after: `rm -f graphify-out/.graphify_old.json`
 
----
 
 ## For --cluster-only
 
@@ -833,7 +741,6 @@ data = json.loads(Path('graphify-out/graph.json').read_text())
 G = json_graph.node_link_graph(data, edges='links')
 
 detection = {'total_files': 0, 'total_words': 99999, 'needs_graph': True, 'warning': None,
-             'files': {'code': [], 'document': [], 'paper': []}}
 tokens = {'input': 0, 'output': 0}
 
 communities = cluster(G)
@@ -847,10 +754,6 @@ Path('graphify-out/GRAPH_REPORT.md').write_text(report)
 to_json(G, communities, 'graphify-out/graph.json')
 
 analysis = {
-    'communities': {str(k): v for k, v in communities.items()},
-    'cohesion': {str(k): v for k, v in cohesion.items()},
-    'gods': gods,
-    'surprises': surprises,
 }
 Path('graphify-out/.graphify_analysis.json').write_text(json.dumps(analysis, indent=2))
 print(f'Re-clustered: {len(communities)} communities')
@@ -859,7 +762,6 @@ print(f'Re-clustered: {len(communities)} communities')
 
 Then run Steps 5–9 as normal (label communities, generate viz, benchmark, clean up, report).
 
----
 
 ## For /graphify query
 
@@ -875,8 +777,6 @@ First check the graph exists:
 $(cat graphify-out/.graphify_python) -c "
 from pathlib import Path
 if not Path('graphify-out/graph.json').exists():
-    print('ERROR: No graph found. Run /graphify <path> first to build the graph.')
-    raise SystemExit(1)
 "
 ```
 If it fails, stop and tell the user to run `/graphify <path>` first.
@@ -906,48 +806,16 @@ terms = [t.lower() for t in question.split() if len(t) > 3]
 # Find best-matching start nodes
 scored = []
 for nid, ndata in G.nodes(data=True):
-    label = ndata.get('label', '').lower()
-    score = sum(1 for t in terms if t in label)
-    if score > 0:
-        scored.append((score, nid))
 scored.sort(reverse=True)
 start_nodes = [nid for _, nid in scored[:3]]
 
 if not start_nodes:
-    print('No matching nodes found for query terms:', terms)
-    sys.exit(0)
 
 subgraph_nodes = set()
 subgraph_edges = []
 
 if mode == 'dfs':
-    # DFS: follow one path as deep as possible before backtracking.
-    # Depth-limited to 6 to avoid traversing the whole graph.
-    visited = set()
-    stack = [(n, 0) for n in reversed(start_nodes)]
-    while stack:
-        node, depth = stack.pop()
-        if node in visited or depth > 6:
-            continue
-        visited.add(node)
-        subgraph_nodes.add(node)
-        for neighbor in G.neighbors(node):
-            if neighbor not in visited:
-                stack.append((neighbor, depth + 1))
-                subgraph_edges.append((node, neighbor))
 else:
-    # BFS: explore all neighbors layer by layer up to depth 3.
-    frontier = set(start_nodes)
-    subgraph_nodes = set(start_nodes)
-    for _ in range(3):
-        next_frontier = set()
-        for n in frontier:
-            for neighbor in G.neighbors(n):
-                if neighbor not in subgraph_nodes:
-                    next_frontier.add(neighbor)
-                    subgraph_edges.append((n, neighbor))
-        subgraph_nodes.update(next_frontier)
-        frontier = next_frontier
 
 # Token-budget aware output: rank by relevance, cut at budget (~4 chars/token)
 token_budget = BUDGET  # default 2000
@@ -955,23 +823,15 @@ char_budget = token_budget * 4
 
 # Score each node by term overlap for ranked output
 def relevance(nid):
-    label = G.nodes[nid].get('label', '').lower()
-    return sum(1 for t in terms if t in label)
 
 ranked_nodes = sorted(subgraph_nodes, key=relevance, reverse=True)
 
 lines = [f'Traversal: {mode.upper()} | Start: {[G.nodes[n].get(\"label\",n) for n in start_nodes]} | {len(subgraph_nodes)} nodes']
 for nid in ranked_nodes:
-    d = G.nodes[nid]
-    lines.append(f'  NODE {d.get(\"label\", nid)} [src={d.get(\"source_file\",\"\")} loc={d.get(\"source_location\",\"\")}]')
 for u, v in subgraph_edges:
-    if u in subgraph_nodes and v in subgraph_nodes:
-        d = G.edges[u, v]
-        lines.append(f'  EDGE {G.nodes[u].get(\"label\",u)} --{d.get(\"relation\",\"\")} [{d.get(\"confidence\",\"\")}]--> {G.nodes[v].get(\"label\",v)}')
 
 output = '\n'.join(lines)
 if len(output) > char_budget:
-    output = output[:char_budget] + f'\n... (truncated at ~{token_budget} token budget - use --budget N for more)'
 print(output)
 "
 ```
@@ -986,7 +846,6 @@ $(cat graphify-out/.graphify_python) -m graphify save-result --question "QUESTIO
 
 Replace `QUESTION` with the question, `ANSWER` with your full answer text, `SOURCE_NODES` with the list of node labels you cited. This closes the feedback loop: the next `--update` will extract this Q&A as a node in the graph.
 
----
 
 ## For /graphify path
 
@@ -997,8 +856,6 @@ First check the graph exists:
 $(cat graphify-out/.graphify_python) -c "
 from pathlib import Path
 if not Path('graphify-out/graph.json').exists():
-    print('ERROR: No graph found. Run /graphify <path> first to build the graph.')
-    raise SystemExit(1)
 "
 ```
 If it fails, stop and tell the user to run `/graphify <path>` first.
@@ -1017,37 +874,15 @@ a_term = 'NODE_A'
 b_term = 'NODE_B'
 
 def find_node(term):
-    term = term.lower()
-    scored = sorted(
-        [(sum(1 for w in term.split() if w in G.nodes[n].get('label','').lower()), n)
-         for n in G.nodes()],
-        reverse=True
-    )
-    return scored[0][1] if scored and scored[0][0] > 0 else None
 
 src = find_node(a_term)
 tgt = find_node(b_term)
 
 if not src or not tgt:
-    print(f'Could not find nodes matching: {a_term!r} or {b_term!r}')
-    sys.exit(0)
 
 try:
-    path = nx.shortest_path(G, src, tgt)
-    print(f'Shortest path ({len(path)-1} hops):')
-    for i, nid in enumerate(path):
-        label = G.nodes[nid].get('label', nid)
-        if i < len(path) - 1:
-            edge = G.edges[nid, path[i+1]]
-            rel = edge.get('relation', '')
-            conf = edge.get('confidence', '')
-            print(f'  {label} --{rel}--> [{conf}]')
-        else:
-            print(f'  {label}')
 except nx.NetworkXNoPath:
-    print(f'No path found between {a_term!r} and {b_term!r}')
 except nx.NodeNotFound as e:
-    print(f'Node not found: {e}')
 "
 ```
 
@@ -1059,7 +894,6 @@ After writing the explanation, save it back:
 $(cat graphify-out/.graphify_python) -m graphify save-result --question "Path from NODE_A to NODE_B" --answer "ANSWER" --type path_query --nodes NODE_A NODE_B
 ```
 
----
 
 ## For /graphify explain
 
@@ -1070,8 +904,6 @@ First check the graph exists:
 $(cat graphify-out/.graphify_python) -c "
 from pathlib import Path
 if not Path('graphify-out/graph.json').exists():
-    print('ERROR: No graph found. Run /graphify <path> first to build the graph.')
-    raise SystemExit(1)
 "
 ```
 If it fails, stop and tell the user to run `/graphify <path>` first.
@@ -1091,13 +923,8 @@ term_lower = term.lower()
 
 # Find best matching node
 scored = sorted(
-    [(sum(1 for w in term_lower.split() if w in G.nodes[n].get('label','').lower()), n)
-     for n in G.nodes()],
-    reverse=True
 )
 if not scored or scored[0][0] == 0:
-    print(f'No node matching {term!r}')
-    sys.exit(0)
 
 nid = scored[0][1]
 data_n = G.nodes[nid]
@@ -1108,12 +935,6 @@ print(f'  degree: {G.degree(nid)}')
 print()
 print('CONNECTIONS:')
 for neighbor in G.neighbors(nid):
-    edge = G.edges[nid, neighbor]
-    nlabel = G.nodes[neighbor].get('label', neighbor)
-    rel = edge.get('relation', '')
-    conf = edge.get('confidence', '')
-    src_file = G.nodes[neighbor].get('source_file', '')
-    print(f'  --{rel}--> {nlabel} [{conf}] ({src_file})')
 "
 ```
 
@@ -1125,7 +946,6 @@ After writing the explanation, save it back:
 $(cat graphify-out/.graphify_python) -m graphify save-result --question "Explain NODE_NAME" --answer "ANSWER" --type explain --nodes NODE_NAME
 ```
 
----
 
 ## For /graphify add
 
@@ -1138,14 +958,8 @@ from graphify.ingest import ingest
 from pathlib import Path
 
 try:
-    out = ingest('URL', Path('./raw'), author='AUTHOR', contributor='CONTRIBUTOR')
-    print(f'Saved to {out}')
 except ValueError as e:
-    print(f'error: {e}', file=sys.stderr)
-    sys.exit(1)
 except RuntimeError as e:
-    print(f'error: {e}', file=sys.stderr)
-    sys.exit(1)
 "
 ```
 
@@ -1158,7 +972,6 @@ Supported URL types (auto-detected):
 - Images (.png/.jpg/.webp) → downloaded, Claude vision extracts on next run
 - Any webpage → converted to markdown via html2text
 
----
 
 ## For --watch
 
@@ -1179,7 +992,6 @@ Press Ctrl+C to stop.
 
 For agentic workflows: run `--watch` in a background terminal. Code changes from agent waves are picked up automatically between waves. If agents are also writing docs or notes, you'll need a manual `/graphify --update` after those waves.
 
----
 
 ## For git commit hook
 
@@ -1195,7 +1007,6 @@ After every `git commit`, the hook detects which code files changed (via `git di
 
 If a post-commit hook already exists, graphify appends to it rather than replacing it.
 
----
 
 ## For native CLAUDE.md integration
 
@@ -1211,7 +1022,6 @@ This writes a `## graphify` section to the local `CLAUDE.md` that instructs Clau
 graphify claude uninstall  # remove the section
 ```
 
----
 
 ## Honesty Rules
 
