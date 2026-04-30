@@ -45,6 +45,7 @@ _DEFAULT_BINARIES = {
     "mv", "cp", "rm", "wc", "date", "chmod", "df", "du", "head", "tail",
     "curl", "wget", "scp", "ssh",
     "uv", "python", "python3", "pip", "pip3",
+    "rg", "bat", "eza", "tokei", "shellcheck",
     "wsl",
 }
 

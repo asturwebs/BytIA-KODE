@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.8] - 2026-04-30
+
+### Fixed
+
+- **BashTool allowlist incompleta**: Añadidos `rg` (ripgrep), `bat`, `eza`, `tokei`, `shellcheck` a `_DEFAULT_BINARIES`. Antes, el agente recurría a `python -c` como workaround. Binarios `z`, `tmux`, `gh` excluidos deliberadamente (sin valor para agente no-interactivo o superficie de seguridad excesiva).
+- **Race condition en kill()**: `_active_subprocess` capturado en variable local antes del check de `returncode`. Elimina ventana teórica donde el callback `on_subprocess` podría sobrescribir la referencia durante terminate/kill.
+
+### Added
+
+- **Test: system message preservation**: Verifica que mensajes `role="system"` en cualquier posición de `self.messages` sobreviven a `_manage_context()`. El enforcement ya existía (filtro `non_system` en `agent.py:538`), pero el test protege contra regresiones futuras. 145 tests total.
+- **Session metadata persistence**: `update_metadata()` en `SessionStore` persiste `model` y `token_count` por sesión. Hook en `Agent.chat()` actualiza ambos campos tras cada turno. SQL parametrizado con allowlist de campos.
+- **Code review document**: `docs/CODE-REVIEW.md` con análisis triple (Hermes + Peke + Claude). 11 patrones buenos, 5 flags analizados, priorización para v0.7.8.
+
+### Changed
+
+- **ROADMAP.md**: Corregido allowlist marcada como completada cuando no lo estaba, binarios sin valor eliminados, threshold arbitrario TUI eliminado, cabecera actualizada.
+- **CODE-REVIEW.md**: Flag #5 corregido (no era bug, enforcement existía), idiomas mezclados corregidos, tamaño TUI precisado.
+
 ## [0.7.7] - 2026-04-29
 
 ### Fixed

@@ -1017,13 +1017,14 @@ class Agent:
     async def kill(self) -> None:
         """Nuclear cancel: interrupt + kill subprocess + reset state."""
         self._cancel_event.set()
-        if self._active_subprocess and self._active_subprocess.returncode is None:
+        proc = self._active_subprocess
+        if proc and proc.returncode is None:
             try:
-                self._active_subprocess.terminate()
-                await asyncio.wait_for(self._active_subprocess.wait(), timeout=2.0)
+                proc.terminate()
+                await asyncio.wait_for(proc.wait(), timeout=2.0)
             except (ProcessLookupError, asyncio.TimeoutError):
                 try:
-                    self._active_subprocess.kill()
+                    proc.kill()
                 except ProcessLookupError:
                     pass
             self._active_subprocess = None
