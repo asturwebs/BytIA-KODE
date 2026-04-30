@@ -13,9 +13,7 @@
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
 
-BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de Telegram. Agente multi-workspace con contexto automático, sesiones persistentes, skills y logging estructurado.
-
-> **B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI.**
+**BytIA KODE** es un agente de IA para terminal con identidad configurable, fallback automático de providers y skills extensibles. TUI (Textual) + bot de Telegram, sesiones persistentes en SQLite y arquitectura multi-provider con circuit breaker.
 
 <p align="center">
   <img src="docs/img/bytia-kode-1-TUI-inicio.png" width="700"><br>
@@ -39,13 +37,9 @@ BytIA KODE es una TUI agéntica para desarrollo asistido con terminal y bot de T
   <em>Benchmark: 4.90x speedup async</em>
 </p>
 
-> **Nota:** Las capturas muestran la TUI. El bot de Telegram funciona con la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes) más abajo). Añadiré captura del bot cuando esté disponible.
+> **Nota:** Las capturas muestran la TUI. El bot de Telegram comparte la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes)).
 
-> Release actual: `0.7.8`
->
-> Formato de identidad del sistema: `YAML`
->
-> Método recomendado de instalación: `uv` (ver [uv installation](https://docs.astral.sh/uv/getting-started/installation/))
+> Release actual: `0.7.8` · Identidad: `YAML` · Instalación: [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
 
 ### Novedades en v0.7.8 — Code Review Fixes
 
@@ -372,7 +366,7 @@ Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.
 
 ## Skills System
 
-BytIA KODE incluye un sistema de skills persistente inspirado en [Hermes Agent](https://github.com/hermes-agent/hermes) y el paper [_Terminal Agents Suffice for Enterprise Automation_](https://arxiv.org/abs/2604.00073). Las skills son procedimientos reutilizables que el agente carga en su system prompt.
+BytIA KODE incluye un sistema de skills persistente. Las skills son procedimientos reutilizables en formato Markdown+YAML que el agente carga en su system prompt según relevancia.
 
 ### Arquitectura de Capas
 
@@ -401,11 +395,11 @@ KODE incluye por defecto:
 - **skills-manager** — Gestión del sistema de skills
 - **graphify** — Knowledge graphs de código
 
-### Visión (v0.6.0+)
+### Extensibilidad
 
-Las skills evolucionarán de instrucciones estáticas a **unidades autónomas**:
+Las skills evolucionarán hacia unidades más autónomas:
 
-- **Tools dinámicas** — scripts en `skills/<name>/scripts/` auto-registrados como tools del agente
+- **Tools dinámicas** — scripts en `skills/<name>/scripts/` auto-registrados como tools
 - **Sub-agentes** — una skill puede definir su propio SP y ejecutarse como agente dedicado
 - **Skills Hub** — instalar skills desde repos GitHub
 - **`write_skill` tool** — el agente crea skills programáticamente
@@ -457,11 +451,11 @@ git config core.hooksPath .githooks
 
 ## BytIA OS Kernel + Runtime
 
-El agente carga su identidad desde `src/bytia_kode/prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml`, un archivo YAML que define la personalidad, valores, protocolos y reglas del sistema. Este archivo se empaqueta dentro del wheel como recurso del paquete.
+El agente carga su identidad desde dos archivos YAML: `bytia.kernel.yaml` (identidad y valores inmutables) + `bytia.runtime.kode.yaml` (adaptación al entorno). Se empaquetan dentro del wheel como recursos del paquete.
 
 ### Personalizar la identidad
 
-Para adaptar BytIA KODE a tu propio contexto, edita `src/bytia_kode/prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml`:
+Para personalizar la identidad, edita los YAML en `src/bytia_kode/prompts/`:
 
 | Sección | Qué contiene | Personalizar |
 | --- | --- | --- |
@@ -497,16 +491,16 @@ BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCH
 
 ## Seguridad
 
-Hardening de seguridad verificado con auditoría profesional:
+Modelo de seguridad con defense-in-depth:
 
-| Issue | Mitigación |
+| Capa | Mitigación |
 | --- | --- |
-| SEC-001 — Command injection | Allowlist de binarios + `shell=False` + `shlex.split()` |
-| SEC-002/003 — Path traversal | `_resolve_workspace_path()` con sandbox a `cwd` + trusted paths controlados |
-| SEC-005 — Telegram abierto | Fail-secure por defecto (denegar sin allowlist) |
-| SEC-006 — Sesiones compartidas | Aislamiento por `chat_id` (v0.5.0) |
+| Command injection | Allowlist de binarios + `shell=False` + `shlex.split()` |
+| Path traversal | `_resolve_workspace_path()` con sandbox a CWD + trusted paths |
+| Telegram abierto | Fail-secure por defecto (deniega sin allowlist) |
+| Sesiones cruzadas | Aislamiento por `chat_id` |
 
-Motor I/O asíncrono validado con benchmark: **4.90x speedup** (80% mejora) frente a ejecución secuencial.
+Motor I/O asíncrono con benchmark: **4.90x speedup** frente a ejecución secuencial.
 
 ## Limitaciones conocidas
 
