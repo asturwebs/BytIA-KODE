@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.7.7 (Alpha estable)
+## Estado actual: v0.7.8 (Alpha estable)
 
 ---
 
@@ -12,6 +12,36 @@
 - [x] **pytest testpaths** — `uv run pytest -q` recoge 144 tests (antes 116)
 - [x] **Flaky test fix** — `test_file_write_tool_handles_relative_path` resetea `_WORKSPACE_ROOT`
 - [x] **2 tests nuevos** — hash normalization + security policy blocking. Total: 144.
+
+---
+
+## v0.7.8 — Code Review Fixes (COMPLETADO)
+
+**Fuente:** Code Review triple (2026-04-30) — Hermes + Peke + Claude → `docs/CODE-REVIEW.md`
+
+### P0 — Inmediato
+
+- [x] **Ampliar allowlist bash** — `rg`, `bat`, `eza`, `tokei`, `shellcheck`
+  - *No se añaden:* `z` (requiere shell interactivo), `tmux` (requiere TTY), `gh` (superficie de seguridad)
+  - *Archivo:* `src/bytia_kode/tools/registry.py`
+- [x] **Test: system messages sobreviven compression** — test de regresión (NO es bug, enforcement ya existe en `agent.py:538`)
+  - *Archivo:* `tests/test_context_management.py`
+
+### P1 — Alta prioridad
+
+- [x] **Fix race condition interrupt/kill** — capturar `_active_subprocess` en variable local antes del if
+  - *Archivo:* `src/bytia_kode/agent.py`
+
+### P2 — Tech debt (no bloqueante)
+
+- [ ] **TUI refactor: extraer widgets a subdir** — `ToolBlock`, `ThinkingBlock`, `StatusBar` → `src/bytia_kode/tui/widgets/`
+  - *Archivo:* `src/bytia_kode/tui.py`
+
+### No incluido en v0.7.8 (trade-offs deliberados)
+
+- Summary con modelo separado — requiere redesign del provider manager
+- `z` / `tmux` / `gh` en allowlist — sin valor real para el agente
+- Symlink attack surface fix — bajo riesgo, alto esfuerzo
 
 ---
 
@@ -82,15 +112,10 @@
 
 ### P2 — Mejora de experiencia
 
-- [ ] **FIX-5: Proactive Escalation Threshold**
-  - Tras N fallos con herramientas, generar mensaje automático con comando que el usuario pueda ejecutar manualmente
-  - N propuesto: 3 fallos consecutivos con el mismo tool
-  - **Archivo:** `src/bytia_kode/agent.py`
-
-- [ ] **FIX-6: Post-Generation Workspace Validation**
-  - Tras batch de escrituras, verificar que archivos están dentro del árbol del proyecto actual
-  - Alertar si se detectan archivos fuera de contexto (ej: proyecto Astro en repo Python)
-  - **Archivo:** `src/bytia_kode/tools/registry.py`
+- [ ] **FIX-5: Proactive Escalation Threshold** — Tras 3 fallos consecutivos con el mismo tool, generar mensaje automático con comando manual
+  - *Pubsub:* Pendiente desde v0.7.2
+- [ ] **FIX-6: Post-Generation Workspace Validation** — Verificar que archivos están dentro del árbol del proyecto actual
+  - *Pubsub:* Pendiente desde v0.7.2
 
 ### Tests requeridos para cerrar hotfix
 

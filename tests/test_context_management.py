@@ -146,3 +146,31 @@ class TestUpdateContextLimit:
         original = agent._max_context_tokens
         agent.update_context_limit(-1)
         assert agent._max_context_tokens == original
+
+
+class TestSystemMessagePreservation:
+    @pytest.mark.asyncio
+    async def test_system_messages_survive_compression(self, agent, mock_provider):
+        agent._max_context_tokens = 30
+        long_msg = "x" * 200
+        system_content = "CRITICAL_INSTRUCTION: never delete this"
+
+        agent.messages = [
+            Message(role="system", content="You are BytIA."),
+            Message(role="user", content=long_msg),
+            Message(role="assistant", content=long_msg),
+            Message(role="system", content=system_content),
+            Message(role="user", content=long_msg),
+            Message(role="assistant", content=long_msg),
+            Message(role="user", content="latest question"),
+            Message(role="assistant", content="latest answer"),
+        ]
+
+        await agent._manage_context(mock_provider)
+
+        all_content = [m.content for m in agent.messages]
+        assert "You are BytIA." in all_content
+        assert "CRITICAL_INSTRUCTION: never delete this" in all_content
+        assert agent.messages[-1].content == "latest answer"
+        assert agent.messages[-2].content == "latest question"
+        assert len(agent.messages) < 8

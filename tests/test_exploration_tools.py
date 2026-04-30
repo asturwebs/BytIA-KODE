@@ -178,28 +178,28 @@ class TestTreeTool:
 
 
 class TestPanicButtons:
-    def test_interrupt_sets_event(self):
+    def test_interrupt_sets_event(self, tmp_path):
         from bytia_kode.agent import Agent
         from bytia_kode.config import AppConfig
 
-        agent = Agent(AppConfig(data_dir=Path("/tmp/bkode-test-panic")))
+        agent = Agent(AppConfig(data_dir=tmp_path / "panic1"))
         assert not agent._cancel_event.is_set()
         agent.interrupt()
         assert agent._cancel_event.is_set()
 
-    def test_kill_clears_event(self):
+    def test_kill_clears_event(self, tmp_path):
         from bytia_kode.agent import Agent
         from bytia_kode.config import AppConfig
 
-        agent = Agent(AppConfig(data_dir=Path("/tmp/bkode-test-panic2")))
+        agent = Agent(AppConfig(data_dir=tmp_path / "panic2"))
         agent.interrupt()
         assert agent._cancel_event.is_set()
         asyncio.run(agent.kill())
         assert not agent._cancel_event.is_set()
 
-    def test_subprocess_starts_none(self):
+    def test_subprocess_starts_none(self, tmp_path):
         from bytia_kode.agent import Agent
         from bytia_kode.config import AppConfig
 
-        agent = Agent(AppConfig(data_dir=Path("/tmp/bkode-test-panic3")))
+        agent = Agent(AppConfig(data_dir=tmp_path / "panic3"))
         assert agent._active_subprocess is None
