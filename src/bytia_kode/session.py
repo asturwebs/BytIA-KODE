@@ -291,3 +291,17 @@ class SessionStore:
                 (title[:80], session_id),
             )
             return True
+
+    def update_metadata(self, session_id: str, **kwargs) -> None:
+        """Update session metadata fields (model, token_count)."""
+        allowed = {"model", "token_count"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [session_id]
+        with self._connect() as conn:
+            conn.execute(
+                f"UPDATE sessions SET {set_clause} WHERE session_id = ?",
+                values,
+            )

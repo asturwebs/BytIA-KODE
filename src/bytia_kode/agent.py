@@ -874,6 +874,14 @@ class Agent:
                         self._current_session_id,
                         sanitized_message[:80],
                     )
+                model_name = getattr(provider_client, "model", "")
+                if not isinstance(model_name, str):
+                    model_name = ""
+                self._session_store.update_metadata(
+                    self._current_session_id,
+                    model=model_name,
+                    token_count=self._estimate_tokens(),
+                )
 
             # ── Fallback: parse pseudo tool calls from text (GGUF models) ──
             if not tool_calls_accum and response_text:
