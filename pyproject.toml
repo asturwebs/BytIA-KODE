@@ -1,6 +1,6 @@
 [project]
 name = "bytia-kode"
-version = "0.7.8"
+version = "0.8.0a1"
 description = "B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI."
 authors = [{ name = "Pedro Luis Cuevas Villarrubia", email = "pedro@asturwebs.es" }]
 maintainers = [{ name = "BytIA" }]
@@ -43,6 +43,7 @@ dev = [
     "textual-dev>=1.8.0",
 ]
 local = ["llama-cpp-python>=0.3"]
+mcp = ["mcp>=1.27.1"]
 memory = ["sentence-transformers>=4.0", "faiss-cpu>=1.11"]
 
 [project.scripts]
