@@ -348,19 +348,38 @@
 
 - [x] 130 tests pasando — sin regresiones
 
-## v0.8.0 — Memoria y Conocimiento
+## v0.8.0 — MCP Client + Memoria y Conocimiento (EN PROGRESO)
 
-**Objetivo:** Memoria semántica y base de conocimiento.
+### v0.8.0a — MCP Client Support (EN PROGRESO — Sesión 39, 2026-05-24)
+
+**Objetivo:** Soporte MCP client para tools dinámicas desde servidores externos.
+
+**Arquitectura:** Adapter Pattern — `McpTool` extiende `Tool`, se registra en `ToolRegistry`. El agente nunca distingue tools nativas de MCP.
+
+**Módulo nuevo:** `src/bytia_kode/mcp/`
+
+- [x] **`mcp/config.py`** — `McpServerConfig` dataclass, `load_mcp_config()` desde `~/.bytia-kode/mcp_servers.json`
+- [x] **`mcp/__init__.py`** — Public API + soft-import guard (stub sin SDK)
+- [x] **`mcp/client.py`** — `McpClient`: stdio transport + `AsyncExitStack` + handshake + `tools/list` + `tools/call`
+- [x] **`mcp/tool.py`** — `McpTool` skeleton con `TODO(human)` para `execute()` (puente MCP → ToolResult)
+- [ ] **`mcp/manager.py`** — `McpManager`: lifecycle (`start_all`, `stop_all`, `restart_server`), registry integration
+- [ ] **`agent.py` wiring** — `McpManager` en `__init__`, `mcp_start()` desde TUI bootstrap, `stop_all()` en `close()`
+- [ ] **`tui.py` wiring** — Llamar `agent.mcp_start()` en `on_mount()`, status en banner
+- [ ] **`pyproject.toml`** — `[mcp]` optional dependency: `mcp>=1.6.0`
+- [ ] **Tests** — `test_mcp_config.py` (unit), `test_mcp_tool.py` (mock client)
+
+**Configuración:** `~/.bytia-kode/mcp_servers.json` (formato Claude Code compatible)
+
+**Seguridad:** Entorno heredado + overrides (no whitelist), AsyncExitStack para lifecycle, timeouts, graceful degradation
+
+**Tool naming:** `mcp__{server}__{tool}` (ej: `mcp__codegraph__codegraph_search`)
+
+### v0.8.0b — Memoria y Conocimiento
 
 - [ ] Memoria vectorial con FAISS/ChromaDB (búsqueda semántica)
 - [ ] System prompt caching optimizado
 - [ ] Memoria entre sesiones (recordar decisiones previas)
-- [ ] **Intercom como Skill Package** — sistema genérico de addons:
-  - `/setup-intercom` comando TUI que crea `~/.bytia-kode/intercom/` + instala skill
-  - Skill package auto-contenido: SKILL.md + scripts + plantillas de directorio
-  - Validación de conectividad (local + VPS/remote)
-  - Publicar como ejemplo de extensibilidad del sistema de skills
-  - Base para futuros addons: Slack bridge, Discord bridge, etc.
+- [ ] **Intercom como Skill Package** — sistema genérico de addons
 
 ## v0.7.2 — Installer Interactivo
 
@@ -492,10 +511,10 @@ memory = ["sentence-transformers>=4.0", "faiss-cpu>=1.11"]
 - [ ] Definición en Python: `~/.bytia-kode/hooks/`
 - [ ] Capacidad de bloquear/modificar tool calls y responses
 
-**MCP Client nativo** (inspirado en oh-my-pi)
-- [ ] Conexión a MCP servers vía stdio/HTTP como client
-- [ ] Auto-descubrimiento de tools MCP y registro en tool registry
-- [ ] Configuración en `.bytia-kode/mcp.json`
+**MCP Client nativo** (inspirado en oh-my-pi) — **MOVIDO A v0.8.0a (EN PROGRESO)**
+- [x] ~~Conexión a MCP servers vía stdio/HTTP como client~~ → v0.8.0a (stdio done, SSE v2+)
+- [x] ~~Auto-descubrimiento de tools MCP y registro en tool registry~~ → v0.8.0a
+- [x] ~~Configuración en `.bytia-kode/mcp.json`~~ → v0.8.0a (usando `mcp_servers.json`)
 
 ### v0.13.0 — TUI avanzado
 

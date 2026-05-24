@@ -1,6 +1,6 @@
 # Arquitectura técnica
 
-Documento actualizado para la release 0.7.0.
+Documento actualizado para la release 0.8.0a1 (MCP Client).
 
 ## Entrada principal
 
@@ -247,11 +247,11 @@ Implementado via `Agent._cancel_event` (threading.Event) y `Agent._active_subpro
 
 - `tools/registry.py` — registro y ejecución de tools
 - `tools/session.py` — tools de sesión (session_list, session_load, session_search)
-- Tools actuales (12): `bash`, `file_read`, `file_write`, `file_edit`, `web_fetch`, `read_context`, `grep`, `glob`, `tree`, `session_list`, `session_load`, `session_search`
+- Tools actuales (12 nativas + N MCP): `bash`, `file_read`, `file_write`, `file_edit`, `web_fetch`, `read_context`, `grep`, `glob`, `tree`, `session_list`, `session_load`, `session_search` + tools dinámicas desde servidores MCP
 
 ### Seguridad de tools
 
-- **BashTool**: allowlist de 25 binarios (`ls`, `pwd`, `echo`, `git`, `grep`, `find`, `mkdir`, `rmdir`, `touch`, `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `uv`, `python`, `python3`, `pip`, `pip3`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
+- **BashTool**: allowlist de 31 binarios (`ls`, `pwd`, `echo`, `git`, `grep`, `find`, `mkdir`, `rmdir`, `touch`, `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `df`, `du`, `head`, `tail`, `curl`, `wget`, `scp`, `ssh`, `uv`, `python`, `python3`, `pip`, `pip3`, `rg`, `bat`, `eza`, `tokei`, `shellcheck`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
 - **FileReadTool / FileWriteTool**: `_resolve_workspace_path()` impide path traversal. I/O delegado a `asyncio.to_thread` para no bloquear el event loop.
 - **FileEditTool**: search/replace + create. Backup automático con timestamp. Diff unificado. `_no_match_help` con diagnósticos de partial match.
 - **WebFetchTool**: HTTP GET via httpx. Solo URLs http/https. Validación de content-type (text/*, json, xml). HTML se convierte a texto plano (tag stripping). Truncation a 30k chars. Timeout configurable (15s default).
@@ -268,6 +268,66 @@ class SessionListTool(Tool):
 ```
 
 El `Agent` registra estas tools automáticamente en `__init__` después de crear el store.
+
+## MCP Client (v0.8.0a1 — en progreso)
+
+- `mcp/config.py` — configuración de servidores MCP
+- `mcp/client.py` — transporte stdio con `AsyncExitStack`
+- `mcp/tool.py` — puente Adapter Pattern (MCP → Tool)
+- `mcp/manager.py` — lifecycle manager (pendiente)
+
+### Arquitectura: Adapter Pattern
+
+MCP tools se registran como instancias de `McpTool` (subclase de `Tool`) en el `ToolRegistry` existente. El agente nunca distingue entre tools nativas y MCP — mismo `execute()`, mismo `ToolResult`, mismas `ToolDef`.
+
+```
+~/.bytia-kode/mcp_servers.json  →  McpManager  →  McpClient (stdio)
+                                      ↓
+                                  McpTool (Tool subclass)
+                                      ↓
+                                  ToolRegistry.register()
+```
+
+### Configuración
+
+Archivo: `~/.bytia-kode/mcp_servers.json` (formato compatible con Claude Code):
+
+```json
+{
+  "mcpServers": {
+    "codegraph": {
+      "command": "python",
+      "args": ["-m", "codegraph", "serve"],
+      "env": {"CODEGRAPH_PATH": "/path/to/project"},
+      "timeout": 60
+    }
+  }
+}
+```
+
+Ausencia del archivo = sin MCP (safe default). `disabled: true` para deshabilitar sin eliminar.
+
+### Tool Naming
+
+Prefijo `mcp__{server}__{tool}` (ej: `mcp__codegraph__search`). Evita colisiones con tools nativas y sigue la convención de Claude Code.
+
+### Lifecycle: AsyncExitStack
+
+El SDK MCP usa async context managers (`stdio_client`, `ClientSession`). `McpClient` los gestiona via `AsyncExitStack` — se mantienen vivos durante toda la sesión y se cierran ordenadamente en `stop_all()`.
+
+### Seguridad
+
+- **Entorno heredado + overrides**: child processes heredan `os.environ` completo + config overrides (necesario para WSL2, venvs, CUDA)
+- **Sin shell**: `anyio.open_process([command, *args])` directo
+- **Timeouts**: 10s connect, 30s tool call (configurable)
+- **Output truncation**: 50,000 chars (mismo límite que BashTool)
+- **Graceful degradation**: server caído = tools unavailable, agente sigue funcionando
+
+### Soft Dependency
+
+`mcp` SDK es dependencia opcional (`[mcp]` en pyproject.toml). Si no está instalado, `__init__.py` exporta un stub `McpManager` con métodos vacíos. El agente funciona normalmente con solo tools nativas.
+
+---
 
 ### Herramientas de Exploración Nativas (v0.6.0)
 
@@ -386,6 +446,7 @@ Librerías y frameworks que usamos, no creamos. Versión mínima según `pyproje
 | Grupo | Paquetes | Uso |
 | --- | --- | --- |
 | `local` | llama-cpp-python>=0.3 | Inferencia local con GGUF |
+| `mcp` | mcp>=1.6.0 | MCP client — conexión a servidores de tools externos |
 | `memory` | sentence-transformers>=4.0, faiss-cpu>=1.11 | Búsqueda semántica en memoria |
 
 ### External CLI tools

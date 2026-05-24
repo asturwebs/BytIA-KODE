@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.8.0a1] - 2026-05-24 (EN PROGRESO)
+
+### Added — MCP Client Support
+
+Nueva capacidad: B-KODE puede conectarse a servidores MCP externos y registrar sus tools dinámicamente en el `ToolRegistry`. El agente nunca distingue entre tools nativas y MCP.
+
+- **`src/bytia_kode/mcp/config.py`**: `McpServerConfig` dataclass + `load_mcp_config()` desde `~/.bytia-kode/mcp_servers.json`. Formato compatible con Claude Code.
+- **`src/bytia_kode/mcp/__init__.py`**: Public API + soft-import guard. Si el SDK `mcp` no está instalado, exporta stub no-op.
+- **`src/bytia_kode/mcp/client.py`**: `McpClient` con transporte stdio + `AsyncExitStack` para lifecycle de context managers del SDK. Handshake (`initialize`), descubrimiento (`tools/list`), ejecución (`tools/call`) con timeouts.
+- **`src/bytia_kode/mcp/tool.py`**: `McpTool` (subclase de `Tool`) — puente Adapter Pattern. Naming: `mcp__{server}__{tool}`.
+
+### Architecture Decisions
+
+- **Adapter Pattern**: MCP tools extienden `Tool`, se registran en `ToolRegistry` existente. Zero cambios en dispatch.
+- **AsyncExitStack**: Los context managers del SDK MCP (`stdio_client`, `ClientSession`) se mantienen vivos durante toda la sesión.
+- **Entorno heredado + overrides**: Child processes heredan el entorno completo del padre (necesario para WSL2/venvs/CUDA), con overrides desde config.
+- **Soft dependency**: `mcp` SDK como `[mcp]` optional. Sin él, B-KODE funciona con solo tools nativas.
+
+### Pending (próxima sesión)
+
+- `mcp/manager.py` — lifecycle manager
+- `agent.py` + `tui.py` wiring — bootstrap integration
+- `pyproject.toml` — optional dependency
+- Tests — `test_mcp_config.py`, `test_mcp_tool.py`
+- `McpTool.execute()` — implementación del puente (TODO(human))
+
 ## [0.7.8] - 2026-04-30
 
 ### Fixed
