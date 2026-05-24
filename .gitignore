@@ -28,3 +28,6 @@ CONTEXT.md
 CLAUDE.md
 .claude/settings.local.json
 temp_audio/
+
+# Windows metadata
+*Zone.Identifier*
