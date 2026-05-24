@@ -31,3 +31,5 @@ temp_audio/
 
 # Windows metadata
 *Zone.Identifier*
+
+.codegraph/
