@@ -208,7 +208,7 @@ wheels = [
 
 [[package]]
 name = "bytia-kode"
-version = "0.7.8"
+version = "0.8.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "edge-tts" },
@@ -265,7 +265,7 @@ requires-dist = [
     { name = "textual", specifier = ">=8.2.1" },
     { name = "textual-dev", marker = "extra == 'dev'", specifier = ">=1.8.0" },
 ]
-provides-extras = ["dev", "local", "memory", "mcp"]
+provides-extras = ["dev", "local", "mcp", "memory"]
 
 [package.metadata.requires-dev]
 dev = [
