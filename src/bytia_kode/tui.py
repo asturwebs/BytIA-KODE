@@ -564,7 +564,7 @@ class BytIAKODEApp(App):
     async def _poll_router_info(self) -> None:
         """Poll router every 5s for model changes and real ctx metrics. Backoff on failures.
 
-        Only polls local providers (llama.cpp router). Cloud APIs (DeepSeek, MiniMax, Z.ai)
+        Only polls local providers (llama.cpp router). Cloud APIs (DeepSeek, Z.ai)
         are skipped — their /v1/models endpoint returns model lists, not router metrics.
         """
         if self.is_processing:
@@ -649,8 +649,6 @@ class BytIAKODEApp(App):
             return "Local"
         if "openrouter" in url:
             return "OpenRouter"
-        if "minimax" in url:
-            return "MiniMax"
         return url.split("//")[1].split("/")[0] if "//" in url else url
 
     def _add_system_message(self, text: str):
@@ -875,8 +873,6 @@ class BytIAKODEApp(App):
         table.add_row("Primary", self.config.provider.base_url, self.config.provider.model)
         if self.config.provider.fallback_url:
             table.add_row("Fallback", self.config.provider.fallback_url, self.config.provider.fallback_model)
-        if self.config.provider.minimax_url and self.config.provider.minimax_key:
-            table.add_row("MiniMax", self.config.provider.minimax_url, self.config.provider.minimax_model)
         if self.config.provider.deepseek_url and self.config.provider.deepseek_key:
             table.add_row("DeepSeek", self.config.provider.deepseek_url, self.config.provider.deepseek_model)
         if self.config.provider.local_url:
@@ -955,7 +951,7 @@ class BytIAKODEApp(App):
         self._skill_save_lines = []
 
     def _provider_display_name(self, provider: str) -> str:
-        names = {"primary": "Primary", "fallback": "Fallback", "minimax": "MiniMax", "deepseek": "DeepSeek", "local": "Local"}
+        names = {"primary": "Primary", "fallback": "Fallback", "deepseek": "DeepSeek", "local": "Local"}
         return names.get(provider, provider)
 
     def action_switch_provider(self) -> None:
