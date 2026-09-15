@@ -37,6 +37,7 @@ class ProviderManager:
         self._fallback: ProviderClient | None = None
         self._deepseek: ProviderClient | None = None
         self._local: ProviderClient | None = None
+        self._unsloth: ProviderClient | None = None
 
         if config.fallback_url and config.fallback_key:
             self._fallback = ProviderClient(config.fallback_url, config.fallback_key, config.fallback_model, extra_body=_extra_body("FALLBACK"))
@@ -52,20 +53,21 @@ class ProviderManager:
                 extra_body=_extra_body("LOCAL"),
             )
 
+        if config.unsloth_url and config.unsloth_key:
+            self._unsloth = ProviderClient(config.unsloth_url, config.unsloth_key, config.unsloth_model, extra_body=_extra_body("UNSLOTH"))
+
         self._circuits: dict[str, CircuitBreaker] = {"primary": CircuitBreaker()}
-        if self._fallback:
-            self._circuits["fallback"] = CircuitBreaker()
-        if self._deepseek:
-            self._circuits["deepseek"] = CircuitBreaker()
-        if self._local:
-            self._circuits["local"] = CircuitBreaker()
-        self._priority_order = ["primary"]
-        if self._fallback:
-            self._priority_order.append("fallback")
-        if self._deepseek:
-            self._priority_order.append("deepseek")
-        if self._local:
-            self._priority_order.append("local")
+        for name in ("fallback", "deepseek", "local", "unsloth"):
+            if getattr(self, f"_{name}"):
+                self._circuits[name] = CircuitBreaker()
+        # Failover local-first: router → Unsloth Studio → Ollama → nube (z.ai → deepseek).
+        # El sondeo de arranque (auto_detect_model) abre el circuito de los locales muertos,
+        # así get_healthy aterriza en el primer motor vivo sin quemar peticiones.
+        self._priority_order = [
+            name
+            for name in ("primary", "unsloth", "local", "fallback", "deepseek")
+            if name in self._circuits
+        ]
 
         self._pinned: str | None = None
 
@@ -77,26 +79,55 @@ class ProviderManager:
         self._pinned = provider
 
     async def auto_detect_model(self) -> bool:
-        """Detect 'auto' models: primary from router, local from Ollama/compatible.
+        """Probe local engines at startup, resolve 'auto' models, open circuits of dead slots.
 
-        Returns True if the primary model is usable (pinned or detected), False otherwise.
+        Los slots locales (primary/unsloth/local) se sondean SIEMPRE — no solo con
+        model=auto — para que el failover aterrice en un motor real. La nube no se
+        sondea (coste/latencia): sus circuitos reaccionan a la primera petición.
+        Devuelve True si el primario es utilizable.
         """
         detected = True
-        if self._primary.model == "auto":
+
+        # Primario: el router lista presets aunque esté dormido (sleep-idle) —
+        # list_models() es la prueba de vida; detect_loaded_model() resuelve el modelo.
+        models = await self._primary.list_models()
+        if not models:
+            logger.warning("Router primario sin respuesta — circuito abierto, failover a los locales")
+            self._circuits["primary"].force_open()
+            detected = False
+        elif self._primary.model == "auto":
             loaded = await self._primary.detect_loaded_model()
             if loaded:
                 self._primary.model = loaded
                 logger.info("Auto-detected loaded model: %s", loaded)
+            elif models:
+                # Router vivo pero dormido (sleep-idle): resolver al primer preset.
+                # La primera petición lo despierta ya con el nombre correcto;
+                # el poll de métricas corrige el nombre en cuanto cargue.
+                self._primary.model = models[0]
+                logger.info(
+                    "Router dormido (sleep-idle) — auto resuelto a preset %s (despierta en la 1ª petición)",
+                    models[0],
+                )
             else:
-                logger.warning("No model loaded on router")
                 detected = False
-        if self._local and self._local.model == "auto":
-            models = await self._local.list_models()
+
+        for name in ("unsloth", "local"):
+            client: ProviderClient | None = getattr(self, f"_{name}")
+            circuit = self._circuits.get(name)
+            if not client or not circuit:
+                continue
+            models = await client.list_models()
             if models:
-                self._local.model = models[0]
-                logger.info("Local model auto-detected: %s (%d disponibles)", models[0], len(models))
+                if client.model == "auto":
+                    client.model = models[0]
+                    logger.info(
+                        "%s model auto-detected: %s (%d disponibles)",
+                        name, client.model, len(models),
+                    )
             else:
-                logger.warning("No models available on local provider")
+                logger.warning("Slot '%s' sin respuesta — circuito abierto", name)
+                circuit.force_open()
         return detected
 
     @property
@@ -115,6 +146,10 @@ class ProviderManager:
     def local(self) -> ProviderClient | None:
         return self._local
 
+    @property
+    def unsloth(self) -> ProviderClient | None:
+        return self._unsloth
+
     def get(self, name: str = "primary") -> ProviderClient:
         """Get provider by name: primary, fallback, deepseek, local."""
         match name:
@@ -132,6 +167,10 @@ class ProviderManager:
                 if not self._local:
                     raise ValueError("No local provider configured")
                 return self._local
+            case "unsloth":
+                if not self._unsloth:
+                    raise ValueError("No unsloth provider configured")
+                return self._unsloth
             case _:
                 raise ValueError(f"Unknown provider: {name}")
 
@@ -143,6 +182,8 @@ class ProviderManager:
             await self._deepseek.close()
         if self._local:
             await self._local.close()
+        if self._unsloth:
+            await self._unsloth.close()
 
     def list_available(self) -> list[str]:
         """Return list of provider names with healthy circuits."""
