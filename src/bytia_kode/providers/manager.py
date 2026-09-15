@@ -77,19 +77,27 @@ class ProviderManager:
         self._pinned = provider
 
     async def auto_detect_model(self) -> bool:
-        """If primary model is 'auto', detect loaded model from router.
+        """Detect 'auto' models: primary from router, local from Ollama/compatible.
 
-        Returns True if a model was detected, False otherwise.
+        Returns True if the primary model is usable (pinned or detected), False otherwise.
         """
-        if self._primary.model != "auto":
-            return True
-        loaded = await self._primary.detect_loaded_model()
-        if loaded:
-            self._primary.model = loaded
-            logger.info("Auto-detected loaded model: %s", loaded)
-            return True
-        logger.warning("No model loaded on router")
-        return False
+        detected = True
+        if self._primary.model == "auto":
+            loaded = await self._primary.detect_loaded_model()
+            if loaded:
+                self._primary.model = loaded
+                logger.info("Auto-detected loaded model: %s", loaded)
+            else:
+                logger.warning("No model loaded on router")
+                detected = False
+        if self._local and self._local.model == "auto":
+            models = await self._local.list_models()
+            if models:
+                self._local.model = models[0]
+                logger.info("Local model auto-detected: %s (%d disponibles)", models[0], len(models))
+            else:
+                logger.warning("No models available on local provider")
+        return detected
 
     @property
     def primary(self) -> ProviderClient:
