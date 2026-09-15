@@ -39,6 +39,12 @@ Kill-switch: `BYTIA_KODE_HERDR=0`. Detalles y gotcha del parser CLI 0.8.2
 
 ## Decisiones vivas
 
+- **Failover local-first (2026-09-15 tarde, `27934dc`)**: 5 slots — `primary(router
+  :8080) → unsloth(Studio :8888) → local(ollama) → fallback(z.ai) → deepseek`.
+  Locales ANTES que nube (petición del Socio). El sondeo de arranque abre circuito
+  de los locales muertos (reviven solos a los 60 s, half-open); solo si NO hay
+  ningún local se tira del fallback. Router vivo-dormido (sleep-idle) NO se salta:
+  auto → primer preset, la 1ª petición lo despierta.
 - **Estados → herdr**: `ready→idle`, `thinking/tool/skill→working`. Aún no hay
   prompt de aprobación nativo → `blocked` soportado en el mapa pero sin emisor.
 - **CLI de herdr, no socket**: interfaz pública estable > protocolo interno.
@@ -48,6 +54,7 @@ Kill-switch: `BYTIA_KODE_HERDR=0`. Detalles y gotcha del parser CLI 0.8.2
 
 - MCP (v0.8.0a1): `mcp/manager.py` lifecycle, wiring bootstrap en agent+tui,
   `McpTool.execute()` (TODO(human)), optional dep `[mcp]` en pyproject
+- Dependabot: 36 vulns acumuladas en deps (`uv lock --upgrade` + suite)
 - Emisor de estado `blocked` cuando exista flujo de aprobación de tools
 - Sesión `--agent-session-id` en el puente herdr (hoy best-effort sin id)
 - Telegram: sin activar (decisión del Socio)
