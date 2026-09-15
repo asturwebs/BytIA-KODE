@@ -60,12 +60,13 @@ class ProviderManager:
         for name in ("fallback", "deepseek", "local", "unsloth"):
             if getattr(self, f"_{name}"):
                 self._circuits[name] = CircuitBreaker()
-        # Failover local-first: router → Unsloth Studio → Ollama → nube (z.ai → deepseek).
-        # El sondeo de arranque (auto_detect_model) abre el circuito de los locales muertos,
-        # así get_healthy aterriza en el primer motor vivo sin quemar peticiones.
+        # Cadena AUTO (decisión Socio 15-sep): solo motores siempre-disponibles —
+        # Unsloth Studio (bandeja, autostart) → Ollama (servicio) → nube (z.ai → deepseek).
+        # El router llama.cpp (:8080) es BAJO DEMANDA: fuera del walk de failover,
+        # solo se usa con pin manual (F3) — o como último recurso si TODO está caído.
         self._priority_order = [
             name
-            for name in ("primary", "unsloth", "local", "fallback", "deepseek")
+            for name in ("unsloth", "local", "fallback", "deepseek")
             if name in self._circuits
         ]
 
@@ -79,39 +80,24 @@ class ProviderManager:
         self._pinned = provider
 
     async def auto_detect_model(self) -> bool:
-        """Probe local engines at startup, resolve 'auto' models, open circuits of dead slots.
+        """Probe tray/service engines at startup, resolve 'auto' models, open circuits of dead slots.
 
-        Los slots locales (primary/unsloth/local) se sondean SIEMPRE — no solo con
-        model=auto — para que el failover aterrice en un motor real. La nube no se
-        sondea (coste/latencia): sus circuitos reaccionan a la primera petición.
-        Devuelve True si el primario es utilizable.
+        Cadena auto del Socio (15-sep): unsloth + local son los motores de arranque.
+        El router (:8080) NO se auto-despierta: se sondea SOLO su catálogo (GET
+        /v1/models no carga modelo) para tener el nombre listo si el Socio lo pinea
+        a mano — eso es la "demanda". La nube no se sondea: reacciona a la 1ª petición.
+        Devuelve True si hay algún local usable en la cadena auto (unsloth o local).
         """
-        detected = True
-
-        # Primario: el router lista presets aunque esté dormido (sleep-idle) —
-        # list_models() es la prueba de vida; detect_loaded_model() resuelve el modelo.
         models = await self._primary.list_models()
         if not models:
-            logger.warning("Router primario sin respuesta — circuito abierto, failover a los locales")
-            self._circuits["primary"].force_open()
-            detected = False
+            logger.info("Router :8080 sin respuesta — quedará fuera hasta demanda manual")
         elif self._primary.model == "auto":
             loaded = await self._primary.detect_loaded_model()
-            if loaded:
-                self._primary.model = loaded
-                logger.info("Auto-detected loaded model: %s", loaded)
-            elif models:
-                # Router vivo pero dormido (sleep-idle): resolver al primer preset.
-                # La primera petición lo despierta ya con el nombre correcto;
-                # el poll de métricas corrige el nombre en cuanto cargue.
-                self._primary.model = models[0]
-                logger.info(
-                    "Router dormido (sleep-idle) — auto resuelto a preset %s (despierta en la 1ª petición)",
-                    models[0],
-                )
-            else:
-                detected = False
+            if loaded or models:
+                self._primary.model = loaded or models[0]
+                logger.info("Router accesible (sin despertar) — modelo para demanda manual: %s", self._primary.model)
 
+        detected = False
         for name in ("unsloth", "local"):
             client: ProviderClient | None = getattr(self, f"_{name}")
             circuit = self._circuits.get(name)
@@ -119,6 +105,7 @@ class ProviderManager:
                 continue
             models = await client.list_models()
             if models:
+                detected = True
                 if client.model == "auto":
                     client.model = models[0]
                     logger.info(

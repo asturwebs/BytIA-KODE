@@ -20,18 +20,18 @@ def manager():
 
 
 class TestProviderManagerHealth:
-    def test_get_healthy_returns_preferred_when_closed(self, manager):
+    def test_get_healthy_walk_starts_at_first_auto_engine(self, manager):
         client, name = manager.get_healthy("primary")
-        assert name == "primary"
+        # El walk de la cadena auto empieza en unsloth — primary (router) es bajo demanda
+        assert name == "unsloth"
 
     def test_get_healthy_skips_open_circuit(self, manager):
-        manager._circuits["primary"].record_failure()
-        manager._circuits["primary"].record_failure()
-        manager._circuits["primary"].record_failure()
-        assert manager._circuits["primary"].state == "open"
+        for _ in range(3):
+            manager._circuits["unsloth"].record_failure()
+        assert manager._circuits["unsloth"].state == "open"
         client, name = manager.get_healthy("primary")
-        # Orden local-first: el siguiente vivo tras primary es unsloth
-        assert name == "unsloth"
+        # Studio caído → el siguiente vivo de la cadena auto es local (Ollama)
+        assert name == "local"
 
     def test_get_healthy_all_open_returns_preferred(self, manager):
         for cb in manager._circuits.values():
@@ -79,7 +79,7 @@ class TestUnslothSlot:
         # MagicMock: unsloth_url/unsloth_key son truthy por defecto → slot activo
         assert manager.unsloth is not None
         assert manager.get("unsloth") is manager.unsloth
-        assert manager._priority_order == ["primary", "unsloth", "local", "fallback", "deepseek"]
+        assert manager._priority_order == ["unsloth", "local", "fallback", "deepseek"]
         assert "unsloth" in manager.list_available()
 
     def test_unsloth_slot_absent_without_key(self):
@@ -96,9 +96,11 @@ class TestUnslothSlot:
         with pytest.raises(ValueError, match="No unsloth provider"):
             mgr.get("unsloth")
 
-    def test_local_first_failover_order(self, manager):
-        # Locales antes que nube: router → unsloth → ollama → z.ai → deepseek
-        assert manager._priority_order == ["primary", "unsloth", "local", "fallback", "deepseek"]
+    def test_auto_chain_excludes_router(self, manager):
+        # Cadena auto v3 (decisión Socio 15-sep): Studio → Ollama → nube.
+        # El router (:8080) es BAJO DEMANDA — fuera del walk, solo pin manual.
+        assert manager._priority_order == ["unsloth", "local", "fallback", "deepseek"]
+        assert "primary" not in manager._priority_order
 
 
 class TestStartupProbing:
@@ -116,9 +118,12 @@ class TestStartupProbing:
         mgr = ProviderManager(cfg)
         detected = await mgr.auto_detect_model()
         assert detected is False
-        # Todos los locales sonados caen; la nube no se sondea (círculos cerrados)
-        for name in ("primary", "unsloth", "local"):
+        # Los locales de la cadena auto caen; primary (router) queda cerrado pero
+        # FUERA del walk — no se despierta ni se usa sin pin manual. Nube sin sondear.
+        for name in ("unsloth", "local"):
             assert mgr._circuits[name].state == "open"
+        assert mgr._circuits["primary"].state == "closed"
+        assert "primary" not in mgr.list_available()
         assert mgr._circuits["fallback"].state == "closed"
 
     @pytest.mark.asyncio

@@ -554,9 +554,14 @@ class BytIAKODEApp(App):
                 self.agent.update_context_limit(MAX_CONTEXT_TOKENS)
 
     async def _auto_detect_model(self) -> None:
-        """Auto-detect loaded model from router on startup/provider switch."""
+        """Auto-detect models at startup/provider switch and land on the first auto engine."""
         try:
             detected = await self.agent.providers.auto_detect_model()
+            # El default del reactive es "primary" (router) — con la cadena auto v3
+            # (Studio→Ollama→nube) el slot inicial es el primero disponible.
+            available = self.agent.providers.list_available()
+            if available and self.active_provider not in available:
+                self.active_provider = available[0]
             if detected:
                 self.query_one(ActivityIndicator)._refresh()
         except Exception as exc:
