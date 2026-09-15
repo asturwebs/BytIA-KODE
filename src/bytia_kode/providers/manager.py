@@ -1,7 +1,9 @@
 """Provider management - switch between providers at runtime."""
 from __future__ import annotations
 
+import json
 import logging
+import os
 
 from bytia_kode.config import ProviderConfig
 from bytia_kode.providers.circuit import CircuitBreaker
@@ -10,31 +12,48 @@ from bytia_kode.providers.client import ProviderClient
 logger = logging.getLogger(__name__)
 
 
+def _extra_body(name: str) -> dict:
+    """Vendor-specific payload params per slot, JSON in {NAME}_EXTRA_BODY (e.g. FALLBACK_EXTRA_BODY).
+
+    Permite pasar parámetros tipo reasoning_effort / thinking sin acoplar el cliente a un vendor.
+    """
+    raw = os.environ.get(f"{name}_EXTRA_BODY", "")
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        logger.warning("%s_EXTRA_BODY no es JSON válido — ignorado", name)
+        return {}
+
+
 class ProviderManager:
     """Manages multiple provider clients with fallback + manual pinning."""
 
     def __init__(self, config: ProviderConfig):
         self.config = config
-        self._primary = ProviderClient(config.base_url, config.api_key, config.model)
+        self._primary = ProviderClient(config.base_url, config.api_key, config.model, extra_body=_extra_body("PROVIDER"))
         self._fallback: ProviderClient | None = None
         self._minimax: ProviderClient | None = None
         self._deepseek: ProviderClient | None = None
         self._local: ProviderClient | None = None
 
         if config.fallback_url and config.fallback_key:
-            self._fallback = ProviderClient(config.fallback_url, config.fallback_key, config.fallback_model)
+            self._fallback = ProviderClient(config.fallback_url, config.fallback_key, config.fallback_model, extra_body=_extra_body("FALLBACK"))
 
         if config.minimax_url and config.minimax_key:
-            self._minimax = ProviderClient(config.minimax_url, config.minimax_key, config.minimax_model)
+            self._minimax = ProviderClient(config.minimax_url, config.minimax_key, config.minimax_model, extra_body=_extra_body("MINIMAX"))
 
         if config.deepseek_url and config.deepseek_key:
-            self._deepseek = ProviderClient(config.deepseek_url, config.deepseek_key, config.deepseek_model)
+            self._deepseek = ProviderClient(config.deepseek_url, config.deepseek_key, config.deepseek_model, extra_body=_extra_body("DEEPSEEK"))
 
         if config.local_url:
             self._local = ProviderClient(
                 config.local_url,
                 "not-needed",
                 config.local_model,
+                extra_body=_extra_body("LOCAL"),
             )
 
         self._circuits: dict[str, CircuitBreaker] = {"primary": CircuitBreaker()}

@@ -46,11 +46,12 @@ class ProviderResponse(BaseModel):
 class ProviderClient:
     """Async OpenAI-compatible chat completions client."""
 
-    def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 120.0):
+    def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 120.0, extra_body: dict | None = None):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
+        self.extra_body = extra_body or {}
         self._client: httpx.AsyncClient | None = None
 
     @property
@@ -124,6 +125,8 @@ class ProviderClient:
         }
         if tools:
             payload["tools"] = [t.model_dump() for t in tools]
+        if self.extra_body:
+            payload.update(self.extra_body)
 
         logger.debug(f"-> {self.model} | {len(messages)} msgs | tools={len(tools) if tools else 0}")
 
@@ -186,6 +189,8 @@ class ProviderClient:
         }
         if tools:
             payload["tools"] = [t.model_dump() for t in tools]
+        if self.extra_body:
+            payload.update(self.extra_body)
 
         tool_calls_acc: dict[int, dict] = {}
 
