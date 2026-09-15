@@ -26,6 +26,32 @@ Nueva capacidad: B-KODE puede conectarse a servidores MCP externos y registrar s
 - Tests — `test_mcp_config.py`, `test_mcp_tool.py`
 - `McpTool.execute()` — implementación del puente (TODO(human))
 
+### Added — Puente herdr (integración con multiplexor)
+
+Cuando B-KODE corre dentro de un pane de herdr (env `HERDR_PANE_ID`), se
+reporta al panel de agentes del multiplexor con su nombre y ciclo de vida
+(working/idle/blocked), igual que los agentes nativos soportados (claude,
+codex, opencode…).
+
+- **`src/bytia_kode/herdr.py`**: `HerdrBridge` — thread daemon con cola
+  (fire-and-forget, nunca bloquea la TUI), de-dup de estados repetidos,
+  `--seq` monotónico y kill-switch `BYTIA_KODE_HERDR=0`. Fuera de herdr:
+  inactivo (cero overhead).
+- **`src/bytia_kode/tui.py`**: `ActivityIndicator.set_status` notifica el
+  bridge — choke point único: `ready→idle`, `thinking/tool/skill→working`.
+- **`tests/test_herdr.py`**: 17 tests (activación, mapeo, dedup, seq,
+  sintaxis CLI, robustez).
+
+### Architecture Decisions (herdr)
+
+- **CLI sobre socket**: el bridge invoca `herdr pane report-agent*` (interfaz
+  pública estable) en vez del protocolo interno del socket.
+- **Orden de args canónico**: `<PANE_ID>` antes que las opciones — el parser
+  del CLI 0.8.2 rechaza valores espaciados si las opciones van primero
+  (verificado empíricamente 2026-09-15 contra herdr real).
+- **Degradación silenciosa**: fallos del CLI (herdr cerrado, timeout) → log
+  debug; jamás afectan al funcionamiento del agente.
+
 ## [0.7.8] - 2026-04-30
 
 ### Fixed

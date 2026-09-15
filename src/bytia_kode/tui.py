@@ -30,6 +30,7 @@ from bytia_kode.config import load_config
 from bytia_kode.agent import Agent, MAX_CONTEXT_TOKENS
 from bytia_kode.providers.client import Message
 from bytia_kode.audio import play_speech, is_playing, stop
+from bytia_kode.herdr import HerdrBridge
 
 
 logger = logging.getLogger(__name__)
@@ -154,6 +155,7 @@ class ActivityIndicator(Static):
         self._detail = ""
         self._router_ctx_size = 0
         self._router_prompt_tokens = 0
+        self._herdr = HerdrBridge()
         super().__init__("", id="activity-indicator", **kwargs)
 
     def on_mount(self) -> None:
@@ -163,6 +165,7 @@ class ActivityIndicator(Static):
     def set_status(self, status: str, detail: str = ""):
         self._status = status
         self._detail = detail
+        self._herdr.notify_state(status, detail)
         self._refresh()
 
     def set_router_info(self, ctx_size: int, prompt_tokens: int):
