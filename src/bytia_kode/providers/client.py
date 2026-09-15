@@ -289,6 +289,24 @@ class ProviderClient:
         except httpx.ConnectError:
             logger.warning("Router not reachable for model detection")
             return None
+
+    async def list_models(self) -> list[str]:
+        """List model ids available on the provider (OpenAI-compatible /v1/models).
+
+        A diferencia de detect_loaded_model (específica del router llama.cpp), esto
+        funciona con cualquier servidor compatible: Ollama lista TODOS los instalados.
+        """
+        try:
+            base = self.base_url.removesuffix("/v1")
+            client = await self._get_client()
+            resp = await client.get(f"{base}/v1/models", timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                return [m["id"] for m in data.get("data", []) if m.get("id")]
+            return []
+        except (httpx.ConnectError, httpx.TimeoutException):
+            logger.warning("Provider not reachable for model listing")
+            return []
         except Exception as exc:
             logger.error("Error in detect_loaded_model: %s", exc)
             return None
