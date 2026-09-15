@@ -148,8 +148,8 @@ def test_fallo_del_cli_no_propaga(monkeypatch):
         raise RuntimeError("herdr caído")
 
     bridge._run = boom
-    bridge._process("working", "")  # no debe levantar
-    bridge._process("ready", "")
+    bridge._process("state", "working", "")  # no debe levantar
+    bridge._process("state", "ready", "")
 
 
 def test_timeout_y_flags_de_subprocess(monkeypatch):
@@ -162,3 +162,61 @@ def test_timeout_y_flags_de_subprocess(monkeypatch):
     HerdrBridge(timeout=1.5)._run(["herdr", "test"])
     assert capturado["timeout"] == 1.5
     assert capturado["check"] is False
+
+
+# ------------------------------------------------------------------ sesión
+
+def test_notify_session_reporta_el_id(monkeypatch):
+    bridge, rec = _make_bridge(monkeypatch)
+    bridge.notify_session("sess_abc")
+
+    assert rec.wait_for(1)
+    with rec.lock:
+        identify = rec.cmds[0]
+    assert "report-agent-session" in identify
+    assert identify[identify.index("--agent-session-id") + 1] == "sess_abc"
+
+
+def test_notify_session_dedup(monkeypatch):
+    bridge, rec = _make_bridge(monkeypatch)
+    bridge.notify_session("sess_abc")
+    bridge.notify_session("sess_abc")
+
+    assert rec.wait_for(1)
+    time.sleep(0.05)
+    with rec.lock:
+        assert len(rec.cmds) == 1
+
+
+def test_cambio_de_sesion_reancla(monkeypatch):
+    bridge, rec = _make_bridge(monkeypatch)
+    sid = {"v": None}
+    bridge._session_id_fn = lambda: sid["v"]
+
+    bridge.notify_state("ready")        # identify sin sesión + report idle
+    assert rec.wait_for(2)              # sincroniza: el worker ya procesó el primero
+    sid["v"] = "sess_1"
+    bridge.notify_state("thinking")     # re-ancla con sess_1 + report working
+
+    assert rec.wait_for(4)
+    time.sleep(0.05)
+    with rec.lock:
+        identifies = [c for c in rec.cmds if "report-agent-session" in c]
+        assert len(identifies) == 2
+        assert "--agent-session-id" not in identifies[0]
+        assert identifies[1][identifies[1].index("--agent-session-id") + 1] == "sess_1"
+
+
+def test_session_id_fn_que_falla_degrada(monkeypatch):
+    bridge, rec = _make_bridge(monkeypatch)
+
+    def roto():
+        raise RuntimeError("TUI no montada")
+
+    bridge._session_id_fn = roto
+    bridge.notify_state("thinking")
+
+    assert rec.wait_for(2)
+    with rec.lock:
+        identify = [c for c in rec.cmds if "report-agent-session" in c][0]
+    assert "--agent-session-id" not in identify  # degradó a None sin crash

@@ -12,6 +12,12 @@ opciones; el parser rechaza valores espaciados si las opciones van primero):
 
     herdr pane report-agent-session <PANE> --source L --agent L [--agent-session-id ID]
     herdr pane report-agent <PANE> --source L --agent L --state S --seq N [--message M]
+
+Sesión: si hay `session_id_fn`, el bridge re-ancla la identidad cuando el id de
+sesión activa cambia (con lag de un ciclo de estado; `notify_session` lo hace
+inmediato tras /load o /new). NOTA herdr 0.8.2: acepta el reporte de sesión de
+agentes self-reported (exit 0) pero aún no lo expone en agent get/list ni lo
+persiste visiblemente — se envía por forward-compatibility.
 """
 from __future__ import annotations
 
@@ -52,13 +58,21 @@ class HerdrBridge:
     versión sin soporte, timeout) se tragan con log debug.
     """
 
-    def __init__(self, pane_id: str | None = None, label: str = LABEL, timeout: float = 3.0):
+    def __init__(
+        self,
+        pane_id: str | None = None,
+        label: str = LABEL,
+        timeout: float = 3.0,
+        session_id_fn: "callable | None" = None,
+    ):
         self._pane_id = pane_id if pane_id is not None else os.environ.get("HERDR_PANE_ID", "")
         self._label = label
         self._timeout = timeout
+        self._session_id_fn = session_id_fn
         self._seq = count(1)
         self._queue: queue.SimpleQueue = queue.SimpleQueue()
         self._last_report: tuple[str, str] | None = None
+        self._last_session: str | None = None
         self._identified = False
         self.enabled = (
             bool(self._pane_id)
@@ -81,30 +95,59 @@ class HerdrBridge:
         if (state, message) == self._last_report:
             return
         self._last_report = (state, message)
-        self._queue.put((state, message))
+        self._queue.put(("state", state, message))
+
+    def notify_session(self, session_id: str | None) -> None:
+        """(Re)ancla la identidad de sesión en herdr (tras /load o /new).
+
+        Inmediato, sin esperar al próximo cambio de estado. De-duplica ids
+        repetidos y no hace nada sin sesión activa.
+        """
+        if not self.enabled or not session_id or session_id == self._last_session:
+            return
+        self._last_session = session_id
+        self._queue.put(("session", session_id, ""))
+
+    def _current_session(self) -> str | None:
+        """Lee el id de sesión activa vía el callback de la TUI (thread-safe)."""
+        if self._session_id_fn is None:
+            return None
+        try:
+            return self._session_id_fn() or None
+        except Exception:
+            return None
 
     # ------------------------------------------------------------------
     # Thread worker
 
     def _drain(self) -> None:
         while True:
-            state, message = self._queue.get()
-            self._process(state, message)
+            kind, a, b = self._queue.get()
+            self._process(kind, a, b)
 
-    def _process(self, state: str, message: str) -> None:
+    def _process(self, kind: str, a: str, b: str) -> None:
         try:
-            if not self._identified:
-                self._identify()
+            if kind == "session":
+                self._identify(a)
+                return
+            state, message = a, b
+            sid = self._current_session()
+            if not self._identified or sid != self._last_session:
+                self._identify(sid)
                 self._identified = True
+                self._last_session = sid
             self._report(state, message)
         except Exception:
             log.debug("herdr: reporte de estado falló", exc_info=True)
 
-    def _identify(self) -> None:
-        self._run([
+    def _identify(self, session_id: str | None = None) -> None:
+        cmd = [
             "herdr", "pane", "report-agent-session", self._pane_id,
             "--source", self._label, "--agent", self._label,
-        ])
+        ]
+        if session_id:
+            cmd += ["--agent-session-id", session_id]
+        self._run(cmd)
 
     def _report(self, state: str, message: str) -> None:
         cmd = [

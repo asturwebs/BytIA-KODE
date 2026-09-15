@@ -39,8 +39,13 @@ codex, opencode…).
   inactivo (cero overhead).
 - **`src/bytia_kode/tui.py`**: `ActivityIndicator.set_status` notifica el
   bridge — choke point único: `ready→idle`, `thinking/tool/skill→working`.
-- **`tests/test_herdr.py`**: 17 tests (activación, mapeo, dedup, seq,
-  sintaxis CLI, robustez).
+  Además pasa un `session_id_fn` (lee `agent._current_session_id`) y notifica
+  cambios de sesión en `/load` y `/new`.
+- **Sesión activa**: el bridge ancla el id de sesión (`--agent-session-id`)
+  al identificarse y lo re-ancla cuando cambia (inmediato en /load //new,
+  lag de un ciclo de estado en el resto).
+- **`tests/test_herdr.py`**: 21 tests (activación, mapeo, dedup, seq,
+  sintaxis CLI, robustez, sesión).
 
 ### Architecture Decisions (herdr)
 
@@ -51,6 +56,10 @@ codex, opencode…).
   (verificado empíricamente 2026-09-15 contra herdr real).
 - **Degradación silenciosa**: fallos del CLI (herdr cerrado, timeout) → log
   debug; jamás afectan al funcionamiento del agente.
+- **Sesión forward-compatible**: herdr 0.8.2 acepta `report-agent-session` de
+  agentes self-reported (exit 0) pero aún no expone ni persiste visiblemente
+  la sesión (verificado: agent get/list, api snapshot, estado en disco). Se
+  envía igualmente — el día que herdr lo consuma, B-KODE ya lo reporta.
 
 ## [0.7.8] - 2026-04-30
 
