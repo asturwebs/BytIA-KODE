@@ -68,6 +68,13 @@ class ProviderConfig:
         default_factory=lambda: int(_env("DEEPSEEK_MAX_CONTEXT", "1000000"))
     )
 
+    # Unsloth Studio (local AppImage, :8888)
+    unsloth_url: str = field(
+        default_factory=lambda: _env("UNSLOTH_BASE_URL", "http://localhost:8888/v1")
+    )
+    unsloth_key: str = field(default_factory=lambda: _env("UNSLOTH_API_KEY"))
+    unsloth_model: str = field(default_factory=lambda: _env("UNSLOTH_MODEL", "auto"))
+
 
 @dataclass
 class TelegramConfig:

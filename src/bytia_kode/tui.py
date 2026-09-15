@@ -645,6 +645,8 @@ class BytIAKODEApp(App):
             return "Ollama"
         if ":8080" in url:
             return "Llama"
+        if ":8888" in url:
+            return "Unsloth Studio"
         if "localhost" in url or "127.0.0.1" in url:
             return "Local"
         if "openrouter" in url:
@@ -877,6 +879,8 @@ class BytIAKODEApp(App):
             table.add_row("DeepSeek", self.config.provider.deepseek_url, self.config.provider.deepseek_model)
         if self.config.provider.local_url:
             table.add_row("Local", self.config.provider.local_url, self.config.provider.local_model or "-")
+        if self.config.provider.unsloth_url and self.config.provider.unsloth_key:
+            table.add_row("Unsloth", self.config.provider.unsloth_url, self.config.provider.unsloth_model or "-")
         chat = self.query_one("#chat-area", VerticalScroll)
         chat.mount(Static(table))
         chat.scroll_end(animate=False)
@@ -951,7 +955,7 @@ class BytIAKODEApp(App):
         self._skill_save_lines = []
 
     def _provider_display_name(self, provider: str) -> str:
-        names = {"primary": "Primary", "fallback": "Fallback", "deepseek": "DeepSeek", "local": "Local"}
+        names = {"primary": "Primary", "fallback": "Fallback", "deepseek": "DeepSeek", "local": "Local", "unsloth": "Unsloth"}
         return names.get(provider, provider)
 
     def action_switch_provider(self) -> None:
