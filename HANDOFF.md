@@ -55,8 +55,13 @@ Kill-switch: `BYTIA_KODE_HERDR=0`. Detalles y gotcha del parser CLI 0.8.2
 ## Pendiente (próxima sesión)
 
 - MCP (v0.8.0a1): `mcp/manager.py` lifecycle, wiring bootstrap en agent+tui,
-  `McpTool.execute()` (TODO(human)), optional dep `[mcp]` en pyproject
-- Dependabot: 36 vulns acumuladas en deps (`uv lock --upgrade` + suite)
+  `McpTool.execute()` (TODO(human)), optional dep `[mcp]` en pyproject.
+  ⚠️ **Latente**: `mcp/__init__.py` ya importa `manager.py` → con el extra
+  `[mcp]` instalado, cualquier `import bytia_kode.mcp` explota (sin extra, el
+  soft-guard lo esconde). La TUI no depende del paquete mcp.
+- Dependabot: ✅ **36 vulns cerradas (2026-09-15, `uv lock` quirúrgico de 12
+  paquetes; `mcp` pineado `>=1.28.1,<2` para evitar major 2.x sin tests)** —
+  verificar que GitHub cierra las alerts tras el re-escaneo
 - Emisor de estado `blocked` cuando exista flujo de aprobación de tools
 - Upstream herdr: que exponga/persista sesiones self-reported (hoy las traga)
 

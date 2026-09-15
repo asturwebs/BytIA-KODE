@@ -43,7 +43,7 @@ dev = [
     "textual-dev>=1.8.0",
 ]
 local = ["llama-cpp-python>=0.3"]
-mcp = ["mcp>=1.27.1"]
+mcp = ["mcp>=1.28.1,<2"]
 memory = ["sentence-transformers>=4.0", "faiss-cpu>=1.11"]
 
 [project.scripts]
