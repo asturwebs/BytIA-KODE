@@ -35,15 +35,11 @@ class ProviderManager:
         self.config = config
         self._primary = ProviderClient(config.base_url, config.api_key, config.model, extra_body=_extra_body("PROVIDER"))
         self._fallback: ProviderClient | None = None
-        self._minimax: ProviderClient | None = None
         self._deepseek: ProviderClient | None = None
         self._local: ProviderClient | None = None
 
         if config.fallback_url and config.fallback_key:
             self._fallback = ProviderClient(config.fallback_url, config.fallback_key, config.fallback_model, extra_body=_extra_body("FALLBACK"))
-
-        if config.minimax_url and config.minimax_key:
-            self._minimax = ProviderClient(config.minimax_url, config.minimax_key, config.minimax_model, extra_body=_extra_body("MINIMAX"))
 
         if config.deepseek_url and config.deepseek_key:
             self._deepseek = ProviderClient(config.deepseek_url, config.deepseek_key, config.deepseek_model, extra_body=_extra_body("DEEPSEEK"))
@@ -59,8 +55,6 @@ class ProviderManager:
         self._circuits: dict[str, CircuitBreaker] = {"primary": CircuitBreaker()}
         if self._fallback:
             self._circuits["fallback"] = CircuitBreaker()
-        if self._minimax:
-            self._circuits["minimax"] = CircuitBreaker()
         if self._deepseek:
             self._circuits["deepseek"] = CircuitBreaker()
         if self._local:
@@ -68,8 +62,6 @@ class ProviderManager:
         self._priority_order = ["primary"]
         if self._fallback:
             self._priority_order.append("fallback")
-        if self._minimax:
-            self._priority_order.append("minimax")
         if self._deepseek:
             self._priority_order.append("deepseek")
         if self._local:
@@ -108,10 +100,6 @@ class ProviderManager:
         return self._fallback
 
     @property
-    def minimax(self) -> ProviderClient | None:
-        return self._minimax
-
-    @property
     def deepseek(self) -> ProviderClient | None:
         return self._deepseek
 
@@ -120,7 +108,7 @@ class ProviderManager:
         return self._local
 
     def get(self, name: str = "primary") -> ProviderClient:
-        """Get provider by name: primary, fallback, minimax, deepseek, local."""
+        """Get provider by name: primary, fallback, deepseek, local."""
         match name:
             case "primary":
                 return self._primary
@@ -128,10 +116,6 @@ class ProviderManager:
                 if not self._fallback:
                     raise ValueError("No fallback provider configured")
                 return self._fallback
-            case "minimax":
-                if not self._minimax:
-                    raise ValueError("No minimax provider configured")
-                return self._minimax
             case "deepseek":
                 if not self._deepseek:
                     raise ValueError("No deepseek provider configured")
@@ -147,8 +131,6 @@ class ProviderManager:
         await self._primary.close()
         if self._fallback:
             await self._fallback.close()
-        if self._minimax:
-            await self._minimax.close()
         if self._deepseek:
             await self._deepseek.close()
         if self._local:
