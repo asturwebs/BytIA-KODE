@@ -59,7 +59,16 @@ Kill-switch: `BYTIA_KODE_HERDR=0`. Detalles y gotcha del parser CLI 0.8.2
 - Dependabot: 36 vulns acumuladas en deps (`uv lock --upgrade` + suite)
 - Emisor de estado `blocked` cuando exista flujo de aprobación de tools
 - Upstream herdr: que exponga/persista sesiones self-reported (hoy las traga)
-- Telegram: sin activar (decisión del Socio)
+
+## Telegram bot (2026-09-15, servicio activado por el Socio)
+
+- **Servicio**: `bytia-kode-telegram.service` (systemd USER, enabled — arranca al
+  boot vía Linger). Activo y polleando (`api.telegram.org` ESTABLISHED, 0 restarts).
+- **Invocación correcta**: `.venv/bin/python -m bytia_kode --bot` — el binario del
+  venv (`bytia-kode`) apunta a `tui:run_tui` e IGNORA argv (por eso `--help` lanza
+  la TUI). Un solo poller: lanzar `--bot` a mano en otra máquina/proceso da 409.
+- Token + allowed_users en `~/.bytia-kode/.env` (600). PATH del unit incluye shims
+  mise + `~/.local/bin` (tools del agente).
 
 ## Gotchas
 
