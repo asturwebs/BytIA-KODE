@@ -155,7 +155,9 @@ class ActivityIndicator(Static):
         self._detail = ""
         self._router_ctx_size = 0
         self._router_prompt_tokens = 0
-        self._herdr = HerdrBridge()
+        self._herdr = HerdrBridge(
+            session_id_fn=lambda: getattr(getattr(self.app, "agent", None), "_current_session_id", None)
+        )
         super().__init__("", id="activity-indicator", **kwargs)
 
     def on_mount(self) -> None:
@@ -923,6 +925,7 @@ class BytIAKODEApp(App):
             return
         if self.agent.load_session_by_id(session_id):
             self._add_system_message(f"Session loaded: {session_id}")
+            self.query_one(ActivityIndicator)._herdr.notify_session(session_id)
             self.query_one(ActivityIndicator)._refresh()
         else:
             self._add_system_message(f"Session not found: {session_id}")
@@ -930,6 +933,7 @@ class BytIAKODEApp(App):
     def _new_session(self):
         self.agent.reset()
         self.agent.set_session(source="tui")
+        self.query_one(ActivityIndicator)._herdr.notify_session(self.agent._current_session_id)
         self._add_system_message("New session started. Auto-save enabled.")
 
     def _show_skills(self):

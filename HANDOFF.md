@@ -11,7 +11,7 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 ## Estado
 
 - **Versión**: `0.8.0a1` (EN PROGRESO — ver CHANGELOG.md para el detalle por feature)
-- **Tests**: 167/167 ✅ (`uv run pytest -q`)
+- **Tests**: 171/171 ✅ (`uv run pytest -q`)
 - **CI**: `.github/workflows/ci.yml` — solo validación (metadata + tests + wheel + twine). Push a main NO deploya.
 - **Lanzador**: `~/.local/bin/bytia-kode` (wrapper bash → `.venv/bin/bytia-kode`)
 - **Cerebro**: `~/.bytia-kode/` (config, sesiones SQLite, temas, `mcp_servers.json`)
@@ -34,6 +34,8 @@ src/bytia_kode/
 
 Si corre en un pane de herdr (`HERDR_PANE_ID`), el TUI se auto-reporta al panel
 de agentes del multiplexor (label `bytia-kode`, estados working/idle/blocked).
+También ancla el id de sesión activa (`--agent-session-id`, re-ancla en /load
+y /new) — herdr 0.8.2 lo acepta pero aún no lo expone (forward-compatible).
 Kill-switch: `BYTIA_KODE_HERDR=0`. Detalles y gotcha del parser CLI 0.8.2
 (positional antes que opciones): docstring de `src/bytia_kode/herdr.py`.
 
@@ -56,7 +58,7 @@ Kill-switch: `BYTIA_KODE_HERDR=0`. Detalles y gotcha del parser CLI 0.8.2
   `McpTool.execute()` (TODO(human)), optional dep `[mcp]` en pyproject
 - Dependabot: 36 vulns acumuladas en deps (`uv lock --upgrade` + suite)
 - Emisor de estado `blocked` cuando exista flujo de aprobación de tools
-- Sesión `--agent-session-id` en el puente herdr (hoy best-effort sin id)
+- Upstream herdr: que exponga/persista sesiones self-reported (hoy las traga)
 - Telegram: sin activar (decisión del Socio)
 
 ## Gotchas
