@@ -14,7 +14,7 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 - **Tests**: 173/173 ✅ (`uv run pytest -q`)
 - **Hotfix 2026-09-16** (`a010780`): failover vivo — pin solo en F3 (guard `_provider_sync`), router pineable de nuevo (`list_pinnable()`; F3→primary pina el router). 2 bugs HIGH hallados por OpenCodeReview revisando `ae97b37`. Detalle: `docs/devlog/2026-09-16.md`
 - **Limitación conocida**: tras un failover el `preferred` queda en el motor usado — el Studio recuperado no se reintenta hasta F3 o reinicio (mejora candidata de `get_healthy`, pendiente de decisión)
-- **Pendiente de decisión (UX)**: no hay vía de volver a modo AUTO desde F3 (primary ahora pina el router). Candidato: slot "Auto" en F3 con `pin(None)`. Detectado en re-review ocr
+- **Selección directa de providers (2026-09-16)**: **F1 = modo AUTO** (pin(None), reversible desde cualquier pin) · F4 Studio · F5 Ollama · F6 Z.ai · F7 DeepSeek · F8 Router (pin manual, aviso de circuito) · F3 cicla. Resuelve el "slot Auto" pendiente del re-review ocr.
 - **CI**: `.github/workflows/ci.yml` — solo validación (metadata + tests + wheel + twine). Push a main NO deploya.
 - **Lanzador**: `~/.local/bin/bytia-kode` (wrapper bash → `.venv/bin/bytia-kode`)
 - **Cerebro**: `~/.bytia-kode/` (config, sesiones SQLite, temas, `mcp_servers.json`)

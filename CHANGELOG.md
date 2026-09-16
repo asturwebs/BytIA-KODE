@@ -18,6 +18,12 @@ Nueva capacidad: B-KODE puede conectarse a servidores MCP externos y registrar s
 - **Entorno heredado + overrides**: Child processes heredan el entorno completo del padre (necesario para WSL2/venvs/CUDA), con overrides desde config.
 - **Soft dependency**: `mcp` SDK como `[mcp]` optional. Sin él, B-KODE funciona con solo tools nativas.
 
+### Added — selección directa de providers (2026-09-16)
+
+- **F1 = modo AUTO** (`pin(None)`): failover Studio→Ollama→nube; reversible desde cualquier pin.
+- **F4 Studio · F5 Ollama · F6 Z.ai · F7 DeepSeek · F8 Router**: pin manual directo con aviso de circuito abierto. F3 sigue ciclando.
+- Fix: el fire inmediato de `watch()` en el mount pineaba `primary` al arranque (regresión del hotfix anterior) — el watcher ignora `old == new`.
+
 ### Fixed — failover vivo (2026-09-16)
 
 Dos bugs HIGH detectados por OpenCodeReview (`ocr` · deepseek-flash) revisando la cadena auto v3 (`ae97b37`):
