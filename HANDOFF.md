@@ -12,7 +12,7 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 
 - **Versión**: `0.8.0a1` (EN PROGRESO — ver CHANGELOG.md para el detalle por feature)
 - **Tests**: 173/173 ✅ (`uv run pytest -q`)
-- **Hotfix 2026-09-16** (`a010780`): failover vivo — pin solo en F3 (guard `_provider_sync`), router pineable de nuevo (`list_pinnable()`; F3→primary pina el router). 2 bugs HIGH hallados por OpenCodeReview revisando `ae97b37`. Detalle: `docs/devlog/2026-09-16.md`
+- **Hotfix 2026-09-16** (`3a1b9ee`): failover vivo — pin solo en F3 (guard `_provider_sync`), router pineable de nuevo (`list_pinnable()`; F3→primary pina el router). 2 bugs HIGH hallados por OpenCodeReview revisando `ae97b37`. Detalle: `docs/devlog/2026-09-16.md`
 - **Limitación conocida**: tras un failover el `preferred` queda en el motor usado — el Studio recuperado no se reintenta hasta F3 o reinicio (mejora candidata de `get_healthy`, pendiente de decisión)
 - **Selección directa de providers (2026-09-16)**: **F1 = modo AUTO** (pin(None), reversible desde cualquier pin) · F4 Studio · F5 Ollama · F6 Z.ai · F7 DeepSeek · F8 Router (pin manual, aviso de circuito) · F3 cicla. Resuelve el "slot Auto" pendiente del re-review ocr.
 - **CI**: `.github/workflows/ci.yml` — solo validación (metadata + tests + wheel + twine). Push a main NO deploya.
