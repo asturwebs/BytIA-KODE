@@ -435,6 +435,12 @@ class BytIAKODEApp(App):
         Binding("ctrl+shift+c", "copy_last_response", "Copy response", show=False),
         Binding("f2", "change_theme", "Theme", show=False, priority=True),
         Binding("f3", "switch_provider", "Provider", show=False, priority=True),
+        Binding("f1", "select_provider('auto')", "Auto", show=False, priority=True),
+        Binding("f4", "select_provider('unsloth')", "Studio", show=False, priority=True),
+        Binding("f5", "select_provider('local')", "Ollama", show=False, priority=True),
+        Binding("f6", "select_provider('fallback')", "Z.ai", show=False, priority=True),
+        Binding("f7", "select_provider('deepseek')", "DeepSeek", show=False, priority=True),
+        Binding("f8", "select_provider('primary')", "Router", show=False, priority=True),
         Binding("up", "history_up", "History prev", show=False),
         Binding("down", "history_down", "History next", show=False),
         Binding("escape", "interrupt_agent", "Interrupt", show=True, priority=True),
@@ -544,8 +550,12 @@ class BytIAKODEApp(App):
 
     def _on_provider_changed(self, old_provider: str, new_provider: str) -> None:
         self.query_one(ActivityIndicator)._refresh()
+        if old_provider == new_provider:
+            # Fire inmediato de watch() al registrarlo en el mount (old==new):
+            # no es acción del usuario — pinear aquí dejaba el router fijado al arranque.
+            return
         if self._provider_sync:
-            return  # sync display-only (failover del walk): el pin solo cambia en F3
+            return  # sync display-only (failover del walk / auto-detect): el pin solo cambia en F1/F3/F4-F8
         # Pin manual (F3). 'primary' = demanda explícita del router (bajo demanda):
         # se pinea como cualquier otro slot — get_healthy lo sirve por pin y, si el
         # router está caído, el error es honesto (sin failover: el usuario mandó).
@@ -579,6 +589,7 @@ class BytIAKODEApp(App):
                     self._provider_sync = False
                 self._add_system_message(
                     f"Cadena auto operativa — motor inicial: {self._provider_display_name(available[0])}"
+                    " (F1=Auto · F4 Studio · F5 Ollama · F6 Z.ai · F7 DeepSeek · F8 Router · F3 cicla)"
                 )
         except Exception as exc:
             logger.debug("Auto-detect model failed: %s", exc)
@@ -985,6 +996,45 @@ class BytIAKODEApp(App):
     def _provider_display_name(self, provider: str) -> str:
         names = {"primary": "Primary", "fallback": "Fallback", "deepseek": "DeepSeek", "local": "Local", "unsloth": "Unsloth"}
         return names.get(provider, provider)
+
+    def action_select_provider(self, name: str) -> None:
+        """Selección directa de provider (F1 auto · F4-F8 slots).
+
+        'auto' = sin pin: el walk de failover decide en cada chat (F1 restaura
+        el modo auto desde cualquier pin). El resto = pin manual explícito.
+        """
+        providers = self.agent.providers
+        if name == "auto":
+            providers.pin(None)
+            self.agent.update_context_limit(MAX_CONTEXT_TOKENS)
+            available = providers.list_available()
+            if available and self.active_provider != available[0]:
+                # Sync display-only: el reactive sigue al motor efectivo SIN pin
+                self._provider_sync = True
+                try:
+                    self.active_provider = available[0]
+                finally:
+                    self._provider_sync = False
+            self.run_worker(self._auto_detect_model, exclusive=True)
+            self._add_system_message("Modo AUTO — failover Studio → Ollama → nube (router bajo demanda)")
+            return
+        # Slot real: pin manual explícito. Se pina SIEMPRE (aunque el reactive ya
+        # valga ese slot — p. ej. volver a pinear tras estar en modo auto).
+        providers.pin(name)
+        limit = providers.get_context_limit(name)
+        self.agent.update_context_limit(limit if limit > 0 else MAX_CONTEXT_TOKENS)
+        if self.active_provider != name:
+            self._provider_sync = True
+            try:
+                self.active_provider = name
+            finally:
+                self._provider_sync = False
+        state = providers.get_status().get(name, {}).get("state", "closed")
+        aviso = " ⚠ circuito abierto" if state == "open" else ""
+        client = providers.get(name)
+        self._add_system_message(
+            f"Provider: {self._provider_display_name(name)} ({client.model}) — pin manual{aviso}"
+        )
 
     def action_switch_provider(self) -> None:
         available = self.agent.providers.list_pinnable()
