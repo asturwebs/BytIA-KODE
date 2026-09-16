@@ -31,9 +31,9 @@ Dos bugs HIGH detectados por OpenCodeReview (`ocr` · deepseek-flash) revisando 
 - **Pin implícito mataba el failover**: reasignar `active_provider` (reactivo) en `_auto_detect_model` y en el handler `provider_used` disparaba `_on_provider_changed` → `pin()` implícito → `agent.chat` cortaba por `pinned`. El walk Studio→Ollama→nube quedaba desactivado de facto (en el arranque y en cada failover). Fix: guard `_provider_sync` — el reactive se sincroniza display-only; el pin solo cambia con acción manual (F3).
 - **Router no pineable**: `primary` fuera de `_priority_order` → `list_available()` nunca lo devolvía → F3 no ofrecía el router. Fix: `ProviderManager.list_pinnable()` (cadena auto + primary); seleccionar `primary` en F3 ahora **pina el router** (demanda manual real: `get_healthy` lo sirve por pin, error honesto si está caído).
 
-Re-review con `ocr` del propio fix: 0 HIGH; hardening aplicado (sync con `try/finally`, `active_provider` sigue al motor efectivo, rename `list_pinnable`). Pendiente de decisión: vía para volver a modo AUTO desde F3 (el primary ahora pina el router).
+Re-review con `ocr` del propio fix: 0 HIGH; hardening aplicado (sync con `try/finally`, `active_provider` sigue al motor efectivo, rename `list_pinnable`). La vía de vuelta a modo AUTO llegó con F1 (selección directa, mismo día).
 
-Tests: 173 passed (2 nuevos).
+Tests: 173 passed (2 nuevos). Auditoría posterior (mismo día): la "limitación conocida" del failover era fantasma — el auto-sanado vía half-open está verificado con `test_self_heal_returns_to_chain_head_after_recovery` (174 passed).
 
 ### Pending (próxima sesión)
 

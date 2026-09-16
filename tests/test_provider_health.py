@@ -40,6 +40,21 @@ class TestProviderManagerHealth:
         client, name = manager.get_healthy("primary")
         assert name == "primary"
 
+    def test_self_heal_returns_to_chain_head_after_recovery(self, manager):
+        # Contrato de auto-sanado (auditoría 16-sep): el Studio caído se recupera SOLO —
+        # sin pin, cada chat camina desde la cabeza (get_healthy) y el half-open del
+        # breaker (60 s) reintenta el slot. No hace falta F3 ni reinicio.
+        for _ in range(3):
+            manager.report_failure("unsloth")
+        assert manager._circuits["unsloth"].state == "open"
+        assert manager.get_healthy("primary")[1] == "local"
+
+        # Expira el recovery_timeout → half_open → el walk vuelve a la cabeza
+        manager._circuits["unsloth"]._last_failure_time -= 61
+        assert manager.get_healthy("primary")[1] == "unsloth"
+        manager.report_success("unsloth")
+        assert manager._circuits["unsloth"].state == "closed"
+
     def test_list_pinnable_includes_router(self, manager):
         # F3 debe ofrecer la cadena auto + el router (bajo demanda, pin manual)
         assert manager.list_pinnable() == ["unsloth", "local", "fallback", "deepseek", "primary"]
