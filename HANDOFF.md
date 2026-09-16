@@ -1,7 +1,7 @@
 # HANDOFF — BytIA-KODE (B-KODE)
 
 > Memoria transferible del repo. Leer ANTES de asumir contexto. Actualizar al cerrar sesión significativa.
-> Última actualización: 2026-09-15 (sesión puente herdr)
+> Última actualización: 2026-09-16 (hotfix failover — bugs hallados por OpenCodeReview)
 
 ## Qué es
 
@@ -11,7 +11,10 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 ## Estado
 
 - **Versión**: `0.8.0a1` (EN PROGRESO — ver CHANGELOG.md para el detalle por feature)
-- **Tests**: 171/171 ✅ (`uv run pytest -q`)
+- **Tests**: 173/173 ✅ (`uv run pytest -q`)
+- **Hotfix 2026-09-16** (`a010780`): failover vivo — pin solo en F3 (guard `_provider_sync`), router pineable de nuevo (`list_pinnable()`; F3→primary pina el router). 2 bugs HIGH hallados por OpenCodeReview revisando `ae97b37`. Detalle: `docs/devlog/2026-09-16.md`
+- **Limitación conocida**: tras un failover el `preferred` queda en el motor usado — el Studio recuperado no se reintenta hasta F3 o reinicio (mejora candidata de `get_healthy`, pendiente de decisión)
+- **Pendiente de decisión (UX)**: no hay vía de volver a modo AUTO desde F3 (primary ahora pina el router). Candidato: slot "Auto" en F3 con `pin(None)`. Detectado en re-review ocr
 - **CI**: `.github/workflows/ci.yml` — solo validación (metadata + tests + wheel + twine). Push a main NO deploya.
 - **Lanzador**: `~/.local/bin/bytia-kode` (wrapper bash → `.venv/bin/bytia-kode`)
 - **Cerebro**: `~/.bytia-kode/` (config, sesiones SQLite, temas, `mcp_servers.json`)

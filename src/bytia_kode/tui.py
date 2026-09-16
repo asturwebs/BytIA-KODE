@@ -445,6 +445,9 @@ class BytIAKODEApp(App):
     msg_count: reactive[int] = reactive(0)
     safe_mode: reactive[bool] = reactive(True)
     active_provider: reactive[str] = reactive("primary")
+    # Guard: sincroniza el reactive con el motor real (failover) SIN disparar pin —
+    # el pin solo cambia con acción manual del usuario (F3). Ver _on_provider_changed.
+    _provider_sync: bool = False
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -541,29 +544,42 @@ class BytIAKODEApp(App):
 
     def _on_provider_changed(self, old_provider: str, new_provider: str) -> None:
         self.query_one(ActivityIndicator)._refresh()
-        if new_provider == "primary":
-            self.agent.providers.pin(None)
-            self.agent.update_context_limit(MAX_CONTEXT_TOKENS)
-            self.run_worker(self._auto_detect_model, exclusive=True)
+        if self._provider_sync:
+            return  # sync display-only (failover del walk): el pin solo cambia en F3
+        # Pin manual (F3). 'primary' = demanda explícita del router (bajo demanda):
+        # se pinea como cualquier otro slot — get_healthy lo sirve por pin y, si el
+        # router está caído, el error es honesto (sin failover: el usuario mandó).
+        self.agent.providers.pin(new_provider)
+        limit = self.agent.providers.get_context_limit(new_provider)
+        if limit > 0:
+            self.agent.update_context_limit(limit)
         else:
-            self.agent.providers.pin(new_provider)
-            limit = self.agent.providers.get_context_limit(new_provider)
-            if limit > 0:
-                self.agent.update_context_limit(limit)
-            else:
-                self.agent.update_context_limit(MAX_CONTEXT_TOKENS)
+            self.agent.update_context_limit(MAX_CONTEXT_TOKENS)
 
     async def _auto_detect_model(self) -> None:
-        """Auto-detect models at startup/provider switch and land on the first auto engine."""
+        """Auto-detect models at startup and inform the effective engine.
+
+        NO reasigna active_provider: el reactive dispara _on_provider_changed,
+        que pinea — y un pin en el arranque mata el failover de la cadena auto
+        (agent.chat corta por pinned). El motor efectivo lo decide el walk de
+        failover en cada chat; aquí solo se informa del primero disponible.
+        """
         try:
             detected = await self.agent.providers.auto_detect_model()
-            # El default del reactive es "primary" (router) — con la cadena auto v3
-            # (Studio→Ollama→nube) el slot inicial es el primero disponible.
-            available = self.agent.providers.list_available()
-            if available and self.active_provider not in available:
-                self.active_provider = available[0]
             if detected:
                 self.query_one(ActivityIndicator)._refresh()
+            available = self.agent.providers.list_available()
+            if available and self.active_provider not in available:
+                # Sync display-only: el reactive sigue al motor efectivo SIN pin
+                # (la status bar lee active_provider; el pin solo cambia en F3)
+                self._provider_sync = True
+                try:
+                    self.active_provider = available[0]
+                finally:
+                    self._provider_sync = False
+                self._add_system_message(
+                    f"Cadena auto operativa — motor inicial: {self._provider_display_name(available[0])}"
+                )
         except Exception as exc:
             logger.debug("Auto-detect model failed: %s", exc)
 
@@ -971,7 +987,7 @@ class BytIAKODEApp(App):
         return names.get(provider, provider)
 
     def action_switch_provider(self) -> None:
-        available = self.agent.providers.list_available()
+        available = self.agent.providers.list_pinnable()
         try:
             idx = available.index(self.active_provider)
             next_idx = (idx + 1) % len(available)
@@ -1037,9 +1053,13 @@ class BytIAKODEApp(App):
                     chat.scroll_end(animate=False)
                 elif isinstance(chunk, tuple) and chunk[0] == "provider_used":
                     if chunk[1] != self.active_provider:
-                        old = self.active_provider
-                        self.active_provider = chunk[1]
-                        self._add_system_message(f"Switched to: {self._provider_display_name(chunk[1])}")
+                        # Failover del walk: sincroniza display SIN pin (el pin solo cambia en F3)
+                        self._provider_sync = True
+                        try:
+                            self.active_provider = chunk[1]
+                        finally:
+                            self._provider_sync = False
+                        self._add_system_message(f"Failover → {self._provider_display_name(chunk[1])}")
                 elif isinstance(chunk, tuple) and chunk[0] == "system":
                     self._add_message("system", chunk[1])
                 elif isinstance(chunk, tuple) and chunk[0] == "error":

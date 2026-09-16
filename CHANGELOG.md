@@ -18,6 +18,17 @@ Nueva capacidad: B-KODE puede conectarse a servidores MCP externos y registrar s
 - **Entorno heredado + overrides**: Child processes heredan el entorno completo del padre (necesario para WSL2/venvs/CUDA), con overrides desde config.
 - **Soft dependency**: `mcp` SDK como `[mcp]` optional. Sin él, B-KODE funciona con solo tools nativas.
 
+### Fixed — failover vivo (2026-09-16)
+
+Dos bugs HIGH detectados por OpenCodeReview (`ocr` · deepseek-flash) revisando la cadena auto v3 (`ae97b37`):
+
+- **Pin implícito mataba el failover**: reasignar `active_provider` (reactivo) en `_auto_detect_model` y en el handler `provider_used` disparaba `_on_provider_changed` → `pin()` implícito → `agent.chat` cortaba por `pinned`. El walk Studio→Ollama→nube quedaba desactivado de facto (en el arranque y en cada failover). Fix: guard `_provider_sync` — el reactive se sincroniza display-only; el pin solo cambia con acción manual (F3).
+- **Router no pineable**: `primary` fuera de `_priority_order` → `list_available()` nunca lo devolvía → F3 no ofrecía el router. Fix: `ProviderManager.list_pinnable()` (cadena auto + primary); seleccionar `primary` en F3 ahora **pina el router** (demanda manual real: `get_healthy` lo sirve por pin, error honesto si está caído).
+
+Re-review con `ocr` del propio fix: 0 HIGH; hardening aplicado (sync con `try/finally`, `active_provider` sigue al motor efectivo, rename `list_pinnable`). Pendiente de decisión: vía para volver a modo AUTO desde F3 (el primary ahora pina el router).
+
+Tests: 173 passed (2 nuevos).
+
 ### Pending (próxima sesión)
 
 - `mcp/manager.py` — lifecycle manager
