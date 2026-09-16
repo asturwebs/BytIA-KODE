@@ -24,6 +24,7 @@ Registro diario de sesiones de desarrollo. Cada día tiene su propio archivo en 
 | 2026-04-28 | S35: Provider Resilience Hotfixes (v0.7.4) | [`2026-04-28.md`](docs/devlog/2026-04-28.md) |
 | 2026-04-29 | S36: Skills v2.0 + FIX-3/4 (v0.7.5/6), S37: Session Audit Fixes (v0.7.7) | [`2026-04-29.md`](docs/devlog/2026-04-29.md) |
 | 2026-04-30 | S38: Session Metadata Persistence + v0.7.7 Closure | [`2026-04-30.md`](docs/devlog/2026-04-30.md) |
+| 2026-09-16 | Hotfix providers: failover vivo (2 HIGH de OpenCodeReview + re-review) | [`2026-09-16.md`](docs/devlog/2026-09-16.md) |
 
 ## Formato
 

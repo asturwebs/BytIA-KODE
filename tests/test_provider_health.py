@@ -40,6 +40,19 @@ class TestProviderManagerHealth:
         client, name = manager.get_healthy("primary")
         assert name == "primary"
 
+    def test_list_pinnable_includes_router(self, manager):
+        # F3 debe ofrecer la cadena auto + el router (bajo demanda, pin manual)
+        assert manager.list_pinnable() == ["unsloth", "local", "fallback", "deepseek", "primary"]
+        # El walk de failover sigue SIN primary — el router no se despierta solo
+        assert manager.list_available() == ["unsloth", "local", "fallback", "deepseek"]
+
+    def test_pinned_router_is_served_directly(self, manager):
+        # Pin manual del router (F3 → primary): get_healthy lo sirve aunque no esté en el walk
+        manager.pin("primary")
+        client, name = manager.get_healthy("primary")
+        assert name == "primary"
+        assert client is manager.get("primary")
+
     def test_report_success_resets_circuit(self, manager):
         manager._circuits["primary"].record_failure()
         manager._circuits["primary"].record_failure()

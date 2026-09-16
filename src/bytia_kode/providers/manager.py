@@ -176,6 +176,17 @@ class ProviderManager:
         """Return list of provider names with healthy circuits."""
         return [name for name in self._priority_order if self._circuits[name].is_available]
 
+    def list_pinnable(self) -> list[str]:
+        """Motores ofrecidos al pin manual (F3): cadena auto + router bajo demanda.
+
+        list_available() alimenta el walk de failover y NO incluye 'primary'
+        (el router no se despierta solo); el switch manual sí debe ofrecerlo.
+        """
+        nombres = list(self._priority_order)
+        if "primary" in self._circuits:
+            nombres.append("primary")
+        return [name for name in nombres if self._circuits[name].is_available]
+
     def set_model(self, provider: str, model: str):
         """Update model for a provider at runtime."""
         client = self.get(provider)
