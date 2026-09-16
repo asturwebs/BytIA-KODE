@@ -11,9 +11,9 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 ## Estado
 
 - **Versión**: `0.8.0a1` (EN PROGRESO — ver CHANGELOG.md para el detalle por feature)
-- **Tests**: 173/173 ✅ (`uv run pytest -q`)
+- **Tests**: 174/174 ✅ (`uv run pytest -q`)
 - **Hotfix 2026-09-16** (`3a1b9ee`): failover vivo — pin solo en F3 (guard `_provider_sync`), router pineable de nuevo (`list_pinnable()`; F3→primary pina el router). 2 bugs HIGH hallados por OpenCodeReview revisando `ae97b37`. Detalle: `docs/devlog/2026-09-16.md`
-- **Limitación conocida**: tras un failover el `preferred` queda en el motor usado — el Studio recuperado no se reintenta hasta F3 o reinicio (mejora candidata de `get_healthy`, pendiente de decisión)
+- **Auto-sanado verificado (16-sep, auditoría)**: sin pin, cada chat camina desde la cabeza (`get_healthy`) y el half-open del breaker reintenta el Studio a los 60 s — se recupera solo, sin F3 ni reinicio (`test_self_heal_returns_to_chain_head_after_recovery`). Residual real: el reintento half-open puede costar un arranque en frío del Studio; el failover en-chat continúa y el mensaje no se pierde.
 - **Selección directa de providers (2026-09-16)**: **F1 = modo AUTO** (pin(None), reversible desde cualquier pin) · F4 Studio · F5 Ollama · F6 Z.ai · F7 DeepSeek · F8 Router (pin manual, aviso de circuito) · F3 cicla. Resuelve el "slot Auto" pendiente del re-review ocr.
 - **CI**: `.github/workflows/ci.yml` — solo validación (metadata + tests + wheel + twine). Push a main NO deploya.
 - **Lanzador**: `~/.local/bin/bytia-kode` (wrapper bash → `.venv/bin/bytia-kode`)
