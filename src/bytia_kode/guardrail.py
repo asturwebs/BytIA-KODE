@@ -4,7 +4,7 @@ Classifies every tool call before execution and can block risky ones.
 
 Modes (env JEVAL_MODE, default "off"):
   off     - no classification, near-zero overhead (one cached env read)
-  shadow  - classify + log every tool call, NEVER block (evaluation mode)
+  shadow  - classify + log in background (fire-and-forget, zero added latency), NEVER block
   enforce - block tool calls classified as risky with noul >= JEVAL_THRESHOLD
 
 Fail-open: any Jev error/timeout -> allow the tool call. Jev never breaks the loop.
@@ -103,14 +103,9 @@ class JevalGate:
 
     # --- public API ------------------------------------------------------
 
-    async def check(self, tool_name: str, arguments: dict) -> dict:
-        """Return {'blocked': bool, 'reason': str, 'mode': self.mode}."""
-        if not self.enabled:
-            return {"blocked": False, "reason": "off", "mode": self.mode}
-
-        state = f"Tool: {tool_name}\nArguments: {json.dumps(arguments, ensure_ascii=False)[:1500]}"
+    async def _classify(self, tool_name: str, state: str, rec_id: str) -> dict:
+        """Run the Jev query, log it, return the verdict. Never raises."""
         t0 = time.perf_counter()
-        rec_id = f"{int(time.time()*1000):x}"[-12:]
         try:
             j = await asyncio.to_thread(self._ask_sync, state)
             ms = round((time.perf_counter() - t0) * 1000)
@@ -119,7 +114,7 @@ class JevalGate:
                        "mode": self.mode, "tool": tool_name, "state_head": state[:160],
                        "error": f"{type(e).__name__}: {e}", "ms": None})
             logger.debug("JEVAL unavailable (%s) -> fail-open", e)
-            return {"blocked": False, "reason": f"fail-open: {e}", "mode": self.mode}
+            return {"blocked": False, "reason": f"fail-open: {e}", "noul": None}
 
         a = (j.get("answers") or {}).get("is_risky") or {}
         noul = float(a.get("noul", 0.0))
@@ -133,7 +128,29 @@ class JevalGate:
                     self.mode, tool_name, noul, risky, blocked, ms)
         reason = (f"risky tool call (noul={noul:.2f} >= {self.threshold}): {tool_name}"
                   if blocked else "allowed")
-        return {"blocked": blocked, "reason": reason, "mode": self.mode, "noul": noul}
+        return {"blocked": blocked, "reason": reason, "noul": noul}
+
+    async def check(self, tool_name: str, arguments: dict) -> dict:
+        """Return {'blocked': bool, 'reason': str, 'mode': self.mode}.
+
+        shadow: fire-and-forget (zero added latency; the verdict lands in the
+        JSONL log when the background query finishes).
+        enforce: awaits the verdict and may block.
+        """
+        if not self.enabled:
+            return {"blocked": False, "reason": "off", "mode": self.mode}
+
+        state = f"Tool: {tool_name}\nArguments: {json.dumps(arguments, ensure_ascii=False)[:1500]}"
+        rec_id = f"{int(time.time()*1000):x}"[-12:]
+
+        if self.mode == "shadow":
+            task = asyncio.create_task(self._classify(tool_name, state, rec_id))
+            return {"blocked": False, "reason": "shadow (background)", "mode": self.mode,
+                    "task": task}
+
+        verdict = await self._classify(tool_name, state, rec_id)
+        return {"blocked": verdict["blocked"], "reason": verdict["reason"],
+                "mode": self.mode, "noul": verdict.get("noul")}
 
 
 _gate: JevalGate | None = None

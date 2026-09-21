@@ -1,4 +1,5 @@
 """Tests for the JEVAL guardrail (Jev pre-execution classifier)."""
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -45,11 +46,15 @@ class TestJevalModes:
         assert res["blocked"] is False and res["mode"] == "off"
 
     @pytest.mark.asyncio
-    async def test_shadow_never_blocks(self, monkeypatch):
+    async def test_shadow_never_blocks_and_is_fire_and_forget(self, monkeypatch):
         g = _gate("shadow", monkeypatch)
-        with patch.object(g, "_ask_sync", return_value=_jev_answer(0.95)):
+        with patch.object(g, "_ask_sync", return_value=_jev_answer(0.95)) as m:
             res = await g.check("bash", {"command": "rm -rf /tmp/x"})
-        assert res["blocked"] is False and res["noul"] == 0.95
+            assert res["blocked"] is False
+            assert "noul" not in res  # verdicto llega en background
+            assert res["task"] is not None
+            await res["task"]          # drena la tarea para el log
+            m.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_enforce_blocks_risky(self, monkeypatch):
@@ -100,6 +105,7 @@ class TestAgentIntegration:
         agent.tools.execute = AsyncMock(return_value=ToolResult(output="hi"))
         with patch.object(g, "_ask_sync", return_value=_jev_answer(0.99)):
             await agent._handle_tool_calls([_tool_call()])
+            await asyncio.sleep(0.05)  # drena la tarea background del shadow
         assert agent.tools.execute.await_count == 1
         assert not any(
             m.role == "tool" and str(m.content).startswith("[blocked]")
