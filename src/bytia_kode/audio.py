@@ -58,48 +58,57 @@ def is_playing() -> bool:
     return _active_player is not None and _active_player.returncode is None
 
 
-async def play_speech(text: str) -> None:
-    """Habla el texto con bytia-tts (piper local). Fire-and-forget: lanza el
-    proceso de síntesis+reproducción y devuelve el control a la TUI; stop()
-    puede cortarlo en cualquier momento."""
+async def _launch(clean_text: str) -> asyncio.subprocess.Process:
+    return await asyncio.create_subprocess_exec(
+        "bytia-tts", "--", clean_text,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+        env=_child_env(),
+    )
+
+
+async def play_speech(text: str) -> asyncio.Task | None:
+    """Habla el texto con bytia-tts (piper local). No bloquea: lanza el proceso
+    y devuelve inmediatamente una tarea que COMPLETA CUANDO TERMINA EL HABLA
+    (o None si no había nada que reproducir). stop() puede cortar en cualquier
+    momento; en ese caso la tarea también completa."""
     global _active_player, _reap_task
 
     clean_text = TextCleaner.clean(text)
     if not clean_text:
         logger.warning("play_speech: texto vacío después de limpiar")
-        return
+        return None
 
     try:
-        _active_player = await asyncio.create_subprocess_exec(
-            "bytia-tts", "--", clean_text,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.PIPE,
-            env=_child_env(),
-        )
-        logger.info("bytia-tts lanzado (pid=%s, %d chars)", _active_player.pid, len(clean_text))
-
-        async def _reap(proc: asyncio.subprocess.Process) -> None:
-            _, stderr = await proc.communicate()
-            if proc.returncode != 0:
-                logger.error("bytia-tts failed (rc=%s): %s",
-                             proc.returncode, (stderr or b"").decode()[:200])
-
-        _reap_task = asyncio.create_task(_reap(_active_player))
+        proc = await _launch(clean_text)
     except Exception as e:
         logger.error(f"play_speech error: {e}")
+        return None
+
+    _active_player = proc
+    logger.info("bytia-tts lanzado (pid=%s, %d chars)", proc.pid, len(clean_text))
+
+    async def _reap(proc: asyncio.subprocess.Process) -> None:
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            logger.error("bytia-tts failed (rc=%s): %s",
+                         proc.returncode, (stderr or b"").decode()[:200])
+
+    _reap_task = asyncio.create_task(_reap(proc))
+    return _reap_task
 
 
 if __name__ == "__main__":
     import sys
 
     async def _main() -> None:
-        await play_speech(sys.argv[1] if len(sys.argv) > 1 else "Hola Pedro, esto es una prueba")
-        proc = _active_player
-        if proc is not None:
+        task = await play_speech(sys.argv[1] if len(sys.argv) > 1 else "Hola Pedro, esto es una prueba")
+        if task is not None:
             try:
-                await asyncio.wait_for(proc.wait(), timeout=120)
+                await asyncio.wait_for(task, timeout=120)
             except asyncio.TimeoutError:
                 stop()
+        proc = _active_player
         print(f"bytia-tts rc={proc.returncode if proc else None}")
 
     asyncio.run(_main())
