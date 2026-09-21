@@ -481,9 +481,10 @@ class BytIAKODEApp(App):
         self.agent._active_subprocess = process
 
     async def _play_and_update(self, btn_id: str, button: Button) -> None:
-        await play_speech(self._audio_content[btn_id])
-        if not is_playing():
-            button.label = "🔊 Escuchar"
+        task = await play_speech(self._audio_content.get(btn_id, ""))
+        if task is not None:
+            await task  # espera al fin REAL del habla, no solo al lanzamiento
+        button.label = "🔊 Escuchar"
 
     def _get_theme_colors(self) -> dict[str, str]:
         t = self.current_theme
