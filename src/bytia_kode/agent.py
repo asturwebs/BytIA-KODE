@@ -16,6 +16,7 @@ import httpx
 import yaml
 
 from bytia_kode.config import AppConfig
+from bytia_kode.guardrail import jeval_check
 from bytia_kode.providers.client import Message
 from bytia_kode.providers.manager import ProviderManager
 from bytia_kode.session import SessionStore
@@ -649,6 +650,18 @@ class Agent:
                     Message(
                         role="tool",
                         content=f"[blocked] Previously rejected: {prev}",
+                        tool_call_id=tool_call.id,
+                        name=tool_name,
+                    )
+                )
+                continue
+
+            jeval = await jeval_check(tool_name, arguments)
+            if jeval["blocked"]:
+                self.messages.append(
+                    Message(
+                        role="tool",
+                        content=f"[blocked] JEVAL: {jeval['reason']}",
                         tool_call_id=tool_call.id,
                         name=tool_name,
                     )
