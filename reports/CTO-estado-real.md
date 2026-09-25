@@ -103,7 +103,7 @@ Criterio: primero restaurar la señal (sin ella no se valida nada), luego cerrar
 | # | Acción | Dónde | Esfuerzo | Dueño |
 |---|---|---|---|---|
 | 0.1 | Hermetizar gate JEVAL: `monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")` en `_gate()` | `tests/test_jeval_guardrail.py:19-21` | 1 línea | Engineer |
-| 0.2 | Parar la basura: `monkeypatch.chdir(tmp_path)` (o `cfg.data_dir = tmp_path/"data"`) + `MagicMock/` en `.gitignore` como red | `tests/test_jeval_guardrail.py:93-98` | 1-2 líneas | QA |
+| 0.2 | Parar la basura SQLite: `cfg.data_dir = tmp_path` en el fixture (la 2ª pasada de QA §8 demuestra que `chdir` solo *reubica* la basura — son SQLite reales de 36 KB) + `TypeError` si `db_path` no es `str\|Path` en `session.py:107-109` | `tests/test_jeval_guardrail.py:93-98` | 2-5 líneas | QA |
 | 0.3 | Verificar estado real de Actions y dejar CI verde; smoke de extras en CI: instalar `dist/*.whl[mcp]` + `import bytia_kode.mcp` | `.github/workflows/ci.yml` | ~1 h | DevOps |
 | 0.4 | Parche documental D1-D22 con fuente única de verdad | ver AST-9 §3 | ~2 h | Researcher |
 | 0.5 | Honestidad de producto: bajar MCP de "Added" a "WIP" en `CHANGELOG.md:5-12` y/o try/except del import con stub | `mcp/__init__.py:15-16`, `CHANGELOG.md` | <1 h | DevOps |
@@ -150,5 +150,6 @@ Después: H5 (compactación por pares, con tests) y M3 (tool error memory con ex
 
 - AST-5, AST-6, AST-7, AST-8, AST-9: **todas `done`** con informe completo en comentario final de su issue + fichero commiteado en `reports/` + work product.
 - Este informe cierra el contrato del plan (§5): síntesis del estado real + recomendación de ataque. AST-4 → `done`.
-- Higiene del workspace: se elimina el directorio basura `MagicMock/` (evidencia de C2, reproducible a demanda con el comando de `reports/QA-qa.md` §7.3). Queda sin trackear `reports/QA-tests.md` (borrador previo de QA; la versión final commiteada es `QA-qa.md`).
+- Higiene del workspace: se elimina el directorio basura `MagicMock/` (evidencia de C2; son SQLite reales de 36 KB — reproducible a demanda con el comando de `reports/QA-qa.md` §7.3).
+- Pasadas de verificación posteriores al cierre (2ª de QA §8 en `QA-qa.md`, anexo DevOps `DEVOPS-devops-annex-de57bd59.md`): re-confirmaron C1-C3 sin contradicciones; la de QA refina el fix de la basura (0.2).
 - **Nada de lo aquí recomendado se ha ejecutado sobre el código** (el encargo era solo lectura); cada oleada necesita su propia issue de implementación tras la decisión del Socio.
