@@ -88,6 +88,31 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return merged
 
 
+def _redact_value(value: Any) -> str:
+    """Render one argument value for logs without exposing it (T8).
+
+    Never emits the raw value: only its length and a short sha256, e.g.
+    ``<850 chars sha256:abcd1234>``. The hash still lets you correlate
+    repeated identical values across log lines.
+    """
+    if isinstance(value, str):
+        payload = value
+    else:
+        try:
+            payload = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+        except (TypeError, ValueError):
+            payload = str(value)
+    digest = hashlib.sha256(payload.encode("utf-8", "replace")).hexdigest()[:8]
+    return f"<{len(payload)} chars sha256:{digest}>"
+
+
+def _redact_args(arguments: Any) -> str:
+    """Redact a tool-call argument mapping for logging: keys + hashed values."""
+    if not isinstance(arguments, dict):
+        return _redact_value(arguments)
+    return ", ".join(f"{key}={_redact_value(value)}" for key, value in arguments.items())
+
+
 def load_identity() -> tuple[dict[str, Any], dict[str, Any]]:
     kernel_path = USER_PROMPTS_DIR / KERNEL_RESOURCE
     runtime_path = USER_PROMPTS_DIR / RUNTIME_RESOURCE
@@ -617,7 +642,7 @@ class Agent:
                     logger.error(
                         "Failed to decode JSON arguments for %s: %s",
                         tool_name,
-                        raw_arguments[:200],
+                        _redact_value(raw_arguments),
                     )
                     self.messages.append(
                         Message(
@@ -669,7 +694,7 @@ class Agent:
                 continue
 
             self._has_had_tool_calls = True
-            logger.info("Tool call: %s(%s)", tool_name, arguments)
+            logger.info("Tool call: %s(%s)", tool_name, _redact_args(arguments))
             for cb in self.on_tool_call:
                 cb(tool_name)
             result: ToolResult = await self.tools.execute(

@@ -19,6 +19,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]" build twine pytest
+      - name: Secret scan (full tree)
+        # T8: escanea TODOS los ficheros trackeados, no solo los staged
+        # (el modo staged sigue siendo el que corre el hook .githooks/pre-commit).
+        run: python scripts/check_secrets.py --all
       - name: Validate metadata
         run: python scripts/validate_metadata.py
       - name: Run tests
