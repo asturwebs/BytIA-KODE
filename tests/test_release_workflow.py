@@ -3,6 +3,9 @@
 El workflow es el PROD GATE en forma GitHub: tags `v*` → gates + build →
 publish en el environment `pypi` (required reviewer = aprobación del Socio)
 con `id-token: write` y cero secretos en el repo.
+
+AST-23: tras publicar, `github-release` crea la GitHub Release del tag con
+las notas extraídas de CHANGELOG.md — fuente única de verdad.
 """
 from pathlib import Path
 
@@ -66,3 +69,52 @@ def test_build_runs_gates_before_packaging():
     order = [joined.find(m) for m in ("Secret scan", "Validate metadata", "Run tests", "Build distributions")]
     assert all(i >= 0 for i in order), f"gates ausentes en build: {joined}"
     assert order == sorted(order), "los gates deben correr antes de construir el paquete"
+
+
+# --- AST-23: GitHub Release automática, notas del CHANGELOG ------------------
+
+def test_github_release_runs_only_after_publish():
+    wf, _ = _workflow()
+    release = wf["jobs"]["github-release"]
+    assert release["needs"] == ["build", "publish"], (
+        "la Release sólo se crea si PyPI publicó — nada de anunciar lo no publicado"
+    )
+
+
+def test_github_release_write_is_scoped_to_that_job():
+    # El permiso de escritura vive en el job, no en el workflow: publish y
+    # build siguen con el mínimo (read / id-token).
+    wf, _ = _workflow()
+    assert wf["permissions"] == {"contents": "read"}
+    assert wf["jobs"]["github-release"]["permissions"] == {"contents": "write"}
+    publish_perms = wf["jobs"]["publish"]["permissions"]
+    assert "contents" not in publish_perms
+
+
+def test_release_notes_come_from_changelog_not_github():
+    wf, _ = _workflow()
+    release = wf["jobs"]["github-release"]
+    extraction = [s for s in release["steps"] if "CHANGELOG.md" in str(s.get("run", ""))]
+    assert extraction, "las notas se extraen del CHANGELOG (fuente única de verdad)"
+    for step in release["steps"]:
+        with_block = step.get("with") or {}
+        assert not with_block.get("generate_release_notes"), (
+            "el PR-list de GitHub es una segunda verdad: prohibido como fuente"
+        )
+    uses = [s.get("uses", "") for s in release["steps"]]
+    assert any(u.startswith("softprops/action-gh-release") for u in uses), uses
+    assert any("body_path" in (s.get("with") or {}) for s in release["steps"]), (
+        "el body de la Release nace del archivo extraído del CHANGELOG"
+    )
+
+
+def test_notes_extraction_fails_without_changelog_entry():
+    # El extractor es fail-closed: tag sin entrada en CHANGELOG → job rojo,
+    # nunca una Release vacía.
+    wf, _ = _workflow()
+    release = wf["jobs"]["github-release"]
+    extractor = next(
+        s for s in release["steps"] if "CHANGELOG.md" in str(s.get("run", ""))
+    )
+    run = extractor["run"]
+    assert "sys.exit" in run and "GITHUB_REF_NAME" in run
