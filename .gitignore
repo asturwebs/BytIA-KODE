@@ -33,3 +33,7 @@ temp_audio/
 *Zone.Identifier*
 
 .codegraph/
+
+# Hermetic-suite safety net: MagicMock.__fspath__ materializes this if a mock
+# ever reaches SessionStore/Path again (see reports/QA-qa.md §3/§8)
+MagicMock/

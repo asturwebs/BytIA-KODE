@@ -13,6 +13,7 @@ def agent(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     cfg = MagicMock()
     cfg.provider = MagicMock()
+    cfg.data_dir = tmp_path / "data"
     cfg.skills_dir = Path(tmp_path / "skills")
     with patch("bytia_kode.agent.load_system_prompt", return_value="You are BytIA."):
         a = Agent(cfg)
