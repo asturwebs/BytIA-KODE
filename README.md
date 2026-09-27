@@ -7,8 +7,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.8.0a1-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-314%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.8.0-blue.svg)
+![Tests](https://img.shields.io/badge/tests-331%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -39,7 +39,7 @@
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram comparte la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes)).
 
-> Release actual: `0.8.0a1` · Identidad: `YAML` · Instalación: [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+> Release actual: `0.8.0` · Identidad: `YAML` · Instalación: [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
 
 > ⚠️ **Nota sobre las secciones "Novedades en vX.Y.Z" que siguen:** son **histórico de release**. No describen la versión actual — para eso está `pyproject.toml:3` y la línea "Release actual" de arriba.
 
@@ -49,7 +49,7 @@
 - **Race condition fix en kill()** — `_active_subprocess` capturado en variable local antes del check. Elimina ventana de race si callback sobrescribe durante terminate.
 - **Test: system message preservation** — Verifica que `role=system` sobrevive a compresión de contexto en cualquier posición. Regresión protegida.
 - **Session metadata persistence** — `model` y `token_count` se persisten en SQLite tras cada turno del agentic loop.
-- **1 test nuevo**: system messages survive compression. Total: 145 *(cifra histórica de v0.7.8; la suite actual tiene 314 — ver badge)*.
+- **1 test nuevo**: system messages survive compression. Total: 145 *(cifra histórica de v0.7.8; la suite actual tiene 331 — ver badge)*.
 
 ### Novedades en v0.7.7 — Session Audit Fixes
 

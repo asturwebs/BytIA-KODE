@@ -1,10 +1,35 @@
 # Changelog
 
-## [0.8.0a1] - 2026-05-24 (EN PROGRESO)
+## [0.8.0] - 2026-09-27
 
-### WIP / experimental — MCP Client Support (no funcional)
+Release centrada en **seguridad y verdad del repo** (revisión AST: oleadas O0–O2 + ronda F de endurecimiento). Lo que contiene de verdad:
 
-> **⚠️ Experimental (WIP), no anunciar como capacidad terminada.** El cliente MCP está a medio construir: **`McpTool.execute()` sigue siendo `NotImplementedError`** (`src/bytia_kode/mcp/tool.py:27-29`), no existe `mcp/manager.py` (lifecycle) ni wiring en `agent.py`/`tui.py` — ver "Pending (próxima sesión)" más abajo. El extra `[mcp]` (`pyproject.toml:46`) es **experimental**: instalarlo habilita el paquete `bytia_kode.mcp`, que hoy degrada a stubs no-op (soft-import guard en `mcp/__init__.py`). Sin el extra, B-KODE funciona igual con solo tools nativas.
+### Security — perímetro de ejecución (T1/T2/T4/T8)
+
+- **T1 — allowlist de bash recortada a 24 binarios** (`src/bytia_kode/tools/registry.py`): fuera `python`/`pip`/`uv`/`ssh`/`scp`/`curl`/`wget` y familia (RCE/exfiltración por diseño). `EXTRA_BINARIES` sigue siendo la válvula manual del operador. Guards de argv sobre shlex.split: `-c`/`-m` en intérpretes (aunque el operador los re-habilite), `git -c alias.*`, `--exec` genérico. Resolución `shutil.which()` + exigencia de `/usr/bin` o `/usr/local/bin` (mata el vector `./git` commiteado). (AST-14)
+- **T1 capa 2 — programas inline y posicionales**: rechazo de flags de ejecución de código en intérpretes reintroducidos (`-e`/`-E`/bundles con `e`, `-r` de php, `-p` de node, `--eval`, `--source` — F1/AST-18) y de programas posicionales de `awk`/`gawk` (`-f fichero` obligatorio — F2/AST-19). Fail-closed deliberado en bundles (`sh -e` se rechaza igual).
+- **T2 — SSRF cerrada en `web_fetch`** (AST-15): `_assert_public_host` resuelve el host y rechaza privados/loopback/link-local/reserved para **todas** las IPs antes de conectar; redirects manuales máx. 3 saltos re-validando cada destino; límite de descarga 1 MiB en streaming.
+- **T4 — denylist de escritura en trusted paths** (AST-15): `file_write`/`file_edit` rechazan escribir sobre `~/.bytia-kode/.env`, `mcp_servers.json` y `skills/**` (reads permitidos, decisión documentada). El `.env` global se carga con `override=False` y el del proyecto tiene precedencia.
+- **T8 — secretos**: redacción de argumentos en logs de tool calls (claves + valores hasheados, `sha256:` de prefijo corto) y **scan de secretos full-tree en CI** (`scripts/check_secrets.py --all`), además del hook pre-commit staged. (AST-16)
+
+### Suite — hermética, 331 tests
+
+- Gate JEVAL sin `TYPESAFE_API_KEY`, fin de la basura `MagicMock/` (O0-A/AST-11): la suite corre hermética en CI y en venv limpio.
+- +147 tests de regresión sobre los 184 herméticos: perímetro T1/T2/T4 (incl. F1/F2), redacción T8, escáner de secretos, extras `[mcp]` y build id (AST-20). Total: **331 passed** (`pytest -q`).
+
+### Docs — una sola verdad (D1–D22)
+
+- README/ROADMAP/CHANGELOG/HANDOFF/ARCHITECTURE sincronizados con `pyproject.toml` (parche documental D1–D22): versión, conteo de tests, allowlist, estado real de MCP. `scripts/validate_metadata.py` hace fail en CI si CHANGELOG y versión divergan.
+
+### Added — build id en el header: `v0.8.0+<commit>` (2026-09-27, AST-20)
+
+- **Header y arranque**: la barra de estado de la TUI y el log de arranque muestran `v0.8.0+<hash>` (`src/bytia_kode/_build_info.py`); el banner `/start` de Telegram igual. Residuo del hallazgo C6: dos builds eran indistinguibles entre bumps de versión.
+- **Tres modos**: editable lee `git rev-parse --short HEAD` en runtime; wheel/sdist estampan `_commit.txt` en build time (hook `hatch_build.py`); sin estampa ni git (p.ej. PyPI) degrada a `v0.8.0` a secas — nunca falla. En site-packages jamás se consulta git (un venv dentro de un repo ajeno no hereda su hash).
+- **Coste**: resolución única por proceso (`lru_cache`), ni git ni disco en cada render.
+
+### MCP Client — WIP declarado, NO feature de esta release
+
+> **⚠️ Experimental (WIP), no anunciar como capacidad terminada.** El cliente MCP está a medio construir: **`McpTool.execute()` sigue siendo `NotImplementedError`** (`src/bytia_kode/mcp/tool.py`), no existe `mcp/manager.py` (lifecycle) ni wiring en `agent.py`/`tui.py`. El extra `[mcp]` (`pyproject.toml`) es **experimental**: instalarlo habilita el paquete `bytia_kode.mcp`, que degrada a stubs no-op (soft-import guard en `mcp/__init__.py` — verificado en CI y en venv limpio). Sin el extra, B-KODE funciona igual con solo tools nativas.
 
 Código base presente (sin ejecución real todavía):
 
@@ -13,18 +38,12 @@ Código base presente (sin ejecución real todavía):
 - **`src/bytia_kode/mcp/client.py`**: `McpClient` con transporte stdio + `AsyncExitStack` para lifecycle de context managers del SDK. Handshake (`initialize`), descubrimiento (`tools/list`), ejecución (`tools/call`) con timeouts.
 - **`src/bytia_kode/mcp/tool.py`**: `McpTool` (subclase de `Tool`) — puente Adapter Pattern. Naming: `mcp__{server}__{tool}`. **`execute()` pendiente** (`NotImplementedError`).
 
-### Architecture Decisions
+#### Architecture Decisions (MCP)
 
 - **Adapter Pattern**: MCP tools extienden `Tool`, se registran en `ToolRegistry` existente. Zero cambios en dispatch.
 - **AsyncExitStack**: Los context managers del SDK MCP (`stdio_client`, `ClientSession`) se mantienen vivos durante toda la sesión.
 - **Entorno heredado + overrides**: Child processes heredan el entorno completo del padre (necesario para WSL2/venvs/CUDA), con overrides desde config.
 - **Soft dependency**: `mcp` SDK como `[mcp]` optional. Sin él, B-KODE funciona con solo tools nativas.
-
-### Added — build id en el header: `v0.8.0a1+<commit>` (2026-09-27, AST-20)
-
-- **Header y arranque**: la barra de estado de la TUI y el log de arranque muestran `v0.8.0a1+<hash>` (`src/bytia_kode/_build_info.py`); el banner `/start` de Telegram igual. Residuo del hallazgo C6: dos builds eran indistinguibles entre bumps de versión.
-- **Tres modos**: editable lee `git rev-parse --short HEAD` en runtime; wheel/sdist estampan `_commit.txt` en build time (hook `hatch_build.py`); sin estampa ni git (p.ej. PyPI) degrada a `v0.8.0a1` a secas — nunca falla. En site-packages jamás se consulta git (un venv dentro de un repo ajeno no hereda su hash).
-- **Coste**: resolución única por proceso (`lru_cache`), ni git ni disco en cada render.
 
 ### Added — selección directa de providers (2026-09-16)
 
@@ -43,11 +62,10 @@ Re-review con `ocr` del propio fix: 0 HIGH; hardening aplicado (sync con `try/fi
 
 Tests: 173 passed (2 nuevos). Auditoría posterior (mismo día): la "limitación conocida" del failover era fantasma — el auto-sanado vía half-open está verificado con `test_self_heal_returns_to_chain_head_after_recovery` (174 passed).
 
-### Pending (próxima sesión)
+### Pending — MCP (siguiente release; nada de esto bloquea v0.8.0)
 
 - `mcp/manager.py` — lifecycle manager
 - `agent.py` + `tui.py` wiring — bootstrap integration
-- `pyproject.toml` — optional dependency
 - Tests — `test_mcp_config.py`, `test_mcp_tool.py`
 - `McpTool.execute()` — implementación del puente (TODO(human))
 

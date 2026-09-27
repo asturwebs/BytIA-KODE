@@ -1,6 +1,6 @@
 # Arquitectura técnica
 
-Documento actualizado para la release 0.8.0a1 (MCP Client).
+Documento actualizado para la release 0.8.0 (seguridad + verdad del repo; MCP sigue WIP).
 
 ## Entrada principal
 
@@ -269,7 +269,7 @@ class SessionListTool(Tool):
 
 El `Agent` registra estas tools automáticamente en `__init__` después de crear el store.
 
-## MCP Client (v0.8.0a1 — en progreso)
+## MCP Client (WIP en v0.8.0 — stub declarado, no feature)
 
 - `mcp/config.py` — configuración de servidores MCP
 - `mcp/client.py` — transporte stdio con `AsyncExitStack`
