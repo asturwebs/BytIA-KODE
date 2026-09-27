@@ -23,7 +23,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.syntax import Syntax
 from rich.table import Table
-from bytia_kode import __version__
+from bytia_kode import version_label
 from rich import box
 
 from bytia_kode.config import load_config
@@ -34,6 +34,13 @@ from bytia_kode.herdr import HerdrBridge
 
 
 logger = logging.getLogger(__name__)
+
+
+def _info_line(bk_present: bool) -> str:
+    """Barra de estado del header: lleva el build id (vX.Y.Z+<commit>)."""
+    bk = "[green]B-KODE.md[/]" if bk_present else "[dim]no B-KODE.md[/]"
+    return f"  {bk} | v{version_label()} | Ctrl+P menu | Esc stop | Ctrl+K kill | /context"
+
 
 BANNER_TEMPLATE = """[bold {accent}]██████╗      ██╗  ██╗ ██████╗ ██████╗ ███████╗[/]
 [bold {accent}]██╔══██╗      ██║ ██╔╝██╔═══██╗██╔══██╗██╔════╝[/]
@@ -511,6 +518,7 @@ class BytIAKODEApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        logger.info("TUI start | BytIA KODE v%s", version_label())
         self.query_one("#input-field", TextArea).focus()
         self.watch(self, "active_provider", self._on_provider_changed)
 
@@ -533,11 +541,8 @@ class BytIAKODEApp(App):
             expand=False,
         ), id="banner-panel"))
 
-        bk_status = f"[green]B-KODE.md[/]" if self.agent._bkode_path else "[dim]no B-KODE.md[/]"
         chat.mount(Static(
-            Text.from_markup(
-                f"  {bk_status} | v{__version__} | Ctrl+P menu | Esc stop | Ctrl+K kill | /context"
-            ),
+            Text.from_markup(_info_line(bool(self.agent._bkode_path))),
             id="info-line",
         ))
 

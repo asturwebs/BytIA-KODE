@@ -37,3 +37,6 @@ temp_audio/
 # Hermetic-suite safety net: MagicMock.__fspath__ materializes this if a mock
 # ever reaches SessionStore/Path again (see reports/QA-qa.md §3/§8)
 MagicMock/
+
+# AST-20: estampa efímera del build hook (hatch_build.py)
+src/bytia_kode/_commit.txt

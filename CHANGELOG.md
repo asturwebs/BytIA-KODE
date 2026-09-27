@@ -20,6 +20,12 @@ Código base presente (sin ejecución real todavía):
 - **Entorno heredado + overrides**: Child processes heredan el entorno completo del padre (necesario para WSL2/venvs/CUDA), con overrides desde config.
 - **Soft dependency**: `mcp` SDK como `[mcp]` optional. Sin él, B-KODE funciona con solo tools nativas.
 
+### Added — build id en el header: `v0.8.0a1+<commit>` (2026-09-27, AST-20)
+
+- **Header y arranque**: la barra de estado de la TUI y el log de arranque muestran `v0.8.0a1+<hash>` (`src/bytia_kode/_build_info.py`); el banner `/start` de Telegram igual. Residuo del hallazgo C6: dos builds eran indistinguibles entre bumps de versión.
+- **Tres modos**: editable lee `git rev-parse --short HEAD` en runtime; wheel/sdist estampan `_commit.txt` en build time (hook `hatch_build.py`); sin estampa ni git (p.ej. PyPI) degrada a `v0.8.0a1` a secas — nunca falla. En site-packages jamás se consulta git (un venv dentro de un repo ajeno no hereda su hash).
+- **Coste**: resolución única por proceso (`lru_cache`), ni git ni disco en cada render.
+
 ### Added — selección directa de providers (2026-09-16)
 
 - **F1 = modo AUTO** (`pin(None)`): failover Studio→Ollama→nube; reversible desde cualquier pin.

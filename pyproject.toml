@@ -74,5 +74,10 @@ exclude = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/bytia_kode"]
 
+# AST-20: estampa el commit corto en el artefacto (src/bytia_kode/_commit.txt);
+# sin git el build sigue sin estampa (degradación a versión sin sufijo)
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "src/tests"]
