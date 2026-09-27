@@ -177,6 +177,93 @@ class TestArgvGuards:
             assert result.error
 
 
+class TestInlineProgramFlags:
+    """AST-18 F1: si el operador reintroduce un intérprete vía EXTRA_BINARIES,
+    la capa 2 (_validate_argv_safety) es lo único que queda entre el agente y
+    la ejecución arbitraria — los flags de programa inline (familia -e) deben
+    rechazarse igual que -c/-m."""
+
+    # Vectores de la tabla F1 (repro del CTO 2026-09-27) + variantes bundled.
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["perl", "-e", "print 1"],
+            ["perl", "-E", "say 1"],
+            ["perl", "-ne", "print"],
+            ["perl", "-we", "print"],
+            ["perl", "-pe", "print"],
+            ["ruby", "-e", "puts 1"],
+            ["node", "-e", "console.log(1)"],
+            ["node", "-p", "1+1"],
+            ["php", "-r", "echo 1;"],
+            ["lua", "-e", "print(1)"],
+            ["Rscript", "-e", "cat(1)"],
+            # Misma familia: gawk trata '-e' como texto de programa.
+            ["awk", "-e", "system(1)"],
+            # Trade-offs fail-closed documentados: el bundle contiene 'e' pero
+            # el flag no ejecuta código (errexit de sh, aislamiento de env de
+            # python). Un falso positivo cuesta otro flag; un falso negativo,
+            # RCE.
+            ["sh", "-e", "fich.sh"],
+            ["python", "-E", "fich.py"],
+        ],
+    )
+    def test_inline_program_flags_blocked(self, argv):
+        result = BashTool._validate_argv_safety(argv)
+        assert result is not None
+        assert result.error
+
+    # Formas largas del mismo bypass: node --eval/--print evalúan su argumento.
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["node", "--eval", "console.log(1)"],
+            ["node", "--eval=console.log(1)"],
+            ["node", "--print", "1+1"],
+        ],
+    )
+    def test_long_form_eval_flags_blocked(self, argv):
+        result = BashTool._validate_argv_safety(argv)
+        assert result is not None
+        assert result.error
+
+    # Controles: flags legítimos que NO ejecutan código siguen pasando.
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["python", "-V"],
+            ["python", "--version"],
+            ["python", "-u", "fich.py"],
+            ["python", "-W", "dev", "fich.py"],
+            ["node", "-v"],
+            ["node", "--version"],
+            # 'inspect' contiene 'e': las formas largas NO se casan por subcadena.
+            ["node", "--inspect", "server.js"],
+            ["perl", "-v"],
+            ["php", "-v"],
+            ["Rscript", "--vanilla", "fich.R"],
+        ],
+    )
+    def test_non_executing_flags_still_pass(self, argv):
+        assert BashTool._validate_argv_safety(argv) is None
+
+    def test_perl_e_end_to_end_when_operator_readds_perl(self, monkeypatch, tmp_path):
+        # Idioma de TestArgvGuards: reintroducción simulada vía EXTRA_BINARIES.
+        import bytia_kode.tools.registry as registry
+
+        monkeypatch.setattr(
+            registry, "_ALLOWED_BINARIES", registry._ALLOWED_BINARIES | {"perl"}
+        )
+        result = _run("perl -e 'print 1'", workdir=str(tmp_path))
+        assert result.error
+        assert "interpreter" in result.output
+
+    def test_python_c_and_m_still_blocked(self):
+        # Controles preexistentes que no deben romperse (F1).
+        assert BashTool._validate_argv_safety(["python", "-c", "import os"]) is not None
+        assert BashTool._validate_argv_safety(["python", "-m", "http.server"]) is not None
+
+
 class TestApprovedCommandsStillWork:
     def test_echo_executes(self, tmp_path):
         result = _run("echo hello", workdir=str(tmp_path))
