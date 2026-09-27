@@ -12,6 +12,12 @@
 # PyPI (owner/repo/workflow/environment), el job `publish` falla en el
 # intercambio OIDC — eso ES la validación de que no publica nada por accidente.
 #
+# GitHub Release (AST-23): tras publicar, el job `github-release` crea la
+# Release del tag con las notas EXTRAÍDAS de CHANGELOG.md — fuente única de
+# verdad, nada de notas escritas a mano ni PR-lists de GitHub. Antes la
+# creaba la mano derecha a mano: v0.7.8 siguió de "Latest" cinco horas
+# después de publicar 0.8.0.
+#
 # La CI completa (ci.yml) también corre sobre el tag: `on: push` incluye tags,
 # así que el SHA publicado lleva wheel-verify + smoke [mcp] además de estos gates.
 name: release
@@ -67,3 +73,43 @@ jobs:
           path: dist
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: GitHub Release (notas del CHANGELOG)
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      # Mínimo privilegio: sólo este job escribe en el repo, y sólo para
+      # crear el objeto Release sobre el tag YA publicado en PyPI. Ni el
+      # workflow ni `publish` ganan scopes de más.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract release notes from CHANGELOG
+        # El tag manda: si CHANGELOG no tiene la entrada de ESA versión, el
+        # job falla antes de crear una Release vacía o desincronizada.
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          from pathlib import Path
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          version = tag[1:] if tag.startswith("v") else tag
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          match = re.search(
+              rf"^## \[{re.escape(version)}\] - [^\n]*\n(.*?)(?=^## \[|\Z)",
+              changelog,
+              re.M | re.S,
+          )
+          if not match:
+              sys.exit(f"CHANGELOG.md no tiene entrada ## [{version}] para el tag {tag}")
+          Path("release-notes.md").write_text(
+              match.group(1).strip() + "\n", encoding="utf-8"
+          )
+          PY
+          echo "--- release-notes.md ---"
+          cat release-notes.md
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
