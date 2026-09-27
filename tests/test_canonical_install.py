@@ -57,6 +57,30 @@ def test_readme_documents_pypi_install():
     ), "README debe reflejar la instalación oficial desde PyPI"
 
 
+# --- README profesional (AST-23): el historial vive en el CHANGELOG ---------
+
+def test_readme_has_no_release_notes_dump():
+    # Las secciones "Novedades en vX.Y.Z" duplicaban el CHANGELOG (= drift).
+    readme = README.read_text(encoding="utf-8")
+    assert "Novedades en v" not in readme, "el historial de releases vive en CHANGELOG.md"
+
+
+def test_readme_points_history_to_changelog():
+    readme = README.read_text(encoding="utf-8")
+    assert "Historial completo" in readme
+    assert "CHANGELOG.md" in readme
+
+
+def test_readme_images_are_absolute_urls():
+    # PyPI renderiza el README como long_description: una ruta relativa a
+    # imagen no se resuelve allí — sólo URLs absolutas.
+    readme = README.read_text(encoding="utf-8")
+    for match in re.finditer(r'src="([^"]+)"', readme):
+        assert match.group(1).startswith(("https://", "http://")), (
+            f"imagen con ruta relativa (no renderiza en PyPI): {match.group(1)}"
+        )
+
+
 # --- console script: entry point que despacha -------------------------------
 
 def test_console_script_entry_point_dispatches():

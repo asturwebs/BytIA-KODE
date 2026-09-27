@@ -1,142 +1,18 @@
 # BytIA KODE
 
-> **Quick install:**
-> ```bash
-> curl -fsSL https://raw.githubusercontent.com/asturwebs/BytIA-KODE/main/install.sh | bash
-> ```
+**BytIA KODE** (B-KODE) es un agente de IA para terminal: identidad configurable en YAML, arquitectura multi-provider con failover automático, skills extensibles y sesiones persistentes. Corre como TUI (Textual) y como bot de Telegram — ambas interfaces comparten la misma base de datos de sesiones en SQLite. Pensado para trabajar sobre tu código: tools nativas con perímetro de seguridad (allowlist de binarios, sandbox de paths) y cero dependencias de servicios en la nube para el núcleo.
 
-![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.8.0-blue.svg)
-![PyPI](https://img.shields.io/pypi/v/bytia-kode.svg)
-![Tests](https://img.shields.io/badge/tests-331%20passing-brightgreen.svg)
-![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
-![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
-![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
-
-**BytIA KODE** es un agente de IA para terminal con identidad configurable, fallback automático de providers y skills extensibles. TUI (Textual) + bot de Telegram, sesiones persistentes en SQLite y arquitectura multi-provider con circuit breaker.
-
-
-> **Nota:** El bot de Telegram comparte la misma base de datos de sesiones que la TUI (ver [Sesiones Persistentes](#sesiones-persistentes)).
-
-> Release actual: `0.8.0` · Identidad: `YAML` · Instalación: [`pip install bytia-kode`](https://pypi.org/project/bytia-kode/) · Botón rápido: `install.sh` (abajo)
-
-> ⚠️ **Nota sobre las secciones "Novedades en vX.Y.Z" que siguen:** son **histórico de release**. No describen la versión actual — para eso está `pyproject.toml:3` y la línea "Release actual" de arriba.
-
-### Novedades en v0.7.8 — Code Review Fixes *(histórico)*
-
-- **Allowlist bash ampliada** — `rg`, `bat`, `eza`, `tokei`, `shellcheck` añadidos. El agente ya no necesita `python -c` como workaround para búsqueda y análisis de código.
-- **Race condition fix en kill()** — `_active_subprocess` capturado en variable local antes del check. Elimina ventana de race si callback sobrescribe durante terminate.
-- **Test: system message preservation** — Verifica que `role=system` sobrevive a compresión de contexto en cualquier posición. Regresión protegida.
-- **Session metadata persistence** — `model` y `token_count` se persisten en SQLite tras cada turno del agentic loop.
-- **1 test nuevo**: system messages survive compression. Total: 145 *(cifra histórica de v0.7.8; la suite actual tiene 331 — ver badge)*.
-
-### Novedades en v0.7.7 — Session Audit Fixes
-
-- **Tool Error Memory fix** — Hash normalizado: solo `command`/`path`, no todo el JSON. Antes, mismo comando con diferente `workdir` generaba hash distinto → bypass del memory.
-- **BashTool `df` en allowlist** — Comando read-only para diagnóstico de disco ya disponible directamente.
-- **BashTool error hints** — Mensajes de rechazo incluyen lista de binarios permitidos y hint contextual (`cd` → usar `workdir`).
-- **pytest `testpaths`** — `uv run pytest -q` ahora recoge los 144 tests (antes 116 de 142).
-- **Flaky test fix** — `test_file_write_tool_handles_relative_path` resetea `_WORKSPACE_ROOT` global.
-- **2 tests nuevos**: hash normalization + security policy blocking. Total: 144.
-
-### Novedades en v0.7.6 — HOTFIX v0.7.2 Cierre + Skills Polish
-
-- **FIX-3: Tool Error Memory** — comandos rechazados (bash, file_write, file_edit) no se reintentan. Hash MD5 de args como key.
-- **FIX-4: Workspace Context Awareness** — CWD, sandbox y trusted paths inyectados en system prompt dinámico.
-- **YAML multiline parser** — `description: >` (folded scalar) ahora se parsea correctamente en `_parse_skill()`.
-- **sync-vendor-skills.sh** — nuevo script que transforma formato agentskills.io → flat durante sync.
-- **Vendor skills auto-update** — reinstala solo cuando cambia la versión del paquete.
-- **9 tests nuevos**: 3 loader edge cases + 3 FIX-3 + 3 FIX-4. Total: 142.
-
-### Novedades en v0.7.5 — Skills System v2.0
-
-- **Skills System Architecture**: Sistema de skills reescrito con arquitectura de capas (vendor/user/bytia). Prioridad: bytia > user > vendor.
-- **Vendor Skills**: Skills core incluidas en `src/bytia_kode/vendor/skills/`: bytia-constitution, bytia-memory, skills-manager, graphify. Se instalan automáticamente.
-- **Integración BytIA**: Si existe `~/bytia/`, install.sh ofrece crear symlink para compartir skills.
-- **3 tests nuevos**: layer priority, bytia highest priority, all layers loaded.
-
-### Novedades en v0.7.4 — Provider Resilience Hotfixes
-
-- **DeepSeek V4 thinking mode** — `reasoning_content` incluido en todos los mensajes tras tool calls. Adiós al error 400.
-- **Streaming timeout** — 60s por chunk. Si un provider deja de responder sin error, se detecta y se hace failover en lugar de colgarse.
-- **Cloud polling fix** — Solo el router local recibe polling cada 5s. APIs cloud (DeepSeek, MiniMax, Z.ai) ya no son acosadas con requests inútiles.
-
-### Novedades en v0.7.3 — Agent Loop Optimizations
-
-- **SP cache** — system prompt cacheado por número de mensajes (~500ms ahorrados por iteración).
-- **Router polling** — pausado durante procesamiento del agente.
-- **Batch compression** — 5 mensajes comprimidos a la vez, últimos 4 siempre preservados.
-
-### Novedades en v0.7.2 — DeepSeek V4 Provider
-
-- **DeepSeek V4** — 5º provider: `deepseek-v4-flash` (MoE rápido) y `deepseek-v4-pro` (thinking/reasoning).
-- **Provider pinning** — F3 fija el provider manualmente. Sin auto-fallback en modo pinned.
-- **Context-aware switching** — Límite de contexto actualizado en cada cambio de provider.
-
-### Novedades en v0.7.1 — Circuit Breaker Hardening
-
-- **Reasoning leak fixed** — `<reasoning>` tags ya no se almacenan en el historial de mensajes.
-- **Fallback notification** — TUI muestra "Switched to: Fallback" en tiempo real durante cambios de provider.
-- **Circuit breaker recovery** — `get_healthy()` recorre prioridad completa. Primary se reintenta automáticamente tras 60s.
-- **Security fix** — `rmdir` añadido al BashTool allowlist. Previene bypass vía `file_write` + `python script.py`.
-- **No duplicate messages** — Notificación única desde chunk handler, sin duplicados del watcher reactivo.
-
-### Novedades en v0.7.0 — Circuit Breaker y Provider Resilience
-
-- **Circuit Breaker** — Fallback automático de providers (CLOSED → OPEN → HALF_OPEN). Si el primario falla, el agente cambia al siguiente sin intervención del usuario.
-- **Auto-recuperación** — Tras 60s, el provider caído se reactiva automáticamente.
-- **System messages** — TUI y Telegram muestran avisos cuando se cambia de provider.
-- **24 tests nuevos** — CircuitBreaker (8), ProviderManager (7), Agent fallback (3), fixes (6)
-
-## Novedades en v0.6.0
-
-- **Panic Buttons** — Cancelación de dos niveles: `Escape` interrumpe la generación, `Ctrl+K` hace kill nuclear (cancela + mata subprocess + limpia). Telegram: `/stop` y `/kill`.
-- **Auto-selección de skills** — Las skills relevantes al query del usuario se inyectan automáticamente en el system prompt con contenido completo.
-- **Sandbox hardening** — `cat`, `head`, `tail` eliminados de bash allowlist. Ahora `file_read` es la única vía de lectura de archivos.
-- **Session fixes** — `load_session_by_id` ya no crashea por type mismatch, y `_persisted_count` se actualiza correctamente (sin duplicados en SQLite).
-- **Telegram guard** — No apila mensajes mientras procesa (race condition corregida).
-- **Native exploration tools** — `grep`, `glob`, `tree` implementados en Python puro. El agente ya no necesita bash para explorar el codebase. GrepTool (regex + include filter), GlobTool (pattern matching), TreeTool (directory tree con tamaños).
-- **130 tests** — 6 tests nuevos de agentic loop (v0.6.1) cubriendo terminación del agentic loop.
-- **`/session` command** — Muestra la sesión activa (ID + mensajes). También en Ctrl+P.
-- **Reasoning persistence** — El razonamiento del modelo se guarda en la sesión. Al cargar sesiones anteriores, ve su propio thinking previo.
-
-## Novedades en v0.5.4
-
-- **Sistema de memoria persistente** — Directorio `~/.bytia-kode/memoria/` con 4 categorías (procedimientos, contexto, tecnología, decisiones) + index auto-generable. Skill `memory-manager` para almacenar, buscar, indexar y recuperar conocimiento entre sesiones.
-- **Trusted paths** — `_resolve_workspace_path()` ahora acepta directorios confiados además del workspace. `~/.bytia-kode/` es trusted por defecto, permitiendo al agente gestionar su memoria desde cualquier proyecto sin comprometer la sandbox del código del usuario.
-- **Allowlist expandida** — BashTool: binarios permitidos ampliados. Nuevos: `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `curl`, `wget`, `scp`, `ssh`, `pip`, `pip3`. (`head` y `tail` fueron eliminados en v0.6.0, `rmdir` añadido en v0.7.1; total actual: 25)
-- **EXTRA_BINARIES configurable** — Variables de entorno para expandir la allowlist sin modificar código. `EXTRA_BINARIES=graphify` en `.env`.
-- **Skill graphify** — Análisis de código con knowledge graphs (tree-sitter). Requiere `uv tool install graphifyy`.
-
-## Novedades en v0.5.3
-
-- **TTS (Text-to-Speech)** — Botón 🔊 Escuchar en cada respuesta del asistente. Voz femenina mexicana (`es-MX-DaliaNeural`), reproducción con mpv, toggle play/stop.
-- **Logging de provider** — Errores HTTP (400/500) loggeados antes de `raise_for_status` en `client.py`.
-
-## Novedades en v0.5.2
-
-- **Multi-workspace context** — CONTEXT.md auto-generado por proyecto. El agente detecta lenguaje, estructura, git y herramientas del workspace actual.
-- **Logging a archivo** — Logs rotativos en `~/.bytia-kode/logs/bytia-kode.log` (1MB, 3 backups).
-- **Copiar respuestas** — `Ctrl+X` copia último bloque de código, `Ctrl+Shift+C` copia respuesta completa.
-- **Panic Buttons** — `Escape` para interrumpir, `Ctrl+K` para kill. Implementado en v0.6.0.
-
-## Novedades en v0.5.1
-
-- **Session awareness** — Resumen de sesión anterior inyectado en el prompt. El modelo sabe qué hizo antes.
-- **Directivas proactivas** — Session tools disponibles para uso autónomo del modelo.
-
-## Novedades en v0.5.0
-
-- **Sesiones persistentes** — Todas las conversaciones se guardan automáticamente en SQLite WAL. No se pierde nada al reiniciar.
-- **Acceso cruzado TUI ↔ Telegram** — Desde la TUI puedes ver sesiones de Telegram y viceversa. El modelo también puede acceder a sesiones pasadas.
-- **Aislamiento por usuario en Telegram** — Cada usuario tiene su propia sesión e historial privado.
-- **Session tools** — El modelo puede listar, buscar y cargar contexto de sesiones pasadas.
-- **Contexto ampliado** — `MAX_CONTEXT_TOKENS` subido a 128k (antes 16k), optimizado para modelos GGUF con 256k.
+[![PyPI](https://img.shields.io/pypi/v/bytia-kode.svg)](https://pypi.org/project/bytia-kode/)
+[![Tests](https://github.com/asturwebs/BytIA-KODE/actions/workflows/ci.yml/badge.svg)](https://github.com/asturwebs/BytIA-KODE/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/bytia-kode/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![SQLite WAL](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)](docs/ARCHITECTURE.md)
+[![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)](https://textual.textualize.io/)
+[![Telegram Bot](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)](https://docs.python-telegram-bot.org/)
 
 ## Instalación
 
-El paquete vive en [PyPI](https://pypi.org/project/bytia-kode/): `pip install bytia-kode` (o `uv tool install bytia-kode`) es el camino canónico. El `git clone` queda **solo para desarrollo** (ver [DESARROLLO](docs/DEVELOPMENT.md)).
+El paquete vive en [PyPI](https://pypi.org/project/bytia-kode/): `pip install bytia-kode` (o `uv tool install bytia-kode`) es el camino canónico. El `git clone` queda **solo para desarrollo** (ver [Desarrollo](#desarrollo)).
 
 ### Instalación rápida (recomendada)
 
@@ -168,33 +44,189 @@ EOF
 # editar con tu provider y API key — todas las variables: .env.example del repo
 ```
 
-> Un `.env` en el directorio de trabajo (proyecto) tiene precedencia sobre el global `~/.bytia-kode/.env`. Las skills vendor se siembran solas en `~/.bytia-kode/skills/vendor/` en el primer arranque.
+> Un `.env` en el directorio de trabajo (proyecto) tiene precedencia sobre el global `~/.bytia-kode/.env`. Las skills vendor se siembran solas en `~/.bytia-kode/skills/vendor/` en el primer arranque — y se actualizan solas cuando la versión instalada cambia.
 
-### Desarrollo (desde fuente)
-
-```bash
-git clone https://github.com/asturwebs/BytIA-KODE.git
-cd BytIA-KODE
-uv sync
-uv run bytia-kode
-```
-
-## Publicación en PyPI
-
-Las versiones se publican automáticamente por [Trusted Publishers (OIDC)](https://docs.pypi.org/trusted-publishers/): push de un tag `v*` → `.github/workflows/release.yml` corre los gates, construye con `uv build` y publica vía `pypa/gh-action-pypi-publish` en el environment `pypi` (aprobación manual). Cero secretos en el repo.
-
-## Modos de ejecución
+## Quickstart
 
 ```bash
-bytia-kode                # TUI (por defecto)
-bytia-kode --bot          # Telegram bot (desde la próxima release)
+bytia-kode --version    # versión instalada (+ build id si existe) y sale
+bytia-kode              # TUI (por defecto)
+bytia-kode --bot        # bot de Telegram
 ```
 
-> En `0.8.0` (publicado), el bot desde una instalación PyPI arranca con `uvx --from bytia-kode python -m bytia_kode --bot`; el despacho nativo `bytia-kode --bot` entra con la próxima release (el console script pasa por `bytia_kode.__main__:main`). En desarrollo: `uv run bytia-kode` y `uv run python -m bytia_kode --bot`.
+La TUI pide lo mínimo: el `.env` con tu provider (ver [Instalación](#instalación)) y, para el bot, `TELEGRAM_BOT_TOKEN`. Dentro de la TUI, `Ctrl+P` abre el menú de comandos y `/help` resume todo.
+
+## Características
+
+- **Multi-provider con failover automático** — cadena local-first (router → Ollama → nube) con circuit breaker (CLOSED → OPEN → HALF_OPEN): si el primario cae, el agente cambia solo y se recupera a los 60 s. Pin manual por teclas F1–F8.
+- **Sesiones persistentes** — todo se guarda en SQLite WAL (`~/.bytia-kode/sessions.db`), compartido entre TUI y Telegram: empieza un chat en una interfaz y résumelo en la otra. Auto-save O(1) por mensaje.
+- **Sistema de skills por capas** — procedimientos Markdown+YAML en `~/.bytia-kode/skills/` con prioridad bytia > user > vendor; las vendor se siembran y actualizan automáticamente con el paquete.
+- **Tools nativas con perímetro de seguridad** — 12 tools (bash, files, grep/glob/tree, web_fetch, sesiones) tras un modelo defense-in-depth: allowlist de binarios, sandbox de paths, SSRF cerrada, redacción de secretos en logs.
+- **Identidad configurable en YAML** — `bytia.kernel.yaml` (identidad y valores) + `bytia.runtime.kode.yaml` (adaptación al entorno), empaquetados como recursos.
+- **Bot de Telegram** — mismo cerebro y mismas sesiones, aislamiento por usuario, fail-secure sin allowlist.
+- **Motor I/O asíncrono** — benchmark 4.90x frente a ejecución secuencial.
+
+### Modos de ejecución
+
+| Comando | Descripción |
+| --- | --- |
+| `bytia-kode` | TUI (por defecto) |
+| `bytia-kode --bot` | Bot de Telegram |
+| `bytia-kode --version` | Imprime `versión (+ build id si existe)` y sale 0 |
+
+En desarrollo: `uv run bytia-kode` y `uv run python -m bytia_kode --bot`.
+
+### Configuración principal
+
+| Variable | Descripción | Valor por defecto |
+| --- | --- | --- |
+| `PROVIDER_BASE_URL` | Endpoint principal (router llama.cpp) | `http://localhost:8080/v1` |
+| `PROVIDER_API_KEY` | API key del provider principal | vacío |
+| `PROVIDER_MODEL` | Modelo principal (`auto` = auto-detect del router) | `auto` |
+| `FALLBACK_BASE_URL` | Endpoint fallback (nube) | `https://api.z.ai/api/coding/paas/v4` |
+| `FALLBACK_API_KEY` | API key del fallback | vacío |
+| `FALLBACK_MODEL` | Modelo fallback | `glm-5-turbo` |
+| `LOCAL_BASE_URL` | Endpoint local (Ollama) | `http://localhost:11434/v1` |
+| `LOCAL_MODEL` | Modelo local | `gemma4:26b` |
+| `TELEGRAM_BOT_TOKEN` | Token del bot | vacío |
+| `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
+| `LOG_LEVEL` | Nivel de logging (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
+| `LOG_FILE` | Path custom para logs (vacío = `~/.bytia-kode/logs/bytia-kode.log`) | vacío |
+| `EXTRA_BINARIES` | Binarios adicionales para BashTool (comma-separated) | vacío |
+
+### Sesiones persistentes
+
+Las sesiones se almacenan en `~/.bytia-kode/sessions.db` (SQLite WAL mode). Tanto la TUI como el bot de Telegram comparten la misma base de datos.
+
+| Comando TUI | Descripción |
+| --- | --- |
+| `/sessions` | Listar sesiones guardadas (tabla con ID, source, título, msgs, fecha) |
+| `/load <session_id>` | Cargar una sesión específica |
+| `/new` | Crear nueva sesión (limpia historial, habilita auto-save) |
+| `/reset` | Limpiar conversación en memoria (no borra la sesión del disco) |
+
+El modelo también puede acceder a sesiones pasadas durante la conversación: `session_list`, `session_load`, `session_search`.
+
+### Skills System
+
+Las skills son procedimientos reutilizables en formato Markdown+YAML que el agente carga en su system prompt según relevancia (las relevantes al query se inyectan automáticamente).
+
+```
+~/.bytia-kode/skills/
+├── bytia/      # Ecosistema BytIA (opcional, si ~/bytia existe)
+├── user/       # Skills creadas por el usuario (writable)
+└── vendor/     # Skills incluidas con KODE (read-only, auto-update)
+```
+
+| Capa | Prioridad | Writable | Descripción |
+|------|-----------|----------|-------------|
+| `bytia/` | 1 (más alta) | No (symlink) | Ecosistema BytIA compartido con otros assistants |
+| `user/` | 2 | Sí | Skills propias del usuario |
+| `vendor/` | 3 (más baja) | No | Skills core incluidas con KODE |
+
+Capas superiores sobrescriben las inferiores con el mismo nombre. Skills vendor incluidas: **bytia-constitution** (identidad y valores), **bytia-memory** (memoria entre sesiones), **skills-manager** (gestión del sistema), **graphify** (knowledge graphs de código).
+
+### Tools
+
+| Tool | Propósito | Seguridad |
+| --- | --- | --- |
+| `bash` | Ejecutar comandos shell | Allowlist de binarios, sandbox CWD |
+| `file_read` | Leer archivos | Path traversal bloqueado |
+| `file_write` | Escribir archivos | Path traversal bloqueado |
+| `file_edit` | Editar archivos (search/replace + create) | Backup automático, sandbox CWD |
+| `web_fetch` | Fetch URLs (HTTP GET) | Solo http/https, SSRF cerrada, límite 1 MiB |
+| `read_context` | Contexto del workspace actual | Solo lectura, auto-genera si no existe |
+| `session_list` | Listar sesiones guardadas | Solo lectura |
+| `session_load` | Cargar contexto de sesión pasada | Solo lectura |
+| `session_search` | Buscar sesiones por título | Solo lectura |
+| `grep` | Búsqueda regex en archivos | Python puro, sin bash |
+| `glob` | Pattern matching de archivos | Python puro, sin bash |
+| `tree` | Jerarquía de directorios | Python puro, sin bash |
+
+### Seguridad
+
+Modelo de seguridad con defense-in-depth:
+
+| Capa | Mitigación |
+| --- | --- |
+| Command injection | Allowlist de binarios + `shell=False` + `shlex.split()` + guards de argv |
+| Path traversal | `_resolve_workspace_path()` con sandbox a CWD + trusted paths |
+| Escritura en trusted paths | Denylist sobre `.env`, `mcp_servers.json`, `skills/**` |
+| SSRF | `web_fetch` rechaza hosts privados/loopback, redirects re-validados |
+| Telegram abierto | Fail-secure por defecto (deniega sin allowlist) |
+| Sesiones cruzadas | Aislamiento por `chat_id` |
+| Secretos en logs | Redacción de claves y valores (hash corto) |
+
+#### Guardarraíl JEVAL (pre-ejecución de tools)
+
+`src/bytia_kode/guardrail.py` clasifica **cada** llamada a tool antes de ejecutarla (TypeSafe System One) y puede bloquear las arriesgadas.
+
+| Modo (`JEVAL_MODE`) | Comportamiento |
+| --- | --- |
+| `off` | **Default.** Sin clasificación — coste casi nulo (una lectura de env cacheada) |
+| `shadow` | Clasifica y loguea en background (*fire-and-forget*, cero latencia añadida) — **nunca bloquea** |
+| `enforce` | Bloquea las tools clasificadas como de riesgo con `noul >= JEVAL_THRESHOLD` |
+
+Por defecto `off`; requiere `TYPESAFE_API_KEY` (sin clave, el gate se desactiva aunque `JEVAL_MODE=enforce`); fail-open ante error del clasificador. Otras variables: `JEVAL_THRESHOLD` (`0..1`, default `0.7`), `JEVAL_TIMEOUT` (default `2.0` s). Log de decisiones: `~/.local/state/jev-router/kode-guardrail.jsonl`.
+
+### Limitaciones conocidas
+
+- `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
+- El cliente MCP es WIP declarado (stubs no-op sin el extra `[mcp]`; `McpTool.execute()` pendiente) — no anunciarlo como capacidad terminada.
+- El estimador de tokens es una heurística (chars/3), no un tokenizer real.
+- PromptTextArea no soporta Shift+Enter para newline (limitación de Textual).
+
+## Arquitectura
+
+```text
+__main__.py                     ← entry point: --version / --bot / TUI
+  ├─ tui.py
+  └─ telegram/bot.py
+
+agent.py
+  ├─ prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml
+  ├─ session.py                 ← SQLite WAL persistence
+  ├─ providers/manager.py
+  ├─ providers/circuit.py       ← Circuit breaker (CLOSED/OPEN/HALF_OPEN)
+  ├─ providers/client.py
+  ├─ tools/registry.py
+  ├─ tools/session.py           ← session_list, session_load, session_search
+  └─ skills/loader.py
+
+audio.py                        ← TTS: bytia-tts + piper (local)
+```
+
+### Stack técnico
+
+| Librería | Rol |
+| --- | --- |
+| [Textual](https://textual.textualize.io/) | Framework TUI |
+| [Rich](https://rich.readthedocs.io/) | Renderizado (Markdown, Panel, Table) |
+| [httpx](https://www.python-httpx.org/) | Cliente HTTP async / streaming SSE / web_fetch |
+| [Pydantic](https://docs.pydantic.dev/) | Modelos de datos y validación |
+| [PyYAML](https://pyyaml.org/) | Parseo de identidad y skills |
+| [python-dotenv](https://github.com/theskumar/python-dotenv) | Variables de entorno |
+| [python-telegram-bot](https://docs.python-telegram-bot.org/) | Bot de Telegram |
+| [sqlite3](https://docs.python.org/3/library/sqlite3.html) | Persistencia de sesiones (stdlib) |
+| `bytia-tts` | TTS: CLI local que invoca a piper (binario en `~/.local/bin`, **no está en PyPI**) |
+| `piper` | Motor TTS local, voz `es_AR-daniela-high` (binario del sistema) |
+
+### Identidad: BytIA OS Kernel + Runtime
+
+El agente carga su identidad desde dos YAML empaquetados como recursos del paquete: `bytia.kernel.yaml` (identidad y valores inmutables) + `bytia.runtime.kode.yaml` (adaptación al entorno). Para personalizarla, edita los YAML en `src/bytia_kode/prompts/` y reconstruye el wheel (`uv build`).
+
+| Sección | Qué contiene | Personalizar |
+| --- | --- | --- |
+| `identity` | Nombre, versión, naturaleza, creador, **runtime** (capacidades, comandos) | Tu nombre y rol |
+| `valores` | Jerarquía de prioridades (seguridad, privacidad, precisión...) | Tus prioridades |
+| `protocols` | Comportamiento ante errores, overrides, auto-evaluación | Ajustar a tu flujo |
+| `interfaz` | Idioma, estilo de comunicación, formato | Tu idioma y tono |
+| `contexto` | Perfil del usuario, ubicación, infraestructura | Tu perfil y entorno |
+| `runtime_profile` | Variables del motor (se rellenan en tiempo de ejecución) | No modificar |
 
 ## Bot de Telegram
 
-El bot de Telegram comparte la misma base de datos de sesiones que la TUI (`~/.bytia-kode/sessions.db`), lo que permite:
+El bot comparte la misma base de datos de sesiones que la TUI (`~/.bytia-kode/sessions.db`):
 
 - **Continuar conversaciones** entre interfaces — empieza un chat en Telegram y résumelo en la TUI (y viceversa).
 - **Aislamiento por usuario** — cada `chat_id` tiene su propia sesión e historial privado. No hay filtrado de contenido.
@@ -219,84 +251,6 @@ Sin `TELEGRAM_ALLOWED_USERS` configurado, el bot deniega todos los mensajes (fai
 | `/model` | Mostrar provider y modelo activos |
 | `/sessions` | Listar sesiones del usuario |
 | `/context` | Regenerar contexto del workspace |
-
-## Arquitectura resumida
-
-```text
-__main__.py
-  ├─ tui.py
-  └─ telegram/bot.py
-
-agent.py
-  ├─ prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml
-  ├─ session.py                    ← SQLite WAL persistence
-  ├─ providers/manager.py
-  ├─ providers/circuit.py          ← Circuit breaker (CLOSED/OPEN/HALF_OPEN)
-  ├─ providers/client.py
-  ├─ tools/registry.py
-  ├─ tools/session.py              ← session_list, session_load, session_search
-  └─ skills/loader.py
-
-audio.py                             ← TTS: bytia-tts + piper (local)
-```
-
-Documentación adicional:
-
-- [Manual de la TUI](docs/TUI.md)
-- [Arquitectura técnica](docs/ARCHITECTURE.md)
-- [Guía de desarrollo](docs/DEVELOPMENT.md)
-- [Guía de contribución](CONTRIBUTING.md)
-- [Código de conducta](CODE_OF_CONDUCT.md)
-- [Historial de cambios](CHANGELOG.md)
-
-## Configuración principal
-
-| Variable | Descripción | Valor por defecto |
-| --- | --- | --- |
-| `PROVIDER_BASE_URL` | Endpoint principal (router llama.cpp) | `http://localhost:8080/v1` |
-| `PROVIDER_API_KEY` | API key del provider principal | vacío |
-| `PROVIDER_MODEL` | Modelo principal (`auto` = auto-detect del router) | `auto` |
-| `FALLBACK_BASE_URL` | Endpoint fallback (nube) | `https://api.z.ai/api/coding/paas/v4` |
-| `FALLBACK_API_KEY` | API key del fallback | vacío |
-| `FALLBACK_MODEL` | Modelo fallback | `glm-5-turbo` |
-| `LOCAL_BASE_URL` | Endpoint local (Ollama) | `http://localhost:11434/v1` |
-| `LOCAL_MODEL` | Modelo local | `gemma4:26b` |
-| `TELEGRAM_BOT_TOKEN` | Token del bot | vacío |
-| `DATA_DIR` | Directorio persistente | `~/.bytia-kode` |
-| `LOG_LEVEL` | Nivel de logging (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
-| `LOG_FILE` | Path custom para logs (vacío = `~/.bytia-kode/logs/bytia-kode.log`) | vacío |
-| `EXTRA_BINARIES` | Binarios adicionales para BashTool (comma-separated) | vacío |
-
-## Sesiones Persistentes
-
-Las sesiones se almacenan en `~/.bytia-kode/sessions.db` (SQLite WAL mode). Tanto la TUI como el bot de Telegram comparten la misma base de datos.
-
-### Características
-
-- **Auto-save** — Cada mensaje y tool result se guarda automáticamente. No hay que hacer nada.
-- **O(1) por mensaje** — Solo INSERT, nunca reescribe el historial completo.
-- **Concurrencia segura** — SQLite WAL permite múltiples lectores y un escritor simultáneo.
-- **Acceso cruzado** — TUI y Telegram pueden acceder a las sesiones de la otra interfaz.
-- **Sin límite** — Todas las sesiones se guardan indefinidamente.
-
-### Comandos TUI
-
-| Comando | Descripción |
-| --- | --- |
-| `/sessions` | Listar sesiones guardadas (tabla con ID, source, título, msgs, fecha) |
-| `/load <session_id>` | Cargar una sesión específica |
-| `/new` | Crear nueva sesión (limpia historial, habilita auto-save) |
-| `/reset` | Limpiar conversación en memoria (no borra la sesión del disco) |
-
-### Session Tools (para el modelo)
-
-El modelo puede acceder a sesiones pasadas durante la conversación:
-
-| Tool | Descripción |
-| --- | --- |
-| `session_list` | Listar sesiones (filtro por source opcional) |
-| `session_load` | Cargar contexto de una sesión pasada |
-| `session_search` | Buscar sesiones por título |
 
 ## TUI
 
@@ -339,8 +293,10 @@ El modelo puede acceder a sesiones pasadas durante la conversación:
 | `Ctrl+E` | Alternar safe mode |
 | `Ctrl+X` | Copiar último bloque de código |
 | `Ctrl+Shift+C` | Copiar respuesta completa del agente |
+| `F1` | Modo AUTO (failover por la cadena completa) |
 | `F2` | Cambiar tema cíclicamente |
 | `F3` | Cambiar provider (primary/fallback/local) |
+| `F4`–`F8` | Pin manual: Studio / Ollama / Z.ai / DeepSeek / Router |
 | `↑` / `↓` | Historial de entrada |
 | `Enter` | Enviar prompt |
 
@@ -348,96 +304,16 @@ El modelo puede acceder a sesiones pasadas durante la conversación:
 
 Pulsa `F2` para cambiar entre los 19 temas disponibles (12 oscuros + 7 claros, por defecto `gruvbox`). El tema se guarda en `~/.bytia-kode/theme.json`.
 
-## Tools
+## Desarrollo
 
-| Tool | Propósito | Seguridad |
-| --- | --- | --- |
-| `bash` | Ejecutar comandos shell | Allowlist de binarios, sandbox CWD |
-| `file_read` | Leer archivos | Path traversal bloqueado |
-| `file_write` | Escribir archivos | Path traversal bloqueado |
-| `file_edit` | Editar archivos (search/replace + create) | Backup automático, sandbox CWD |
-| `web_fetch` | Fetch URLs (HTTP GET) | Solo http/https, content type validation |
-| `read_context` | Contexto del workspace actual | Solo lectura, auto-genera si no existe |
-| `session_list` | Listar sesiones guardadas | Solo lectura |
-| `session_load` | Cargar contexto de sesión pasada | Solo lectura |
-| `session_search` | Buscar sesiones por título | Solo lectura |
-| `grep` | Búsqueda regex en archivos | v0.6.0 |
-| `glob` | Pattern matching de archivos | v0.6.0 |
-| `tree` | Jerarquía de directorios | v0.6.0 |
-
-Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para crear nuevas tools.
-
-## Skills System
-
-BytIA KODE incluye un sistema de skills persistente. Las skills son procedimientos reutilizables en formato Markdown+YAML que el agente carga en su system prompt según relevancia.
-
-### Arquitectura de Capas
-
-Las skills se organizan en capas con prioridad (alta → baja):
-
-```
-~/.bytia-kode/skills/
-├── bytia/      # Ecosistema BytIA (opcional, si ~/bytia existe)
-├── user/       # Skills creadas por el usuario (writable)
-└── vendor/     # Skills incluidas con KODE (read-only)
+```bash
+git clone https://github.com/asturwebs/BytIA-KODE.git
+cd BytIA-KODE
+uv sync
+uv run bytia-kode
 ```
 
-| Capa | Prioridad | Writable | Descripción |
-|------|-----------|----------|-------------|
-| `bytia/` | 1 (más alta) | No (symlink) | Ecosistema BytIA compartido con otros assistants |
-| `user/` | 2 | Sí | Skills propias del usuario |
-| `vendor/` | 3 (más baja) | No | Skills core incluidas con KODE |
-
-Capas superiores sobrescriben las inferiores con el mismo nombre.
-
-### Vendor Skills (Core)
-
-KODE incluye por defecto:
-- **bytia-constitution** — Identidad y valores BytIA OS
-- **bytia-memory** — Gestión de memoria entre sesiones
-- **skills-manager** — Gestión del sistema de skills
-- **graphify** — Knowledge graphs de código
-
-### Extensibilidad
-
-Las skills evolucionarán hacia unidades más autónomas:
-
-- **Tools dinámicas** — scripts en `skills/<name>/scripts/` auto-registrados como tools
-- **Sub-agentes** — una skill puede definir su propio SP y ejecutarse como agente dedicado
-- **Skills Hub** — instalar skills desde repos GitHub
-- **`write_skill` tool** — el agente crea skills programáticamente
-
-### Estructura Completa
-
-```
-~/.bytia-kode/
-├── sessions.db           # SQLite WAL — sesiones persistentes
-├── theme.json            # Tema seleccionado
-├── logs/
-│   └── bytia-kode.log   # Logs rotativos (1MB, 3 backups)
-├── contexts/
-│   └── <hash>.md        # CONTEXT.md por workspace
-├── memoria/
-│   ├── procedimientos/   # How-tos, workflows
-│   ├── contexto/         # Decisiones, hitos
-│   ├── tecnologia/       # Stacks, arquitecturas
-│   ├── decisiones/       # ADRs
-│   └── index.md          # Índice auto-generado
-└── skills/
-    ├── bytia/           # Symlink a ~/bytia/skills/ (si existe)
-    ├── user/            # Skills propias (writable)
-    │   └── my-procedure/
-    │       ├── SKILL.md
-    │       └── scripts/
-    └── vendor/           # Skills core (read-only, se actualiza con KODE)
-        ├── bytia-constitution/
-        ├── bytia-memory/
-        ├── graphify/
-        └── skills-manager/
-```
-```
-
-## Validación y release
+### Validación
 
 ```bash
 uv run python scripts/validate_metadata.py
@@ -446,91 +322,17 @@ uv build
 uv run python -m twine check dist/*
 ```
 
+### Publicación
+
+Las versiones se publican automáticamente por [Trusted Publishers (OIDC)](https://docs.pypi.org/trusted-publishers/): push de un tag `v*` → `.github/workflows/release.yml` corre los gates, construye con `uv build`, publica vía `pypa/gh-action-pypi-publish` en el environment `pypi` (aprobación del Socio), y crea la GitHub Release con las notas del CHANGELOG. Cero secretos en el repo. El proceso completo, paso a paso: [RELEASING.md](RELEASING.md).
+
 ### Hook local versionado
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-## BytIA OS Kernel + Runtime
-
-El agente carga su identidad desde dos archivos YAML: `bytia.kernel.yaml` (identidad y valores inmutables) + `bytia.runtime.kode.yaml` (adaptación al entorno). Se empaquetan dentro del wheel como recursos del paquete.
-
-### Personalizar la identidad
-
-Para personalizar la identidad, edita los YAML en `src/bytia_kode/prompts/`:
-
-| Sección | Qué contiene | Personalizar |
-| --- | --- | --- |
-| `identity` | Nombre, versión, naturaleza, creador, **runtime** (capacidades, comandos) | Tu nombre y rol |
-| `valores` | Jerarquía de prioridades (seguridad, privacidad, precisión...) | Tus prioridades |
-| `protocols` | Comportamiento ante errores, overrides, auto-evaluación | Ajustar a tu flujo |
-| `interfaz` | Idioma, estilo de comunicación, formato | Tu idioma y tono |
-| `contexto` | Perfil del usuario, ubicación, infraestructura | Tu perfil y entorno |
-| `runtime_profile` | Variables del motor (se rellenan en tiempo de ejecución) | No modificar |
-
-Después de editar, reconstruye el wheel para que los cambios se empaqueten:
-
-```bash
-uv build
-```
-
-## Stack técnico
-
-BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCHITECTURE.md](docs/ARCHITECTURE.md) para el detalle completo con versiones y uso específico.
-
-| Librería | Rol |
-| --- | --- |
-| [Textual](https://textual.textualize.io/) | Framework TUI |
-| [Rich](https://rich.readthedocs.io/) | Renderizado (Markdown, Panel, Table) |
-| [httpx](https://www.python-httpx.org/) | Cliente HTTP async / streaming SSE / web_fetch |
-| [Pydantic](https://docs.pydantic.dev/) | Modelos de datos y validación |
-| [PyYAML](https://pyyaml.org/) | Parseo de identidad y skills |
-| [python-dotenv](https://github.com/theskumar/python-dotenv) | Variables de entorno |
-| [python-telegram-bot](https://docs.python-telegram-bot.org/) | Bot de Telegram |
-| [sqlite3](https://docs.python.org/3/library/sqlite3.html) | Persistencia de sesiones (stdlib) |
-| `bytia-tts` | TTS: CLI local que invoca a piper (binario en `~/.local/bin`, **no está en PyPI**) |
-| `piper` | Motor TTS local, voz `es_AR-daniela-high` (binario del sistema) |
-
-## Seguridad
-
-Modelo de seguridad con defense-in-depth:
-
-| Capa | Mitigación |
-| --- | --- |
-| Command injection | Allowlist de binarios + `shell=False` + `shlex.split()` |
-| Path traversal | `_resolve_workspace_path()` con sandbox a CWD + trusted paths |
-| Telegram abierto | Fail-secure por defecto (deniega sin allowlist) |
-| Sesiones cruzadas | Aislamiento por `chat_id` |
-
-Motor I/O asíncrono con benchmark: **4.90x speedup** frente a ejecución secuencial.
-
-### Guardarraíl JEVAL (pre-ejecución de tools)
-
-`src/bytia_kode/guardrail.py` clasifica **cada** llamada a tool antes de ejecutarla (TypeSafe System One) y puede bloquear las arriesgadas.
-
-| Modo (`JEVAL_MODE`) | Comportamiento |
-| --- | --- |
-| `off` | **Default.** Sin clasificación — coste casi nulo (una lectura de env cacheada) |
-| `shadow` | Clasifica y loguea en background (*fire-and-forget*, cero latencia añadida) — **nunca bloquea** |
-| `enforce` | Bloquea las tools clasificadas como de riesgo con `noul >= JEVAL_THRESHOLD` |
-
-- **Por defecto `off`** — el guardarraíl está apagado hasta que actives `JEVAL_MODE` explícitamente.
-- **Requiere `TYPESAFE_API_KEY`** (o `~/.config/typesafe/env`). Sin clave, el gate se desactiva **aunque** `JEVAL_MODE=enforce`.
-- **Fail-open**: cualquier error o timeout del clasificador **permite** la llamada — JEVAL nunca rompe el bucle.
-- Otras variables: `JEVAL_THRESHOLD` (`0..1`, default `0.7`), `JEVAL_TIMEOUT` (default `2.0` s).
-- Log de decisiones (JSONL, rotación 600): `~/.local/state/jev-router/kode-guardrail.jsonl`.
-
-## Limitaciones conocidas
-
-- `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
-- Las skills no registran tools dinámicas todavía (previsto para v0.6.0).
-- El estimador de tokens es una heurística (chars/3), no un tokenizer real.
-- PromptTextArea no soporta Shift+Enter para newline (limitación de Textual).
-
-## Contribuir
-
-Contribuciones, issues y sugerencias son bienvenidas.
+### Contribuir
 
 1. Fork del repositorio
 2. Rama para tu feature (`git checkout -b feature/mi-mejora`)
@@ -539,6 +341,17 @@ Contribuciones, issues y sugerencias son bienvenidas.
 5. Abre un Pull Request
 
 Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para los criterios de validación.
+
+## Documentación
+
+- [Manual de la TUI](docs/TUI.md)
+- [Arquitectura técnica](docs/ARCHITECTURE.md)
+- [Guía de desarrollo](docs/DEVELOPMENT.md)
+- [Proceso de release](RELEASING.md)
+- [Guía de contribución](CONTRIBUTING.md)
+- [Código de conducta](CODE_OF_CONDUCT.md)
+
+Historial completo de versiones: [CHANGELOG.md](CHANGELOG.md).
 
 ## Autores
 
