@@ -139,10 +139,18 @@ class SessionStore:
     ) -> str:
         """Create a new session and return its ID."""
         import uuid
-        session_id = f"{source}_{uuid.uuid4().hex[:8]}"
+        # H4: deterministic id when a source_ref exists — this is what lets
+        # Telegram resume one session per chat_id. A second create for the
+        # same ref returns the existing id (INSERT OR IGNORE keeps the row,
+        # and with it the messages already persisted).
+        session_id = (
+            f"{source}_{source_ref}"
+            if source_ref
+            else f"{source}_{uuid.uuid4().hex[:8]}"
+        )
         with self._connect() as conn:
             conn.execute(
-                "INSERT INTO sessions (session_id, source, source_ref, title) VALUES (?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO sessions (session_id, source, source_ref, title) VALUES (?, ?, ?, ?)",
                 (session_id, source, source_ref, title),
             )
         logger.debug("Session created: %s (%s/%s)", session_id, source, source_ref)
@@ -224,6 +232,23 @@ class SessionStore:
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
+        if not row:
+            return None
+        return SessionMetadata.from_row(row)
+
+    def find_session_by_ref(self, source: str, source_ref: str) -> SessionMetadata | None:
+        """Find the most recent active session for a (source, source_ref) pair.
+
+        Served by idx_sessions_source_ref — the ref, not the id, is the stable
+        key for resume (pre-H4 rows may carry a random id).
+        """
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM sessions "
+                "WHERE source = ? AND source_ref = ? AND is_active = 1 "
+                "ORDER BY updated_at DESC LIMIT 1",
+                (source, source_ref),
             ).fetchone()
         if not row:
             return None

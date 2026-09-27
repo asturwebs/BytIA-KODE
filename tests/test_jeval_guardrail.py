@@ -1,5 +1,6 @@
 """Tests for the JEVAL guardrail (Jev pre-execution classifier)."""
 import asyncio
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -89,6 +90,62 @@ class TestJevalModes:
         monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
         monkeypatch.setattr(guardrail, "_load_key", lambda: None)
         assert guardrail.JevalGate().enabled is False
+
+
+class TestFailOpenOnMalformedResponse:
+    """M1: parsing the Jev response must live inside the fail-open try — a
+    non-dict body or `noul: null` used to raise past it and break the turn,
+    violating the "Never raises" contract of _classify."""
+
+    @pytest.mark.asyncio
+    async def test_non_dict_body_fail_open(self, monkeypatch):
+        g = _gate("enforce", monkeypatch)
+        with patch.object(g, "_ask_sync", return_value=["not", "a", "dict"]):
+            v = await g._classify("bash", "state", "rec_m1a")
+        assert v["blocked"] is False
+        assert "fail-open" in v["reason"]
+
+    @pytest.mark.asyncio
+    async def test_noul_null_fail_open(self, monkeypatch):
+        g = _gate("enforce", monkeypatch)
+        with patch.object(g, "_ask_sync", return_value={"answers": {"is_risky": {"noul": None}}}):
+            v = await g._classify("bash", "state", "rec_m1b")
+        assert v["blocked"] is False
+        assert "fail-open" in v["reason"]
+
+    @pytest.mark.asyncio
+    async def test_enforce_check_never_raises_on_malformed(self, monkeypatch):
+        g = _gate("enforce", monkeypatch)
+        with patch.object(g, "_ask_sync", return_value=None):
+            res = await g.check("bash", {"command": "ls"})
+        assert res["blocked"] is False
+        assert "fail-open" in res["reason"]
+
+
+class TestShadowTaskKeepalive:
+    """M2: shadow tasks are held by a module-level strong-ref set — without
+    it the GC can cancel a task before its JSONL verdict lands."""
+
+    @pytest.mark.asyncio
+    async def test_shadow_task_completes_logs_and_is_released(self, monkeypatch, tmp_path):
+        g = _gate("shadow", monkeypatch)
+        monkeypatch.setattr(guardrail, "STATE_DIR", tmp_path / "state")
+        # NB: drain the task INSIDE the patch — outside it the task would
+        # bypass the mock and hit the real API (breaking hermeticity).
+        with patch.object(g, "_ask_sync", return_value=_jev_answer(0.9)):
+            res = await g.check("bash", {"command": "ls"})
+            task = res["task"]
+            assert task in guardrail._shadow_tasks  # strong ref while running
+
+            await asyncio.wait_for(task, timeout=5)
+        assert task.done() and not task.cancelled()
+
+        log = tmp_path / "state" / "kode-guardrail.jsonl"
+        assert log.exists()
+        rec = json.loads(log.read_text().strip().splitlines()[-1])
+        assert rec["tool"] == "bash"
+        assert rec["noul"] == 0.9
+        assert task not in guardrail._shadow_tasks  # released when done
 
 
 class TestAgentIntegration:

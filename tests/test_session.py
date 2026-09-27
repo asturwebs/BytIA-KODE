@@ -28,6 +28,36 @@ class TestSessionLifecycle:
         assert store.get_metadata("nonexistent") is None
 
 
+class TestDeterministicSessionIds:
+    """H4: create_session mints a deterministic id when source_ref is set —
+    this is what lets Telegram resume one session per chat_id."""
+
+    def test_create_session_with_ref_is_deterministic(self, store):
+        assert store.create_session("telegram", "123") == "telegram_123"
+
+    def test_second_create_with_same_ref_reuses_the_row(self, store):
+        sid1 = store.create_session("telegram", "123")
+        store.append_message(sid1, role="user", content="hola")
+        sid2 = store.create_session("telegram", "123")
+        assert sid2 == sid1
+        assert len(store.load_messages(sid2)) == 1  # row reused, not duplicated
+
+    def test_create_session_without_ref_stays_random(self, store):
+        assert store.create_session("tui") != store.create_session("tui")
+
+    def test_find_session_by_ref(self, store):
+        assert store.find_session_by_ref("telegram", "123") is None
+        store.create_session("telegram", "123")
+        found = store.find_session_by_ref("telegram", "123")
+        assert found is not None
+        assert found.session_id == "telegram_123"
+        assert found.source_ref == "123"
+
+    def test_find_session_by_ref_scopes_by_source(self, store):
+        store.create_session("tui", "123")
+        assert store.find_session_by_ref("telegram", "123") is None
+
+
 class TestMessageOperations:
     def test_append_and_load(self, store):
         sid = store.create_session("tui")
