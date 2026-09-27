@@ -25,6 +25,14 @@ SKIP_PATTERNS = [
     re.compile(r'\.gbnf'),
 ]
 
+# Well-known documentation placeholders — public by definition, never real
+# secrets. Telegram's Bot API docs use this exact example token
+# (core.telegram.org/bots#6-botfather); tests mirroring the documented
+# format must not trip the entropy scan.
+KNOWN_PLACEHOLDER_TOKENS = {
+    "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+}
+
 
 def staged_files() -> list[Path]:
     result = subprocess.run(
@@ -53,6 +61,10 @@ def is_suspicious_line(line: str) -> bool:
     if SK_PATTERN.search(line):
         return True
     if any(p.search(line) for p in SKIP_PATTERNS):
+        return False
+    if any(placeholder in line for placeholder in KNOWN_PLACEHOLDER_TOKENS):
+        # A line containing a public documentation placeholder verbatim cannot
+        # be leaking it — a real secret never matches it byte for byte.
         return False
     matches = HIGH_ENTROPY_PATTERN.findall(line)
     for token in matches:
