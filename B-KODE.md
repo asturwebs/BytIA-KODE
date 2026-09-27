@@ -26,11 +26,11 @@ Usuario puede sobreescribir la identidad en `~/.bytia-kode/prompts/bytia.kernel.
 | User prompts | `~/.bytia-kode/prompts/` |
 | Intercom | `~/.bytia-kode/intercom/` |
 
-## Tools Registradas (11)
+## Tools Registradas (12)
 
 | Tool | Propósito | Seguridad |
 |------|-----------|-----------|
-| `bash` | Ejecutar comandos shell | Allowlist 26 binarios, `shell=False`, sin pipes/redirecciones/heredocs |
+| `bash` | Ejecutar comandos shell | Allowlist 34 binarios, `shell=False`, sin pipes/redirecciones/heredocs |
 | `file_read` | Leer archivos | Path traversal bloqueado, sandbox CWD + trusted |
 | `file_write` | Escribir archivos | Path traversal bloqueado, sandbox CWD + trusted |
 | `file_edit` | Editar archivos (search/replace + create) | Backup automático, sandbox CWD + trusted |
@@ -43,13 +43,17 @@ Usuario puede sobreescribir la identidad en `~/.bytia-kode/prompts/bytia.kernel.
 | `session_load` | Cargar contexto de sesión pasada | Solo lectura |
 | `session_search` | Buscar sesiones por título | Solo lectura |
 
-## Bash Allowlist (26 binarios)
+## Bash Allowlist (34 binarios)
+
+Fuente de verdad: `_DEFAULT_BINARIES` en `src/bytia_kode/tools/registry.py:43-50`.
 
 ```
 ls, pwd, echo, git, grep, find, mkdir, rmdir, touch,
-mv, cp, rm, wc, date, chmod,
+mv, cp, rm, wc, date, chmod, df, du, head, tail,
 curl, wget, scp, ssh,
-uv, python, python3, pip, pip3, wsl
+uv, python, python3, pip, pip3,
+rg, bat, eza, tokei, shellcheck,
+wsl
 ```
 
 `shell=False` + `shlex.split()`. Los siguientes operadores están **bloqueados**: `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks. Usa `file_write`/`file_edit` + múltiples llamadas bash en su lugar.
@@ -192,7 +196,7 @@ Aislamiento por `chat_id`. Fail-secure: sin `TELEGRAM_ALLOWED_USERS` configurado
 
 ## Audio (TTS)
 
-Respuestas con botón 🔊. Voz: `es-MX-DaliaNeural` vía `edge-tts`, reproducción con `mpv`. Requiere `edge-tts` instalado como tool (`uv tool install edge-tts`) y `mpv` en el sistema.
+Respuestas con botón 🔊. Voz: **`bytia-tts`** con piper — modelo local `es_AR-daniela-high`, 100 % sin nube (`src/bytia_kode/audio.py:63` lanza `bytia-tts -- <texto>`). Requiere el binario `bytia-tts` en `~/.local/bin` y `piper` a su alcance. El botón vuelve a "Escuchar" al terminar de hablar.
 
 ## Protocolo Intercom (opt-in)
 
@@ -227,11 +231,21 @@ Intercom permite comunicación entre agentes BytIA. Configuración: crear `~/.by
 | `LLM_TEMPERATURE` | Temperatura del modelo | `0.3` |
 | `LLM_MAX_TOKENS` | Max tokens por respuesta | `8192` |
 | `LLM_TIMEOUT` | Timeout en segundos | `120` |
+| `JEVAL_MODE` | Guardarraíl pre-ejecución: `off` / `shadow` / `enforce` | `off` |
+| `JEVAL_THRESHOLD` | Umbral de riesgo (`noul`) para bloquear en `enforce` | `0.7` |
+| `JEVAL_TIMEOUT` | Timeout del clasificador JEVAL (s) | `2.0` |
+| `TYPESAFE_API_KEY` | API key del clasificador JEVAL (fallback `~/.config/typesafe/env`) | vacío |
 
 Carga: `.env` del CWD primero (no sobreescribe), luego `~/.bytia-kode/.env` (sobreescribe).
 
 ## Seguridad
 
+- **Guardarraíl JEVAL** (`src/bytia_kode/guardrail.py`): clasifica cada llamada a
+  tool antes de ejecutarla. Modos vía `JEVAL_MODE`: **`off` (default)**, `shadow`
+  (clasifica y loguea en background, nunca bloquea), `enforce` (bloquea tools con
+  `noul >= JEVAL_THRESHOLD`). Sin `TYPESAFE_API_KEY` el gate se desactiva aunque
+  el modo sea `enforce`; ante cualquier error o timeout **fail-open** (se permite
+  la llamada). Log JSONL: `~/.local/state/jev-router/kode-guardrail.jsonl`.
 - **NUNCA** hardcodear tokens, API keys o secrets en código, skills o este archivo
 - Usar **variables de entorno** para todos los secrets
 - Este repo es **PÚBLICO** (asturwebs/BytIA-KODE) — todo lo commiteado es visible

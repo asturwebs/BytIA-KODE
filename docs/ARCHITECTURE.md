@@ -10,7 +10,7 @@ Documento actualizado para la release 0.8.0a1 (MCP Client).
 
 - `src/bytia_kode/tui.py` — interfaz Textual TUI (19 temas, streaming, reasoning, sesiones)
 - `src/bytia_kode/telegram/bot.py` — bot con fail-secure, aislamiento por chat_id, sesiones
-- `src/bytia_kode/audio.py` — TTS con edge-tts + mpv (toggle play/stop, limpieza de Markdown)
+- `src/bytia_kode/audio.py` — TTS con `bytia-tts` (piper local, voz `es_AR-daniela-high`) — toggle play/stop, limpieza de Markdown
 
 ## Núcleo del agente
 
@@ -251,7 +251,7 @@ Implementado via `Agent._cancel_event` (threading.Event) y `Agent._active_subpro
 
 ### Seguridad de tools
 
-- **BashTool**: allowlist de 31 binarios (`ls`, `pwd`, `echo`, `git`, `grep`, `find`, `mkdir`, `rmdir`, `touch`, `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `df`, `du`, `head`, `tail`, `curl`, `wget`, `scp`, `ssh`, `uv`, `python`, `python3`, `pip`, `pip3`, `rg`, `bat`, `eza`, `tokei`, `shellcheck`, `wsl`). Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
+- **BashTool**: allowlist de **34** binarios (`ls`, `pwd`, `echo`, `git`, `grep`, `find`, `mkdir`, `rmdir`, `touch`, `mv`, `cp`, `rm`, `wc`, `date`, `chmod`, `df`, `du`, `head`, `tail`, `curl`, `wget`, `scp`, `ssh`, `uv`, `python`, `python3`, `pip`, `pip3`, `rg`, `bat`, `eza`, `tokei`, `shellcheck`, `wsl`) — fuente de verdad: `_DEFAULT_BINARIES` en `src/bytia_kode/tools/registry.py:43-50`. Ejecuta con `asyncio.create_subprocess_exec` (sin `shell=True`). Directorio de trabajo confinado al workspace. **Validación de operadores shell**: `_validate_command_safety()` rechaza `|`, `&&`, `||`, `>`, `>>`, `<<`, `;`, `$()`, backticks antes de la ejecución. Estos operadores no se interpretan por `subprocess.exec` y se pasan como argumentos literales al binary, causando resultados catastróficos (ej: heredoc roto → decenas de directorios basura). El LLM recibe mensaje de error con guidance para usar `file_write`/`file_edit` y llamar a `bash` múltiples veces.
 - **FileReadTool / FileWriteTool**: `_resolve_workspace_path()` impide path traversal. I/O delegado a `asyncio.to_thread` para no bloquear el event loop.
 - **FileEditTool**: search/replace + create. Backup automático con timestamp. Diff unificado. `_no_match_help` con diagnósticos de partial match.
 - **WebFetchTool**: HTTP GET via httpx. Solo URLs http/https. Validación de content-type (text/*, json, xml). HTML se convierte a texto plano (tag stripping). Truncation a 30k chars. Timeout configurable (15s default).
@@ -325,7 +325,12 @@ El SDK MCP usa async context managers (`stdio_client`, `ClientSession`). `McpCli
 
 ### Soft Dependency
 
-`mcp` SDK es dependencia opcional (`[mcp]` en pyproject.toml). Si no está instalado, `__init__.py` exporta un stub `McpManager` con métodos vacíos. El agente funciona normalmente con solo tools nativas.
+`mcp` SDK es dependencia opcional (`[mcp]` en `pyproject.toml:46`, `mcp>=1.28.1,<2`).
+
+- **Sin SDK:** `mcp/__init__.py` no importa `mcp.client.stdio` → `_MCP_AVAILABLE = False` y exporta un stub `McpManager` con métodos vacíos.
+- **Con SDK:** `mcp/__init__.py:17-28` intenta `from bytia_kode.mcp.manager import McpManager` dentro de un `try/except ModuleNotFoundError`. Como `manager.py` sigue en WIP y **no está shipped**, el import **cae al mismo stub** con un `logger.warning` — `import bytia_kode.mcp` **sobrevive** con el extra `[mcp]` instalado (fix de la issue hermana **O0-B / AST-12**, commit `5537803`). Un smoke de ese extra está en `.github/workflows/ci.yml` ("Smoke test [mcp] extra").
+
+El agente funciona normalmente con solo tools nativas.
 
 ---
 
@@ -446,15 +451,15 @@ Librerías y frameworks que usamos, no creamos. Versión mínima según `pyproje
 | Grupo | Paquetes | Uso |
 | --- | --- | --- |
 | `local` | llama-cpp-python>=0.3 | Inferencia local con GGUF |
-| `mcp` | mcp>=1.6.0 | MCP client — conexión a servidores de tools externos |
+| `mcp` | mcp>=1.28.1,<2 | MCP client — conexión a servidores de tools externos (WIP/experimental) |
 | `memory` | sentence-transformers>=4.0, faiss-cpu>=1.11 | Búsqueda semántica en memoria |
 
 ### External CLI tools
 
 | Herramienta | Instalación | Uso |
 | --- | --- | --- |
-| `edge-tts` | `uv tool install edge-tts` | TTS: generación de voz neuronal |
-| `mpv` | `sudo apt install mpv` | Reproductor de audio para TTS |
+| `bytia-tts` | binario en `~/.local/bin` (**no está en PyPI**) | TTS: CLI local que invoca a piper |
+| `piper` | motor TTS local | Voz `es_AR-daniela-high` (la invoca `bytia-tts`) |
 
 ---
 

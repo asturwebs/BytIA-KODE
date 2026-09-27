@@ -112,8 +112,8 @@ Cada respuesta del asistente incluye un botón **🔊 Escuchar** que convierte e
 
 | Herramienta | Instalación | Propósito |
 | --- | --- | --- |
-| `edge-tts` | `uv tool install edge-tts` | Generación de voz neuronal (Microsoft Edge) |
-| `mpv` | `sudo apt install mpv` | Reproductor de audio CLI |
+| `bytia-tts` | binario en `~/.local/bin` (**no está en PyPI**) | Generación de voz local (CLI que invoca a piper) |
+| `piper` | motor TTS local | Voz `es_AR-daniela-high` (la invoca `bytia-tts`) |
 
 ### Uso
 
