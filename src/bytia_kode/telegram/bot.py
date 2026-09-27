@@ -27,15 +27,21 @@ class TelegramBot:
     def _get_agent(self, chat_id: str) -> Agent:
         """Get or create an Agent for a specific chat_id (session isolation)."""
         if chat_id not in self._agents:
-            session_id = f"telegram_{chat_id}"
-            if self.session_store.get_metadata(session_id):
-                self._agents[chat_id] = Agent(self.config)
-                self._agents[chat_id].load_session_by_id(session_id)
+            agent = Agent(self.config)
+            # H3 (parcial): same wiring as tui.py — without this callback,
+            # /kill never sees the bash subprocess and can't terminate it.
+            def _on_subprocess(process, _agent=agent):
+                _agent._active_subprocess = process
+            agent.on_subprocess.append(_on_subprocess)
+            # H4: resume via (source, source_ref) — create_session now mints a
+            # deterministic telegram_<chat_id> id, so both paths converge.
+            existing = self.session_store.find_session_by_ref("telegram", chat_id)
+            if existing and agent.load_session_by_id(existing.session_id):
                 logger.info("Loaded existing session for chat %s", chat_id)
             else:
-                self._agents[chat_id] = Agent(self.config)
-                self._agents[chat_id].set_session(source="telegram", source_ref=chat_id)
+                agent.set_session(source="telegram", source_ref=chat_id)
                 logger.info("New agent for chat %s", chat_id)
+            self._agents[chat_id] = agent
         return self._agents[chat_id]
 
     def _setup_handlers(self):

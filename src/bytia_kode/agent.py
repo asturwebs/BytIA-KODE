@@ -781,8 +781,10 @@ class Agent:
         tool_defs = self.tools.get_tool_defs()
         await self._manage_context(provider_client)
 
+        # H1: reset once per turn. Clearing inside the loop wiped interrupts
+        # pressed while the tools of the previous iteration were executing.
+        self._cancel_event.clear()
         for _iteration in range(self.max_iterations):
-            self._cancel_event.clear()
             all_messages = [
                 Message(role="system", content=self._build_system_prompt())
             ] + self.messages
@@ -907,7 +909,10 @@ class Agent:
                     else None,
                     reasoning_content=reasoning_to_store,
                 )
-                if msg_count_before == 0 and sanitized_message:
+                # M4: msg_count_before is measured after the user message was
+                # appended, so the first turn of a session counts 1 — the old
+                # `== 0` made the auto-title dead code.
+                if msg_count_before == 1 and sanitized_message:
                     self._session_store.update_title(
                         self._current_session_id,
                         sanitized_message[:80],
@@ -1066,7 +1071,9 @@ class Agent:
                 except ProcessLookupError:
                     pass
             self._active_subprocess = None
-        self._cancel_event.clear()
+        # H2: do NOT clear the cancel event here — kill() can return before the
+        # chat loop has observed the set(), and clearing it would lose the kill.
+        # The next chat() turn resets the event once per turn.
 
     async def close(self):
         await self.providers.close_all()

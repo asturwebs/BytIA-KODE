@@ -200,3 +200,46 @@ class TestApprovedCommandsStillWork:
         result = _run("git -c color.ui=never status", workdir=str(tmp_path))
         assert not result.error
         assert "Security policy" not in result.output
+
+
+class TestBashTimeoutKillsChild:
+    """H6: on timeout the child is killed and reaped BEFORE the error result
+    is returned, and on_subprocess(None) fires only once the child is dead."""
+
+    def test_timeout_kills_and_reaps_child(self, monkeypatch, tmp_path):
+        events = []
+
+        class FakeProcess:
+            returncode = None
+
+            def kill(self):
+                events.append("kill")
+
+            async def wait(self):
+                events.append("wait")
+                self.returncode = -9
+
+            async def communicate(self):
+                events.append("communicate")
+                await asyncio.sleep(30)  # never completes inside the timeout
+
+        proc = FakeProcess()
+
+        async def _fake_spawn(*args, **kwargs):
+            events.append("spawn")
+            return proc
+
+        monkeypatch.setattr(
+            "bytia_kode.tools.registry.asyncio.create_subprocess_exec", _fake_spawn
+        )
+
+        def on_subprocess(p):
+            events.append("report:alive" if p is not None else "report:dead")
+
+        result = _run("ls", timeout=0.5, workdir=str(tmp_path), on_subprocess=on_subprocess)
+
+        assert result.error is True
+        assert "timed out" in result.output
+        assert events == [
+            "spawn", "report:alive", "communicate", "kill", "wait", "report:dead",
+        ], "child must be killed+reaped before on_subprocess(None) and the result"

@@ -369,6 +369,14 @@ class BashTool(Tool):
                 on_subprocess(None)
             return ToolResult(output=output[:50000], error=process.returncode != 0)
         except asyncio.TimeoutError:
+            # H6: reap the child before reporting the timeout — otherwise the
+            # process keeps running detached. on_subprocess(None) must only
+            # fire once the child is dead, or /kill races a live process.
+            try:
+                process.kill()
+                await process.wait()
+            except ProcessLookupError:
+                pass  # already dead
             if on_subprocess:
                 on_subprocess(None)
             return ToolResult(output=f"Command timed out after {timeout}s", error=True)

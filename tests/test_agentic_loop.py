@@ -179,6 +179,114 @@ class TestAgenticLoopTermination:
         assert "Persisted!" in msgs[1]["content"]
 
 
+class TestInterruptBetweenIterations:
+    """H1: the cancel event is cleared once per turn, not per iteration —
+    an interrupt pressed while the tools of an iteration execute must
+    survive into the next iteration check."""
+
+    @pytest.mark.asyncio
+    async def test_interrupt_during_tool_execution_stops_loop(self, agent):
+        """Interrupt set while a tool runs must cut the follow-up iteration
+        (the old per-iteration clear() wiped it and streamed a full answer)."""
+        from bytia_kode.tools.registry import ToolResult
+
+        call_count = 0
+
+        def _tool_call():
+            tc = MagicMock()
+            tc.id = "tc_h1"
+            tc.function = {"name": "bash", "arguments": '{"command": "true"}'}
+            # chat() stores tc.model_dump() into Message.tool_calls (list[dict])
+            tc.model_dump = lambda: {
+                "id": "tc_h1",
+                "function": {"name": "bash", "arguments": '{"command": "true"}'},
+            }
+            return tc
+
+        async def _stream(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                yield "tool_calls", [_tool_call()]
+            else:
+                yield "text", "respuesta-tras-interrupt"
+
+        mock_provider = AsyncMock()
+        mock_provider.chat_stream = _stream
+        agent.providers._primary = mock_provider
+        agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
+
+        async def _execute(name, args, **kw):
+            agent._cancel_event.set()  # the user presses interrupt mid-tool
+            return ToolResult(output="ok", error=False)
+
+        agent.tools.execute = _execute
+
+        collected = []
+        async for chunk in agent.chat("test"):
+            collected.append(chunk)
+
+        assert "respuesta-tras-interrupt" not in [str(c) for c in collected]
+        assert any("[interrupted]" in str(c) for c in collected)
+
+
+class TestKillKeepsCancelEvent:
+    """H2: kill() must NOT clear the cancel event — kill() can return before
+    the chat loop has observed the set(), and the old final clear() lost it."""
+
+    @pytest.mark.asyncio
+    async def test_kill_leaves_event_set(self, agent):
+        await agent.kill()
+        assert agent._cancel_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_kill_mid_stream_interrupts_output(self, agent):
+        """A /kill landing mid-stream cuts the remaining chunks."""
+
+        async def _stream(**kwargs):
+            yield "text", "par"
+            await agent.kill()
+            yield "text", "tial-de-la-respuesta"
+
+        mock_provider = AsyncMock()
+        mock_provider.chat_stream = _stream
+        agent.providers._primary = mock_provider
+        agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
+
+        collected = []
+        async for chunk in agent.chat("test"):
+            collected.append(chunk)
+
+        assert "tial-de-la-respuesta" not in [str(c) for c in collected]
+        assert agent._cancel_event.is_set()
+
+
+class TestSessionAutoTitle:
+    """M4: the session auto-title fires on the FIRST turn — msg_count_before
+    counts the just-appended user message, so the first turn is 1, not 0."""
+
+    @pytest.mark.asyncio
+    async def test_title_set_on_first_turn_and_kept_on_second(self, agent):
+        mock_provider = AsyncMock()
+        mock_provider.chat_stream = _mock_stream_response(text="Hola!")
+        agent.providers._primary = mock_provider
+        agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
+
+        sid = agent._session_store.create_session("tui")
+        agent._current_session_id = sid
+
+        async for _ in agent.chat("primer mensaje del turno uno"):
+            pass
+        assert agent._session_store.get_metadata(sid).title == "primer mensaje del turno uno"
+
+        async for _ in agent.chat("segundo turno"):
+            pass
+        assert agent._session_store.get_metadata(sid).title == "primer mensaje del turno uno"
+
+
 class TestProviderFallback:
     """Verify automatic provider fallback when primary fails."""
 

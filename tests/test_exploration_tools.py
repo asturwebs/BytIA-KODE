@@ -187,7 +187,9 @@ class TestPanicButtons:
         agent.interrupt()
         assert agent._cancel_event.is_set()
 
-    def test_kill_clears_event(self, tmp_path):
+    def test_kill_keeps_event_set(self, tmp_path):
+        # H2: kill() must NOT clear the cancel event — it can return before
+        # the chat loop has observed the set(); the next chat() turn resets it.
         from bytia_kode.agent import Agent
         from bytia_kode.config import AppConfig
 
@@ -195,7 +197,7 @@ class TestPanicButtons:
         agent.interrupt()
         assert agent._cancel_event.is_set()
         asyncio.run(agent.kill())
-        assert not agent._cancel_event.is_set()
+        assert agent._cancel_event.is_set()
 
     def test_subprocess_starts_none(self, tmp_path):
         from bytia_kode.agent import Agent

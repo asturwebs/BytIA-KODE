@@ -33,6 +33,10 @@ logger = logging.getLogger(__name__)
 API_URL = "https://api.typesafe.ai/v1/systemone"
 STATE_DIR = pathlib.Path.home() / ".local" / "state" / "jev-router"
 
+# M2: strong refs for shadow tasks. asyncio keeps only weak refs, so an
+# unreferenced task can be GC'd (and cancelled) before its log write lands.
+_shadow_tasks: set[asyncio.Task] = set()
+
 RISKY_QUESTION = {
     "is_risky": {
         "type": "noul",
@@ -109,6 +113,10 @@ class JevalGate:
         try:
             j = await asyncio.to_thread(self._ask_sync, state)
             ms = round((time.perf_counter() - t0) * 1000)
+            # M1: parse INSIDE the fail-open try — a non-dict JSON body or
+            # `noul: null` used to raise past it and break the turn.
+            a = (j.get("answers") or {}).get("is_risky") or {}
+            noul = float(a.get("noul", 0.0))
         except Exception as e:
             self._log({"rec_id": rec_id, "ts": round(time.time(), 3), "consumer": "kode-guardrail",
                        "mode": self.mode, "tool": tool_name, "state_head": state[:160],
@@ -145,6 +153,8 @@ class JevalGate:
 
         if self.mode == "shadow":
             task = asyncio.create_task(self._classify(tool_name, state, rec_id))
+            _shadow_tasks.add(task)
+            task.add_done_callback(_shadow_tasks.discard)
             return {"blocked": False, "reason": "shadow (background)", "mode": self.mode,
                     "task": task}
 
