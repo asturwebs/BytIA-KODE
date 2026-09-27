@@ -40,14 +40,32 @@ def set_workspace_root(root: Path) -> None:
     global _WORKSPACE_ROOT
     _WORKSPACE_ROOT = root.resolve()
 
+# Default allowlist for the bash tool.
+#
+# AST-14 O1-A (approved by the owner, 2026-09-27): python, python3, pip, pip3,
+# uv, ssh, scp, wsl, curl and wget were REMOVED — with them on the list the
+# tool amounted to RCE/exfiltration by design (reports/SECURITY-bytia-security.md §T1).
+# EXTRA_BINARIES (config.py, merged in _load_allowed_binaries below) remains the
+# operator's MANUAL valve to deliberately restore a binary; interpreter-style
+# binaries restored that way still cannot run `-c`/`-m` payloads
+# (see _INTERPRETER_BINARIES in _validate_argv_safety).
 _DEFAULT_BINARIES = {
     "ls", "pwd", "echo", "git", "grep", "find", "mkdir", "rmdir", "touch",
     "mv", "cp", "rm", "wc", "date", "chmod", "df", "du", "head", "tail",
-    "curl", "wget", "scp", "ssh",
-    "uv", "python", "python3", "pip", "pip3",
     "rg", "bat", "eza", "tokei", "shellcheck",
-    "wsl",
 }
+
+# Binaries that interpret code passed as arguments. Even if an operator
+# re-enables one via EXTRA_BINARIES, `-c`/`-m` execution flags stay rejected.
+_INTERPRETER_BINARIES = {
+    "python", "python3", "python3.10", "python3.11", "python3.12", "python3.13",
+    "perl", "ruby", "node", "nodejs", "php", "lua", "tclsh", "Rscript",
+    "bash", "sh", "zsh", "dash", "ash", "awk", "gawk",
+}
+
+# Where resolved binaries must live (T1-8: a malicious repo committing ./git
+# must not survive resolution even though its basename passes the allowlist).
+_SYSTEM_BIN_DIRS = (Path("/usr/bin"), Path("/usr/local/bin"))
 
 _DANGEROUS_PATTERNS = [
     (r"<<", "heredoc"),
@@ -159,6 +177,8 @@ class BashTool(Tool):
         catastrophic results (e.g., 'mkdir -p dir && cat << EOF' creates dozens
         of garbage directories from the heredoc content).
 
+        String-level guards only; argv-level guards live in _validate_argv_safety.
+
         Returns None if safe, or a ToolResult(error=True) with guidance.
         """
         dangerous = [
@@ -186,6 +206,66 @@ class BashTool(Tool):
                 )
         return None
 
+    @staticmethod
+    def _validate_argv_safety(argv: list[str]) -> ToolResult | None:
+        """Reject argv patterns that grant arbitrary execution even for allowed binaries.
+
+        Runs AFTER shlex.split (AST-14 O1-A · T1): shell operators are already
+        gone, so these checks see the literal arguments the binary would receive:
+
+        1. Interpreter-style binaries (python, perl, sh, ...) must never receive
+           `-c`/`-m` execution flags — 'python -c <payload in quotes>' needs no
+           shell operator at all.
+        2. git: runtime alias definitions ('-c alias.*') and shell-escape alias
+           values (arguments starting with '!') run commands through sh.
+        3. Generic '--exec'/'-exec' passthrough (find -exec, -execdir, ...).
+
+        Returns None if safe, or a ToolResult(error=True) with the reason.
+        """
+        base = Path(argv[0]).name
+
+        if base in _INTERPRETER_BINARIES:
+            for arg in argv[1:]:
+                if arg.startswith(("-c", "-m")):
+                    return ToolResult(
+                        output=(
+                            f"Security policy: '{base}' is an interpreter binary; "
+                            f"'-c'/'-m' execution flags are not allowed. "
+                            f"Run scripts through file tools or a narrower command."
+                        ),
+                        error=True,
+                    )
+
+        if base == "git":
+            for i, arg in enumerate(argv[1:], start=1):
+                if arg.startswith("!"):
+                    return ToolResult(
+                        output=(
+                            "Security policy: git alias values starting with '!' "
+                            "(shell escape) are not allowed."
+                        ),
+                        error=True,
+                    )
+                if arg == "-c" and i + 1 < len(argv) and argv[i + 1].startswith("alias."):
+                    return ToolResult(
+                        output=(
+                            "Security policy: 'git -c alias.*' (runtime alias "
+                            "definition) is not allowed."
+                        ),
+                        error=True,
+                    )
+
+        for arg in argv[1:]:
+            if arg.startswith(("-exec", "--exec")):
+                return ToolResult(
+                    output=(
+                        f"Security policy: '-exec'/'--exec' passthrough is not "
+                        f"allowed in '{base}' commands."
+                    ),
+                    error=True,
+                )
+        return None
+
     async def execute(self, command: str, timeout: int = 60, workdir: str = ".", on_subprocess=None, **_) -> ToolResult:
         try:
             safety_check = self._validate_command_safety(command)
@@ -206,8 +286,36 @@ class BashTool(Tool):
                     error=True,
                 )
 
+            argv_check = self._validate_argv_safety(argv)
+            if argv_check is not None:
+                return argv_check
+
+            # T1-8: resolve the binary via PATH and require it to live in a
+            # system directory. Validating only the basename let a malicious
+            # repo commit './git' and have it executed; relative and
+            # non-system absolute paths are now rejected outright.
+            resolved_bin = shutil.which(argv[0])
+            if resolved_bin is None:
+                return ToolResult(
+                    output=(
+                        f"Security policy violation: binary '{argv[0]}' not found on PATH; "
+                        f"relative or missing binaries are not executed."
+                    ),
+                    error=True,
+                )
+            resolved_bin = Path(resolved_bin).resolve()
+            if not any(resolved_bin == d or d in resolved_bin.parents for d in _SYSTEM_BIN_DIRS):
+                return ToolResult(
+                    output=(
+                        f"Security policy violation: '{argv[0]}' resolves to "
+                        f"'{resolved_bin}', outside /usr/bin and /usr/local/bin. "
+                        f"Only system binaries are executed."
+                    ),
+                    error=True,
+                )
+
             process = await asyncio.create_subprocess_exec(
-                *argv,
+                str(resolved_bin), *argv[1:],
                 cwd=str(_resolve_workspace_path(workdir)),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
