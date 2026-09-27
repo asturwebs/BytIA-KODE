@@ -264,6 +264,72 @@ class TestInlineProgramFlags:
         assert BashTool._validate_argv_safety(["python", "-m", "http.server"]) is not None
 
 
+class TestAwkPositionalProgram:
+    """AST-19 F2: awk/gawk toman el PROGRAMA como argumento posicional (sin
+    flag), así que la rama de flags de la capa 2 no lo ve. Si el operador
+    reintroduce awk vía EXTRA_BINARIES, un programa posicional con system()
+    o pipes es ejecución arbitraria. Decisión de diseño (ver informe):
+    Opción A fail-closed — el programa debe llegar por '-f fichero'."""
+
+    # Vectores de la tabla F2 (repro del CTO 2026-09-27) + variantes propias.
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["awk", 'BEGIN{system("id")}'],
+            ["gawk", "{system($0)}"],
+            ["awk", '{print | "sort"}'],
+            ["gawk", '{ print |& "tr a-z A-z" }'],
+            ["awk", '"cmd" | getline'],
+            # '--source' es la forma larga de '-e' (gawk): la variante con '='
+            # viaja en un solo token y nunca llega a ser posicional.
+            ["gawk", "--source=BEGIN{system(\"id\")}"],
+            ["awk", "--source", "BEGIN{system(\"id\")}"],
+            # Permutación GNU: un '-f' posterior no desactiva el programa
+            # posicional ya visto — fail-closed.
+            ["awk", "{system($0)}", "-f", "/dev/null"],
+        ],
+    )
+    def test_positional_program_blocked(self, argv):
+        result = BashTool._validate_argv_safety(argv)
+        assert result is not None
+        assert result.error
+
+    # Controles: el programa por fichero ('-f'/'--file') sigue pasando, y los
+    # operandos posteriores son asignaciones/ficheros de entrada, no programa.
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["awk", "-f", "prog.awk"],
+            ["gawk", "-f", "prog.awk", "data.txt"],
+            ["awk", "--file=prog.awk", "-v", "x=1", "data.txt"],
+            ["gawk", "-F:", "-f", "prog.awk", "in.csv"],
+            ["awk", "-v", "x=1", "-f", "prog.awk", "data.txt"],
+        ],
+    )
+    def test_progfile_forms_still_pass(self, argv):
+        assert BashTool._validate_argv_safety(argv) is None
+
+    def test_positional_scripts_of_other_interpreters_unaffected(self):
+        # El endurecimiento es exclusivo de awk/gawk: pasar un FICHERO como
+        # operando seguía pasando para el resto en F1 y debe seguir igual.
+        assert BashTool._validate_argv_safety(["perl", "script.pl"]) is None
+        assert BashTool._validate_argv_safety(["python", "-u", "fich.py"]) is None
+
+    def test_awk_positional_system_end_to_end_when_operator_readds_awk(
+        self, monkeypatch, tmp_path
+    ):
+        # Idioma de TestArgvGuards/F1: reintroducción simulada vía
+        # EXTRA_BINARIES; el vector insignia de la tabla, punta a punta.
+        import bytia_kode.tools.registry as registry
+
+        monkeypatch.setattr(
+            registry, "_ALLOWED_BINARIES", registry._ALLOWED_BINARIES | {"awk"}
+        )
+        result = _run("awk 'BEGIN{system(\"id\")}'", workdir=str(tmp_path))
+        assert result.error
+        assert "interpreter" in result.output
+
+
 class TestApprovedCommandsStillWork:
     def test_echo_executes(self, tmp_path):
         result = _run("echo hello", workdir=str(tmp_path))
