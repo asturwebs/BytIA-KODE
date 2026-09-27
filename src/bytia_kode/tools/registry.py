@@ -49,8 +49,9 @@ def set_workspace_root(root: Path) -> None:
 # tool amounted to RCE/exfiltration by design (reports/SECURITY-bytia-security.md §T1).
 # EXTRA_BINARIES (config.py, merged in _load_allowed_binaries below) remains the
 # operator's MANUAL valve to deliberately restore a binary; interpreter-style
-# binaries restored that way still cannot run `-c`/`-m` payloads nor
-# inline-program flags (AST-18 F1: the `-e` family)
+# binaries restored that way still cannot run `-c`/`-m` payloads, nor
+# inline-program flags (AST-18 F1: the `-e` family), nor bare awk programs
+# (AST-19 F2: positional program text)
 # (see _INTERPRETER_BINARIES in _validate_argv_safety).
 _DEFAULT_BINARIES = {
     "ls", "pwd", "echo", "git", "grep", "find", "mkdir", "rmdir", "touch",
@@ -71,7 +72,10 @@ _INTERPRETER_BINARIES = {
 # makes the interpreter execute the NEXT argument as code — perl/ruby/node/lua/
 # Rscript/awk `-e`, perl `-E`/`-ne`/`-we`/`-pe`. A few interpreters spell it
 # without 'e' (php `-r`, node `-p`) and node also takes long forms
-# (`--eval`, `--print`). Deliberately fail-closed on the bundle match:
+# (`--eval`, `--print`); gawk's long form of `-e` is `--source` (AST-19 F2:
+# the `--source=<code>` variant travels in a single token, so it never
+# becomes a positional argument for _awk_positional_program to catch).
+# Deliberately fail-closed on the bundle match:
 # `sh -e` (errexit) and `python -E` (env isolation) are rejected too — a false
 # positive costs the caller a different flag, a false negative costs arbitrary
 # code execution. Long flags match by exact name so `--version`, `--vanilla`
@@ -82,7 +86,7 @@ _INLINE_FLAGS_BY_BINARY: dict[str, frozenset[str]] = {
     "node": frozenset({"-p"}),
     "nodejs": frozenset({"-p"}),
 }
-_LONG_INLINE_FLAGS = frozenset({"--eval", "--print"})
+_LONG_INLINE_FLAGS = frozenset({"--eval", "--print", "--source"})
 
 
 def _is_inline_program_flag(base: str, arg: str) -> bool:
@@ -95,6 +99,52 @@ def _is_inline_program_flag(base: str, arg: str) -> bool:
     if arg in _INLINE_FLAGS_BY_BINARY.get(base, frozenset()):
         return True
     return any(ch in _INLINE_FLAG_CHARS for ch in arg[1:])
+
+# AST-19 F2: awk/gawk take the PROGRAM as a bare positional argument
+# (`awk 'BEGIN{system("id")}'`) — no flag involved, so the flag branch in
+# _validate_argv_safety cannot see it. Design choice: fail-closed option A —
+# reject positional program text and require `-f <file>`/`--file=<file>`,
+# where the file is written through the audited file tools. Option B
+# (screening the program text for `system(`/`getline`/`|`) was rejected:
+# the patterns are evadable (whitespace between tokens, gawk `--source=`)
+# and POSIX awk argument grammar (bundled `-fprog.awk`, `-F:`, GNU argument
+# permutation) makes "which token is the program" ambiguous — the only
+# robust boundary is "the program never rides argv". Awk is not in the
+# default allowlist, so this only constrains operator-reintroduced awk.
+_AWK_BINARIES = frozenset({"awk", "gawk"})
+# Flags whose value arrives as the NEXT argv token (`-v x=1`, `-F :`); without
+# consuming it here, the value itself would read as a positional program.
+_AWK_VALUE_FLAGS = frozenset({"-v", "-F", "-W", "--assign", "--field-separator"})
+
+
+def _awk_positional_program(argv: list[str]) -> str | None:
+    """First argv token awk/gawk would run as PROGRAM TEXT (AST-19 F2), or None.
+
+    Tokens after a `-f`/`--file` program file are assignments/input files,
+    not programs (POSIX awk). Operands seen BEFORE any `-f` count as program
+    text: GNU awk may permute arguments, so a trailing `-f` cannot
+    retroactively defuse a leading positional program.
+    """
+    has_progfile = False
+    expect_value = False
+    for arg in argv[1:]:
+        if expect_value:
+            expect_value = False  # value of -f/-v/-F/... — not a program
+            continue
+        if len(arg) > 1 and arg.startswith("-"):
+            if arg.startswith("-f") or arg.split("=", 1)[0] == "--file":
+                # '-f prog.awk', '-fprog.awk', '--file=prog.awk', ...
+                has_progfile = True
+                if "=" not in arg and arg in ("-f", "--file"):
+                    expect_value = True
+                continue
+            if arg.split("=", 1)[0] in _AWK_VALUE_FLAGS:
+                expect_value = True
+                continue
+            continue  # any other flag (the '-e' family is rejected by F1)
+        if not has_progfile:
+            return arg  # awk would execute this token as the program
+    return None
 
 # Where resolved binaries must live (T1-8: a malicious repo committing ./git
 # must not survive resolution even though its basename passes the allowlist).
@@ -287,7 +337,10 @@ class BashTool(Tool):
            shell operator at all — nor inline-program flags (AST-18 F1): the
            `-e` family (perl/ruby/node/lua/Rscript/awk `-e`, perl `-E` and
            bundles like `-ne`/`-we`/`-pe`, php `-r`, node `-p`/`--eval`/
-           `--print`) executes the next argument the same way.
+           `--print`) executes the next argument the same way. For awk/gawk
+           the program is itself a bare positional argument (no flag): such
+           text is rejected outright (AST-19 F2) — the program must come from
+           `-f <file>` written via the audited file tools.
         2. git: runtime alias definitions ('-c alias.*') and shell-escape alias
            values (arguments starting with '!') run commands through sh.
         3. Generic '--exec'/'-exec' passthrough (find -exec, -execdir, ...).
@@ -317,6 +370,20 @@ class BashTool(Tool):
                         ),
                         error=True,
                     )
+
+        if base in _AWK_BINARIES:
+            program = _awk_positional_program(argv)
+            if program is not None:
+                return ToolResult(
+                    output=(
+                        f"Security policy: '{base}' is an interpreter binary; "
+                        f"bare positional program text is not allowed "
+                        f"(AST-19 F2: system()/pipes can ride an awk program "
+                        f"passed without a flag). Write the program to a file "
+                        f"with the file tools and run '{base} -f <file>'."
+                    ),
+                    error=True,
+                )
 
         if base == "git":
             for i, arg in enumerate(argv[1:], start=1):
