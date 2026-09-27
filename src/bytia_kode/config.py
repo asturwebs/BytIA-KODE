@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import os
 import shutil
 from pathlib import Path
@@ -130,7 +131,21 @@ class AppConfig:
         self._ensure_vendor_skills()
 
     def _get_package_version(self) -> str:
-        """Get current package version from pyproject.toml."""
+        """Versión instalada del paquete — también en site-packages (AST-23).
+
+        Antes sólo se leía ``pyproject.toml`` por ruta relativa: válido en un
+        checkout, pero en una instalación de wheel (site-packages) no existe
+        ese archivo y la función devolvía ``"unknown"`` — así que
+        ``.vendor-version`` decía "unknown" en TODA instalación de PyPI y el
+        auto-reseed por cambio de versión nunca disparaba. Orden ahora:
+        dist-info vía ``importlib.metadata`` (la verdad de una instalación),
+        fallback al pyproject del checkout (fuente sin instalar), "unknown"
+        como último recurso.
+        """
+        try:
+            return importlib.metadata.version("bytia-kode")
+        except importlib.metadata.PackageNotFoundError:
+            pass
         try:
             pyproject = Path(__file__).parent.parent.parent / "pyproject.toml"
             if pyproject.exists():
