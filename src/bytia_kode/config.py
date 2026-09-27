@@ -9,11 +9,17 @@ from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
-# Load .env: CWD first, then global config
+# Load .env: CWD first, then global config. Neither may override variables
+# already present in the environment, and the project .env (loaded first)
+# wins over the global one — the global file is writable by the agent itself
+# (trusted path), so letting it override would let a compromised session
+# redirect PROVIDER_* or widen EXTRA_BINARIES on the next start (AST-15 T4).
+# The CWD path is explicit because bare load_dotenv() searches from the
+# calling module's directory, not from the process CWD.
 _global_env = Path.home() / ".bytia-kode" / ".env"
-load_dotenv(override=False)  # from CWD
+load_dotenv(Path.cwd() / ".env", override=False)  # project .env wins
 if _global_env.exists():
-    load_dotenv(_global_env, override=True)
+    load_dotenv(_global_env, override=False)
 
 
 def _env(key: str, default: str = "") -> str:

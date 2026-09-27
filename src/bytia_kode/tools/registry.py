@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+import ipaddress
 import logging
 import re
 import shlex
 import shutil
+import socket
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -126,6 +128,42 @@ def _resolve_workspace_path(path: str) -> Path:
         if trusted in resolved.parents:
             return resolved
     raise PermissionError(f"Security violation: path escapes workspace: {path}")
+
+
+def _agent_write_denied_paths() -> list[Path]:
+    """Agent-owned persistence surface that agent writes must never touch (T4).
+
+    Computed against the live Path.home() on every check so tests can pin $HOME.
+    """
+    home = Path.home()
+    return [
+        home / ".bytia-kode" / ".env",
+        home / ".bytia-kode" / "mcp_servers.json",
+        home / ".bytia-kode" / "skills",
+        home / "bytia" / "skills",
+    ]
+
+
+def _check_agent_write_allowed(resolved: Path) -> None:
+    """Reject agent writes to its own configuration and skill instruction paths.
+
+    Decision (AST-15 T4): READS STAY ALLOWED on these paths — inspecting
+    config/skills is legitimate and leaks nothing the session could not learn
+    otherwise. A WRITE, however, is a persistence primitive: a prompt-injected
+    session could plant PROVIDER_*/EXTRA_BINARIES/JEVAL_MODE in
+    ~/.bytia-kode/.env, spawn commands in mcp_servers.json, or a SKILL.md that
+    is re-loaded as binding system prompt on the next start. Trusted paths
+    (agent.py: set_trusted_paths([data_dir, ~/bytia])) therefore grant
+    read-write on ordinary session data but read-only on this denylist.
+    """
+    for denied in _agent_write_denied_paths():
+        if resolved == denied or denied in resolved.parents:
+            raise PermissionError(
+                f"Security violation: agent cannot write its own config/skills "
+                f"(denied path: {resolved}); ~/.bytia-kode/.env, "
+                "~/.bytia-kode/mcp_servers.json, ~/.bytia-kode/skills/** and "
+                "~/bytia/skills/** are read-only for the agent."
+            )
 
 
 def _read_file_lines(path: Path) -> list[str]:
@@ -387,6 +425,7 @@ class FileWriteTool(Tool):
     async def execute(self, path: str, content: str, **_) -> ToolResult:
         try:
             resolved = _resolve_workspace_path(path)
+            _check_agent_write_allowed(resolved)
             await asyncio.to_thread(_write_file, resolved, content)
             return ToolResult(output=f"Wrote {len(content)} chars to {path}")
         except PermissionError as exc:
@@ -399,6 +438,63 @@ class FileWriteTool(Tool):
 _STRIP_TAGS_RE = re.compile(r"<(script|style)[^>]*>.*?</\1>", re.DOTALL | re.IGNORECASE)
 _STRIP_TAG_RE = re.compile(r"<[^>]+>")
 _MAX_CONTENT_LENGTH = 30000
+
+# SSRF hardening (AST-15 T2): private targets are rejected pre-connection,
+# redirects are followed manually with per-hop re-validation, and bodies are
+# capped at 1 MiB streamed.
+_MAX_REDIRECTS = 3
+_MAX_DOWNLOAD_BYTES = 1_048_576
+
+
+class _DownloadLimitExceeded(Exception):
+    """Raised when a web_fetch body passes the _MAX_DOWNLOAD_BYTES cap."""
+
+
+def _is_public_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """True only for globally-routable unicast addresses.
+
+    Rejects private (10/8, 172.16/12, 192.168/16, fc00::/7), loopback (127/8,
+    ::1), link-local (169.254/16, fe80::/10), reserved, multicast and
+    unspecified (0.0.0.0, ::) targets.
+    """
+    return not (
+        addr.is_private
+        or addr.is_loopback
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_multicast
+        or addr.is_unspecified
+    )
+
+
+def _assert_public_host(host: str | None) -> None:
+    """Resolve `host` and require EVERY returned IP to be public.
+
+    Runs before each connection attempt, including every redirect hop. IP
+    literals skip DNS (getaddrinfo parses them directly), so numeric targets
+    like http://169.254.169.254/ are denied without a resolver. Raises
+    PermissionError for denied ranges, ValueError when resolution fails.
+    Residual risk: a DNS server answering differently to this resolver than to
+    httpx's own connection (DNS-rebinding TOCTOU) is NOT covered — closing it
+    needs IP pinning at the transport layer, out of scope here.
+    """
+    if not host:
+        raise ValueError("URL has no host")
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError as exc:
+        raise ValueError(f"Cannot resolve host {host!r}: {exc}") from exc
+    ips = {info[4][0].split("%", 1)[0] for info in infos}
+    if not ips:
+        raise ValueError(f"Host {host!r} did not resolve to any address")
+    for ip in sorted(ips):
+        addr = ipaddress.ip_address(ip)
+        if not _is_public_ip(addr):
+            raise PermissionError(
+                f"Security violation: {host!r} resolves to non-public address "
+                f"{ip} — private, loopback, link-local and reserved targets "
+                "are blocked."
+            )
 
 
 class WebFetchTool(Tool):
@@ -418,22 +514,38 @@ class WebFetchTool(Tool):
         if not url.startswith(("http://", "https://")):
             return ToolResult(output="Invalid URL: must start with http:// or https://", error=True)
         try:
+            current = httpx.URL(url)
+        except Exception as exc:
+            return ToolResult(output=f"Invalid URL: {exc}", error=True)
+        try:
             async with httpx.AsyncClient(
-                follow_redirects=True,
+                follow_redirects=False,
                 headers={"User-Agent": "BytIA-KODE/0.4 (agentic TUI)"},
                 timeout=httpx.Timeout(timeout),
             ) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                content_type = resp.headers.get("content-type", "")
+                resp = await self._fetch_validating_redirects(client, current)
+                if isinstance(resp, ToolResult):
+                    return resp
+                try:
+                    resp.raise_for_status()
+                    content_type = resp.headers.get("content-type", "")
+                    try:
+                        text = await self._read_body_capped(resp)
+                    except _DownloadLimitExceeded:
+                        return ToolResult(
+                            output=(
+                                f"Security policy: response exceeds the "
+                                f"{_MAX_DOWNLOAD_BYTES} byte download limit"
+                            ),
+                            error=True,
+                        )
+                finally:
+                    await resp.aclose()
                 if "text/html" in content_type:
-                    text = resp.text
                     text = _STRIP_TAGS_RE.sub("", text)
                     text = _STRIP_TAG_RE.sub("", text)
                     text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
-                elif any(t in content_type for t in ("json", "text/plain", "text/markdown", "text/yaml", "text/xml")):
-                    text = resp.text
-                else:
+                elif not any(t in content_type for t in ("json", "text/plain", "text/markdown", "text/yaml", "text/xml")):
                     return ToolResult(
                         output=f"Unsupported content type: {content_type}",
                         error=True,
@@ -445,9 +557,68 @@ class WebFetchTool(Tool):
             return ToolResult(output=f"HTTP error {exc.response.status_code}: {exc}", error=True)
         except httpx.TimeoutException:
             return ToolResult(output=f"Request timed out after {timeout}s", error=True)
+        except PermissionError as exc:
+            return ToolResult(output=str(exc), error=True)
         except Exception as exc:
             logger.error("web_fetch error: %s", exc)
             return ToolResult(output=f"Fetch failed: {exc}", error=True)
+
+    async def _fetch_validating_redirects(
+        self, client: httpx.AsyncClient, url: httpx.URL
+    ) -> httpx.Response | ToolResult:
+        """GET `url` following at most _MAX_REDIRECTS hops manually.
+
+        httpx runs with follow_redirects=False; every hop — the initial target
+        and each Location — is resolved and IP-checked by _assert_public_host
+        BEFORE connecting, so a public URL cannot pivot to an internal one via
+        3xx. Returns the final streaming Response (caller must aclose it), or
+        a ToolResult(error) when a hop is denied, invalid or too deep.
+        """
+        current = url
+        for hop in range(_MAX_REDIRECTS + 1):
+            try:
+                await asyncio.to_thread(_assert_public_host, current.host)
+            except (PermissionError, ValueError) as exc:
+                return ToolResult(output=str(exc), error=True)
+            resp = await client.send(client.build_request("GET", str(current)), stream=True)
+            if not resp.is_redirect:
+                return resp
+            location = resp.headers.get("location", "")
+            await resp.aclose()
+            try:
+                next_url = current.join(location)
+            except Exception:
+                next_url = None
+            if (
+                next_url is None
+                or next_url.scheme not in ("http", "https")
+                or not next_url.host
+            ):
+                return ToolResult(
+                    output=f"Refusing redirect to invalid target: {location!r}",
+                    error=True,
+                )
+            if hop == _MAX_REDIRECTS:
+                return ToolResult(
+                    output=f"Too many redirects (max {_MAX_REDIRECTS})", error=True
+                )
+            current = next_url
+        return ToolResult(output=f"Too many redirects (max {_MAX_REDIRECTS})", error=True)
+
+    @staticmethod
+    async def _read_body_capped(resp: httpx.Response) -> str:
+        """Read the body as text with a hard _MAX_DOWNLOAD_BYTES cap.
+
+        Streams via aiter_bytes (decompressed bytes) and counts before any
+        .text materialization; a body over the cap is rejected outright rather
+        than truncated so partial content never reaches the model context.
+        """
+        raw = bytearray()
+        async for chunk in resp.aiter_bytes():
+            raw.extend(chunk)
+            if len(raw) > _MAX_DOWNLOAD_BYTES:
+                raise _DownloadLimitExceeded(len(raw))
+        return bytes(raw).decode(resp.encoding or "utf-8", errors="replace")
 
 
 class FileEditTool(Tool):
@@ -457,7 +628,10 @@ class FileEditTool(Tool):
       - 'replace': find exact old_text and replace with new_text (default, safe)
       - 'create': create a new file with the given content (fails if file exists unless force=True)
 
-    Security: all paths resolved against workspace, no escapes.
+    Security: all paths resolved against workspace, no escapes. Both strategies
+    write, so both are denied on the agent-config denylist (~/.bytia-kode/.env,
+    mcp_servers.json, skills/**, ~/bytia/skills/** — see _check_agent_write_allowed);
+    reading those paths stays allowed.
     """
 
     name = "file_edit"
@@ -519,6 +693,7 @@ class FileEditTool(Tool):
     ) -> ToolResult:
         try:
             resolved = _resolve_workspace_path(path)
+            _check_agent_write_allowed(resolved)
         except PermissionError as exc:
             return ToolResult(output=str(exc), error=True)
 
