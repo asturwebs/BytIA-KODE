@@ -28,7 +28,7 @@ from bytia_kode._build_info import version_suffix
 
 
 def version_label() -> str:
-    """Versión + commit del build: ``0.8.0a1+60bac33`` o ``0.8.0a1`` a secas."""
+    """Versión + commit del build: ``0.8.0+60bac33`` o ``0.8.0`` a secas."""
     return f"{__version__}{version_suffix()}"
 
 

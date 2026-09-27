@@ -1,6 +1,6 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.8.0a1 (Alpha, en progreso)
+## Estado actual: v0.8.0 (Alpha) — publicada 2026-09-27
 
 > Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
 
@@ -350,9 +350,20 @@
 
 - [x] 130 tests pasando — sin regresiones
 
-## v0.8.0 — MCP Client + Memoria y Conocimiento (EN PROGRESO)
+## v0.8.0 — Perímetro de seguridad + verdad del repo (COMPLETADO · histórico, 2026-09-27)
 
-### v0.8.0a — MCP Client Support (EN PROGRESO — Sesión 39, 2026-05-24)
+Lo que se entregó de verdad en v0.8.0 (detalle en CHANGELOG.md · revisión AST, oleadas O0–O2 + ronda F):
+
+- [x] **T1 — perímetro bash**: allowlist recortada a 24 binarios + guards de argv + resolución `/usr/bin` (AST-14); capa 2: flags de programa inline (F1/AST-18) y programas posicionales de awk/gawk (F2/AST-19)
+- [x] **T2 — SSRF cerrada en `web_fetch`**: hosts privados/loopback/reserved rechazados, redirects re-validados (máx. 3), límite 1 MiB (AST-15)
+- [x] **T4 — denylist de escritura** sobre trusted paths (`~/.bytia-kode/.env`, `mcp_servers.json`, `skills/**`) (AST-15)
+- [x] **T8 — secretos**: redacción de argumentos en logs + scan full-tree en CI (AST-16)
+- [x] **Suite hermética**: gate JEVAL sin `TYPESAFE_API_KEY`, **331 tests** con `pytest -q`, extras `[mcp]` con smoke en CI (AST-11/AST-12)
+- [x] **Docs sincronizadas D1–D22**: una sola verdad para versión, tests, allowlist y MCP
+- [x] **Build id en TUI**: `v0.8.0+<commit>` en header, arranque y banner Telegram (AST-20)
+- [x] **O2 quick wins de núcleo**: cancelación, kill, timeout de bash, resume de Telegram, auto-título, JEVAL fail-open (AST-17)
+
+### v0.8.0 MCP Client — quedó WIP, NO feature de la release (Sesión 39, 2026-05-24)
 
 **Objetivo:** Soporte MCP client para tools dinámicas desde servidores externos.
 
@@ -376,7 +387,7 @@
 
 **Tool naming:** `mcp__{server}__{tool}` (ej: `mcp__codegraph__codegraph_search`)
 
-### v0.8.0b — Memoria y Conocimiento
+### v0.8.0b — Memoria y Conocimiento (sigue pendiente)
 
 - [ ] Memoria vectorial con FAISS/ChromaDB (búsqueda semántica)
 - [ ] System prompt caching optimizado
