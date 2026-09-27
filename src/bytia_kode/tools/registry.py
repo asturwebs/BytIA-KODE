@@ -49,7 +49,8 @@ def set_workspace_root(root: Path) -> None:
 # tool amounted to RCE/exfiltration by design (reports/SECURITY-bytia-security.md §T1).
 # EXTRA_BINARIES (config.py, merged in _load_allowed_binaries below) remains the
 # operator's MANUAL valve to deliberately restore a binary; interpreter-style
-# binaries restored that way still cannot run `-c`/`-m` payloads
+# binaries restored that way still cannot run `-c`/`-m` payloads nor
+# inline-program flags (AST-18 F1: the `-e` family)
 # (see _INTERPRETER_BINARIES in _validate_argv_safety).
 _DEFAULT_BINARIES = {
     "ls", "pwd", "echo", "git", "grep", "find", "mkdir", "rmdir", "touch",
@@ -58,12 +59,42 @@ _DEFAULT_BINARIES = {
 }
 
 # Binaries that interpret code passed as arguments. Even if an operator
-# re-enables one via EXTRA_BINARIES, `-c`/`-m` execution flags stay rejected.
+# re-enables one via EXTRA_BINARIES, execution flags (`-c`/`-m` and the
+# inline-program family below) stay rejected.
 _INTERPRETER_BINARIES = {
     "python", "python3", "python3.10", "python3.11", "python3.12", "python3.13",
     "perl", "ruby", "node", "nodejs", "php", "lua", "tclsh", "Rscript",
     "bash", "sh", "zsh", "dash", "ash", "awk", "gawk",
 }
+
+# AST-18 F1: inline-program flags. A short flag (or bundle) containing 'e'/'E'
+# makes the interpreter execute the NEXT argument as code — perl/ruby/node/lua/
+# Rscript/awk `-e`, perl `-E`/`-ne`/`-we`/`-pe`. A few interpreters spell it
+# without 'e' (php `-r`, node `-p`) and node also takes long forms
+# (`--eval`, `--print`). Deliberately fail-closed on the bundle match:
+# `sh -e` (errexit) and `python -E` (env isolation) are rejected too — a false
+# positive costs the caller a different flag, a false negative costs arbitrary
+# code execution. Long flags match by exact name so `--version`, `--vanilla`
+# or `--inspect` (which contains an 'e') keep passing.
+_INLINE_FLAG_CHARS = frozenset("eE")
+_INLINE_FLAGS_BY_BINARY: dict[str, frozenset[str]] = {
+    "php": frozenset({"-r"}),
+    "node": frozenset({"-p"}),
+    "nodejs": frozenset({"-p"}),
+}
+_LONG_INLINE_FLAGS = frozenset({"--eval", "--print"})
+
+
+def _is_inline_program_flag(base: str, arg: str) -> bool:
+    """True if `arg` is a flag that makes interpreter `base` run code passed
+    as an argument (AST-18 F1)."""
+    if arg.startswith("--"):
+        return arg.split("=", 1)[0] in _LONG_INLINE_FLAGS
+    if not arg.startswith("-") or len(arg) < 2:
+        return False
+    if arg in _INLINE_FLAGS_BY_BINARY.get(base, frozenset()):
+        return True
+    return any(ch in _INLINE_FLAG_CHARS for ch in arg[1:])
 
 # Where resolved binaries must live (T1-8: a malicious repo committing ./git
 # must not survive resolution even though its basename passes the allowlist).
@@ -253,7 +284,10 @@ class BashTool(Tool):
 
         1. Interpreter-style binaries (python, perl, sh, ...) must never receive
            `-c`/`-m` execution flags — 'python -c <payload in quotes>' needs no
-           shell operator at all.
+           shell operator at all — nor inline-program flags (AST-18 F1): the
+           `-e` family (perl/ruby/node/lua/Rscript/awk `-e`, perl `-E` and
+           bundles like `-ne`/`-we`/`-pe`, php `-r`, node `-p`/`--eval`/
+           `--print`) executes the next argument the same way.
         2. git: runtime alias definitions ('-c alias.*') and shell-escape alias
            values (arguments starting with '!') run commands through sh.
         3. Generic '--exec'/'-exec' passthrough (find -exec, -execdir, ...).
@@ -269,6 +303,16 @@ class BashTool(Tool):
                         output=(
                             f"Security policy: '{base}' is an interpreter binary; "
                             f"'-c'/'-m' execution flags are not allowed. "
+                            f"Run scripts through file tools or a narrower command."
+                        ),
+                        error=True,
+                    )
+                if _is_inline_program_flag(base, arg):
+                    return ToolResult(
+                        output=(
+                            f"Security policy: '{base}' is an interpreter binary; "
+                            f"inline-program flags like '{arg}' (-e/-E and bundled "
+                            f"variants) are not allowed. "
                             f"Run scripts through file tools or a narrower command."
                         ),
                         error=True,
