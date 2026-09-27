@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed — instalación canónica desde PyPI (AST-22)
+
+- **`install.sh` reescrito**: bootstrap de uv → `uv tool install bytia-kode` (PyPI) → configuración de `~/.bytia-kode/.env` (preservado si existe) + skills dirs. **Ya no clona el repo** ni genera wrapper: el binario `bytia-kode` es el console script del paquete. El clone queda solo para desarrollo (`docs/DEVELOPMENT.md`).
+- **README/docs alineados**: sección Instalación = PyPI (`pip install bytia-kode` / `uv tool install bytia-kode`), badge PyPI, clone marcado como camino de desarrollo. `scripts/validate_metadata.py` ahora exige el camino PyPI como reflejo de la instalación oficial (antes exigía `uv run bytia-kode`).
+- **Console script despacha `--bot`**: `bytia-kode = bytia_kode.__main__:main` (antes `tui:run_tui`). En 0.8.0, `bytia-kode --bot` arrancaba la TUI en silencio — el flag sólo funcionaba vía `python -m bytia_kode`. El despacho nativo entra con la próxima release; mientras tanto, desde PyPI: `uvx --from bytia-kode python -m bytia_kode --bot`.
+
+### Added — release automática por Trusted Publishers (AST-22)
+
+- **`.github/workflows/release.yml`**: push de tag `v*` → gates (secret scan + metadata + suite) → `uv build` → `twine check` → `pypa/gh-action-pypi-publish` **por OIDC** (`permissions: id-token: write`), **cero secretos en el repo**.
+- **PROD GATE en forma GitHub**: el job publish corre en el environment `pypi` con required reviewer — cada release la aprueba el Socio con un clic en la UI. **Fail-closed por diseño**: sin el Trusted Publisher registrado en PyPI, el publish falla en el intercambio OIDC y no publica nada.
+- **Tests de guarda**: `tests/test_canonical_install.py` (install.sh sin git, README refleja PyPI, entry point + despacho `--bot`) y `tests/test_release_workflow.py` (trigger solo tags `v*`, environment `pypi`, OIDC sin secretos, gates antes de build).
+
 ## [0.8.0] - 2026-09-27
 
 Release centrada en **seguridad y verdad del repo** (revisión AST: oleadas O0–O2 + ronda F de endurecimiento). Lo que contiene de verdad:

@@ -1,0 +1,69 @@
+# Release a PyPI — Trusted Publishers (OIDC), cero secretos en el repo.
+#
+# Flujo (AST-22): push de tag `v*` → gates (scan + metadata + suite) →
+# `uv build` → publicación con pypa/gh-action-pypi-publish vía OIDC.
+#
+# PROD GATE en forma GitHub: el job `publish` corre en el environment `pypi`
+# con required reviewer (lo configura el Socio en GitHub Settings →
+# Environments). Cada release la aprueba el Socio con un clic en la UI,
+# igual que su `prod-go`. Sin aprobación, no hay publish.
+#
+# Fail-closed por diseño: hasta que el Socio registre el Trusted Publisher en
+# PyPI (owner/repo/workflow/environment), el job `publish` falla en el
+# intercambio OIDC — eso ES la validación de que no publica nada por accidente.
+#
+# La CI completa (ci.yml) también corre sobre el tag: `on: push` incluye tags,
+# así que el SHA publicado lleva wheel-verify + smoke [mcp] además de estos gates.
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Gates + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.11'
+          enable-cache: true
+      - name: Secret scan (full tree)
+        run: uv run python scripts/check_secrets.py --all
+      - name: Validate metadata
+        # Fail si README/CHANGELOG/pyproject divergen (doctrina de fuente única)
+        run: uv run python scripts/validate_metadata.py
+      - name: Run tests
+        run: uv run pytest -q
+      - name: Build distributions
+        run: uv build
+      - name: Check distributions
+        run: uvx twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI (OIDC)
+    needs: build
+    runs-on: ubuntu-latest
+    # PROD GATE: environment con required reviewer — aprobación del Socio por UI
+    environment: pypi
+    permissions:
+      # OIDC Trusted Publishers: el token se emite por intercambio OIDC,
+      # no hay ningún secreto persistente en el repo ni en GitHub Settings.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1

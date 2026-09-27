@@ -38,6 +38,9 @@ scripts/                      # Utilidades de validación
 
 ## Flujo de desarrollo
 
+El `git clone` es **solo para desarrollo**. Los usuarios finales instalan desde PyPI
+(`pip install bytia-kode` / `uv tool install bytia-kode`, ver README).
+
 ```bash
 # 1. Hacer cambios en src/
 
@@ -47,33 +50,26 @@ uv run pytest -q
 uv run python scripts/validate_metadata.py
 uv run python scripts/check_secrets.py
 
-# 3. Probar (el wrapper usa el .venv editable — cambios reflejados inmediatamente)
-bytia-kode
+# 3. Probar (usa el .venv editable — cambios reflejados al reiniciar)
+uv run bytia-kode
 ```
 
-> **IMPORTANTE:** `bytia-kode` usa un wrapper (`~/.local/bin/bytia-kode`) que ejecuta
-> desde el `.venv` editable del proyecto. Los cambios en `src/` se reflejan al reiniciar.
-> NO usar `uv tool install` — crea copia aislada que ignora los edits.
->
-> Si el wrapper se pierde (ej: alguien hace `uv tool install`):
-> ```bash
-> cat > ~/.local/bin/bytia-kode << 'WRAPPER'
-> #!/usr/bin/env bash
-> set -euo pipefail
-> PROJECT_DIR="$HOME/bytia/proyectos/BytIA-KODE"
-> cd "$PROJECT_DIR"
-> exec uv run python -m bytia_kode.tui "$@"
-> WRAPPER
-> chmod +x ~/.local/bin/bytia-kode
-> ```
+> **IMPORTANTE:** para probar cambios locales usa SIEMPRE `uv run bytia-kode`
+> desde el clon (entorno editable). NO instales el clon como tool
+> (`uv tool install .`) — crea una copia aislada que ignora tus edits.
+> `uv tool install bytia-kode` (sin `.`) instala desde PyPI: eso es el camino
+> de usuario final, no el de desarrollo.
 
-### Build y release (solo para publicar versión)
+### Release (publicar versión en PyPI)
 
-```bash
-# Solo cuando se publica una nueva versión:
-uv build
-uv tool install --force .   # Solo para release, NO para desarrollo diario
-```
+La publicación es automática por [Trusted Publishers (OIDC)](https://docs.pypi.org/trusted-publishers/) — cero secretos en el repo:
+
+1. Bump de `version` en `pyproject.toml` + entrada en `CHANGELOG.md` (la CI valida que no diverjan).
+2. Commit final, gates verdes (`uv run pytest -q`).
+3. Push del tag `vX.Y.Z` → `.github/workflows/release.yml` corre los gates, `uv build`, `twine check`, y publica con `pypa/gh-action-pypi-publish` vía OIDC en el environment `pypi` (required reviewer: aprobación manual del Socio — el PROD GATE).
+
+Para build local de prueba (sin publicar): `uv build` y `uv run twine check dist/*`.
+
 
 ## Hook de pre-commit
 
@@ -356,10 +352,15 @@ Los tests están en `tests/`. El pre-commit hook los ejecuta automáticamente.
 
 ## Build y Release
 
+La release se publica automática por tags (ver "Release" en Flujo de desarrollo):
+push de `vX.Y.Z` → `release.yml` → environment `pypi` (aprobación) → PyPI.
+El build local sólo es para prueba, no publica:
+
 ```bash
 uv build                                    # Genera .tar.gz + .whl
 uv run python -m twine check dist/*        # Verificar paquete
-uv pip install ./dist/*.whl --force-reinstall  # Instalar localmente
+uv pip install ./dist/*.whl --force-reinstall  # Instalar localmente (prueba)
 ```
 
-La versión se gestiona en `pyproject.toml` (campo `version`).
+La versión se gestiona en `pyproject.toml` (campo `version`); la instalación
+de usuario final es `pip install bytia-kode` desde PyPI.

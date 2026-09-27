@@ -24,8 +24,11 @@ if not PROMPT.exists():
     raise SystemExit("faltan recursos YAML de identidad")
 
 readme = README.read_text(encoding="utf-8")
-if "uv run bytia-kode" not in readme:
-    raise SystemExit("README no refleja instalación oficial")
+# AST-22: instalación oficial = PyPI (`pip install bytia-kode` o `uv tool
+# install bytia-kode`). El clone es SOLO desarrollo y no cuenta como reflejo
+# del camino canónico.
+if "pip install bytia-kode" not in readme and "uv tool install bytia-kode" not in readme:
+    raise SystemExit("README no refleja instalación oficial (PyPI)")
 
 changelog = CHANGELOG.read_text(encoding="utf-8")
 if f"## [{version}]" not in changelog:
