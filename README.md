@@ -16,29 +16,8 @@
 
 **BytIA KODE** es un agente de IA para terminal con identidad configurable, fallback automático de providers y skills extensibles. TUI (Textual) + bot de Telegram, sesiones persistentes en SQLite y arquitectura multi-provider con circuit breaker.
 
-<p align="center">
-  <img src="docs/img/bytia-kode-1-TUI-inicio.png" width="700"><br>
-  <em>TUI con identidad constitucional cargada</em>
-</p>
 
-<p align="center">
-  <img src="docs/img/bytia-kode-2-TUI-chat.png" width="350">
-  <img src="docs/img/bytia-kode-4-TUI-temas.png" width="350"><br>
-  <em>Chat con el agente · Temas disponibles</em>
-</p>
-
-<p align="center">
-  <img src="docs/img/bytia-kode-3-TUI-comandos.png" width="350">
-  <img src="docs/img/bytia-kode-6-TUI-menu.png" width="350"><br>
-  <em>Comandos integrados · Menú rápido (Ctrl+P)</em>
-</p>
-
-<p align="center">
-  <img src="docs/img/bytia-kode-5-benchmark.png" width="350"><br>
-  <em>Benchmark: 4.90x speedup async</em>
-</p>
-
-> **Nota:** Las capturas muestran la TUI. El bot de Telegram comparte la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes)).
+> **Nota:** El bot de Telegram comparte la misma base de datos de sesiones que la TUI (ver [Sesiones Persistentes](#sesiones-persistentes)).
 
 > Release actual: `0.8.0` · Identidad: `YAML` · Instalación: [`pip install bytia-kode`](https://pypi.org/project/bytia-kode/) · Botón rápido: `install.sh` (abajo)
 
