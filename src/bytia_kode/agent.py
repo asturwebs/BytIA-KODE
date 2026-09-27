@@ -21,6 +21,7 @@ from bytia_kode.providers.client import Message
 from bytia_kode.providers.manager import ProviderManager
 from bytia_kode.session import SessionStore
 from bytia_kode.skills.loader import SkillLoader
+from bytia_kode.errors import AgentCancelledError
 from bytia_kode.tools.registry import ToolRegistry, ToolResult
 from bytia_kode.tools.session import SessionListTool, SessionLoadTool, SessionSearchTool
 
@@ -630,7 +631,17 @@ class Agent:
                 ) from None
 
     async def _handle_tool_calls(self, tool_calls) -> None:
-        for tool_call in tool_calls:
+        for idx, tool_call in enumerate(tool_calls):
+            if self._cancel_event.is_set():
+                # Panic button durante el lote: el resto de herramientas NO se
+                # ejecuta sobre un agente que el usuario ya mató. Los ids no
+                # ejecutados viajan en la excepción para que chat() los responda
+                # como cancelados y la transcripción no quede colgada.
+                pending = []
+                for tc in tool_calls[idx:]:
+                    fn = tc.function if isinstance(tc.function, dict) else {}
+                    pending.append((tc.id, fn.get("name") or "unknown"))
+                raise AgentCancelledError(pending_tool_calls=pending)
             fn = tool_call.function if isinstance(tool_call.function, dict) else {}
             tool_name = fn.get("name")
             raw_arguments = fn.get("arguments", {})
@@ -700,7 +711,7 @@ class Agent:
             result: ToolResult = await self.tools.execute(
                 tool_name,
                 arguments,
-                on_subprocess=lambda p: [cb(p) for cb in self.on_subprocess],
+                on_subprocess=self._track_subprocess,
             )
             for cb in self.on_tool_done:
                 cb(tool_name, result.output, result.error)
@@ -805,8 +816,11 @@ class Agent:
                     stream, timeout=60.0
                 ):
                     if self._cancel_event.is_set():
-                        yield "\n[interrupted]"
-                        break
+                        # Panic button observado mid-stream: se eleva para el
+                        # cleanup estructurado del handler (persistir el parcial
+                        # + marcar el turno). Es Exception a secas a propósito
+                        # para escapar de la red de fallos de provider de abajo.
+                        raise AgentCancelledError(partial_text=response_text)
                     if chunk_type == "text" and isinstance(data, str) and data:
                         response_text += data
                         yield data
@@ -815,6 +829,10 @@ class Agent:
                         yield ("reasoning", data)
                     elif chunk_type == "tool_calls" and isinstance(data, list):
                         tool_calls_accum = data
+            except AgentCancelledError:
+                yield "\n[interrupted]"
+                self._persist_cancelled_response(response_text)
+                return
             except (
                 TimeoutError,
                 ConnectionError,
@@ -861,17 +879,10 @@ class Agent:
                 return
 
             if self._cancel_event.is_set():
+                # La cancelación aterrizó durante el stream pero el generador
+                # terminó sin entregar otro chunk — mismo cleanup estructurado.
                 if response_text or reasoning_text:
-                    stored_cancel = response_text or "(respuesta cancelada)"
-                    self.messages.append(
-                        Message(role="assistant", content=stored_cancel)
-                    )
-                    if self._current_session_id:
-                        self._session_store.append_message(
-                            self._current_session_id,
-                            role="assistant",
-                            content=stored_cancel,
-                        )
+                    self._persist_cancelled_response(response_text)
                 break
 
             msg_count_before = len(self.messages)
@@ -967,7 +978,32 @@ class Agent:
                 yield "\n[loop detectado — forzando respuesta]"
                 continue
 
-            await self._handle_tool_calls(tool_calls_accum)
+            try:
+                await self._handle_tool_calls(tool_calls_accum)
+            except AgentCancelledError as exc:
+                # El kill/interrupt cortó el lote: se responden explícitamente
+                # los tool_calls que no llegaron a ejecutarse (protocolo — un
+                # tool_call sin respuesta cuelga la transcripción) y el turno
+                # termina marcado.
+                for tc_id, tool_name in exc.pending_tool_calls:
+                    self.messages.append(
+                        Message(
+                            role="tool",
+                            content="[cancelled by user]",
+                            tool_call_id=tc_id,
+                            name=tool_name,
+                        )
+                    )
+                    if self._current_session_id:
+                        self._session_store.append_message(
+                            self._current_session_id,
+                            role="tool",
+                            content="[cancelled by user]",
+                            tool_call_id=tc_id,
+                            name=tool_name,
+                        )
+                yield "\n[interrupted]"
+                return
         else:
             yield "\n[Max iterations reached]"
 
@@ -1056,6 +1092,31 @@ class Agent:
     def interrupt(self) -> None:
         """Signal the agentic loop to stop after current chunk."""
         self._cancel_event.set()
+
+    def _track_subprocess(self, process) -> None:
+        """Kill-wiring central: recuerda el subprocess vivo para que kill()
+        pueda terminarlo, y avisa a las embeddings (estado TUI, contabilidad
+        de Telegram).
+
+        Antes cada embedding duplicaba esta asignación en su propio callback —
+        un Agent a secas tenía un kill() que no veía al hijo. Las escrituras
+        duplicadas que quedan en TUI/Telegram son inofensivas (idempotentes).
+        """
+        self._active_subprocess = process
+        for cb in self.on_subprocess:
+            cb(process)
+
+    def _persist_cancelled_response(self, response_text: str) -> None:
+        """Cleanup estructurado del turno cancelado: el parcial (o el
+        placeholder si no llegó texto) se persiste en memoria y en sesión."""
+        stored_cancel = response_text or "(respuesta cancelada)"
+        self.messages.append(Message(role="assistant", content=stored_cancel))
+        if self._current_session_id:
+            self._session_store.append_message(
+                self._current_session_id,
+                role="assistant",
+                content=stored_cancel,
+            )
 
     async def kill(self) -> None:
         """Nuclear cancel: interrupt + kill subprocess + reset state."""

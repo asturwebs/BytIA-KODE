@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+Blindaje de cancelación (AST-24, de GitHub issue #3): los Panic Buttons se
+comportan como se espera incluso en los casos que daban miedo.
+
+### Fixed — un kill durante un lote de herramientas aborta el resto del lote
+
+- **`_handle_tool_calls` comprueba la cancelación entre herramientas**: si el kill/interrupt aterriza mientras corre la herramienta 1 de N, las herramientas 2..N ya NO se ejecutan sobre un agente que el usuario mató. Los `tool_call` que no llegaron a ejecutarse reciben respuesta explícita `[cancelled by user]` (en memoria y en sesión) — sin tool_calls colgados en la transcripción.
+
+### Fixed — `kill()` ve el subprocess de bash en cualquier embedding
+
+- **Kill-wiring centralizado en el Agent** (`_track_subprocess`): el registro del subprocess vivo en `_active_subprocess` ya no depende de que cada embedding (TUI, Telegram) duplique el callback — un Agent a secas tenía un `kill()` que no podía terminar al hijo. Las duplicaciones existentes son inofensivas.
+
+### Changed — cleanup estructurado de la cancelación
+
+- **`AgentCancelledError`** (`bytia_kode.errors`): excepción propia que señala la cancelación observada mid-operación. Deliberadamente NO hereda de `RuntimeError` (chat() captura esa familia como fallo de provider con failover). El cleanup vive en el catcher: `chat()` persiste el parcial/placeholder en un solo sitio (`_persist_cancelled_response`) y responde los tool_calls pendientes.
+- **Un turno cortado antes del primer chunk ahora deja `(respuesta cancelada)`** en la transcripción — antes no dejaba nada; el turno cancelado queda registrado.
+- Las invariantes H1 (clear una vez por turno) y H2 (kill() NO limpia el evento) se conservan intactas y quedan blindadas por tests.
+- **Tests de TUI arrancados** (Pilot integrado de Textual, sin dependencia nueva): Esc/Ctrl+K llaman a interrupt/kill, sin streaming widget colgado, flujo `_process_message` cortado. 100% coverage de `tui.py` sigue siendo deuda declarada.
+
 ## [0.8.1] - 2026-09-27
 
 Cierre de la 0.8.x: **estreno real del flujo OIDC de publicación** y saneado de la documentación. Publica el fix `--bot` que quedó en main tras v0.8.0 (AST-22) y añade `--version`, el auto-reseed real de skills vendor y la GitHub Release automática.
