@@ -249,3 +249,54 @@ ls -R | grep MagicMock
 # 4) El claim 174 histórico
 git archive 5fe9c1f | tar -x -C <scratch> && cd <scratch> && python -m pytest -p no:cacheprovider -q   # → 174 passed
 ```
+
+---
+
+## 8. Evidencia adicional (re-auditoría independiente, misma issue)
+
+Una segunda pasada sobre el mismo commit reprodujo todos los hallazgos anteriores y añade lo siguiente.
+
+### 8.1 La basura NO son directorios: son bases SQLite reales fuera de `tmp_path`
+
+Las entradas numéricas de `MagicMock/mock.data_dir.__truediv__()/` son **archivos de 36.864 bytes**, no directorios:
+
+```
+d        MagicMock/
+d        MagicMock/mock.data_dir.__truediv__()
+f  36864  MagicMock/mock.data_dir.__truediv__()/126287907513280
+f  36864  MagicMock/mock.data_dir.__truediv__()/126287905920672
+f  36864  MagicMock/mock.data_dir.__truediv__()/126287906441936
+```
+
+La cadena es más grave de lo que dice §3: `session.py:108-109` crea los dos directorios vía `mkdir(parents=True)`, y después `src/bytia_kode/session.py:114` (`sqlite3.connect(str(self.db_path))`) **escribe una base SQLite real con esquema completo** en el tercer nivel, nombrada con el `id()` del mock. Un solo test → un archivo; los 3 tests de `TestAgentIntegration` → 3 archivos. Con `session.py:118` (`PRAGMA journal_mode=WAL`) además se habría generado `-wal`/`-shm` de no cerrarse limpio.
+
+**Corrección al §3 sobre el arreglo:** `monkeypatch.chdir(tmp_path)` solo *reubica* la basura, no la elimina — los tres fixtures (`test_agentic_loop.py:13`, `test_context_management.py:12`, `test_jeval_guardrail.py:93`) escriben igualmente una SQLite real desde un mock; dos caen en el tmp de pytest y solo uno se ve en la raíz. El arreglo de fondo es **`cfg.data_dir = tmp_path`** (o `AppConfig(data_dir=tmp_path)`, patrón ya correcto en `tests/test_session.py:172`), más un `TypeError` explícito en `SessionStore.__init__` (`session.py:107-109`) si `db_path` no es `str | Path`.
+
+### 8.2 Sonda de mutación: ¿hay tests que siempre pasan?
+
+Se aplicaron 6 mutaciones al código de producto, **verificando que cada una llegaba a aplicarse** y restaurando tras cada prueba (`TYPESAFE_API_KEY=k`, suite completa):
+
+| Mutación | Detectada por |
+|---|---|
+| `guardrail.py:122` — `blocked = False` (enforce nunca bloquea) | **2** tests |
+| `session.py:162` — todo mensaje con `seq_num` 0 | 15 tests |
+| `session.py:196` — `ORDER BY seq_num DESC` | 9 tests |
+| `providers/circuit.py:34` — el breaker nunca abre | **1** test |
+| `providers/manager.py:201` — `get_healthy` ignora el pin | **1** test |
+| `skills/loader.py` — prioridad de capas invertida | 13 tests + 28 errores |
+
+**6/6 detectadas → la suite tiene dientes; no hay tests vacíos en el sentido fuerte.** Pero tres zonas son finas: el umbral del circuit breaker y el pin de `get_healthy` se sostienen sobre **un único test cada uno**, y el bloqueo de `guardrail` sobre dos. Esas tres son las primeras candidatas a reforzarse si se refactoriza.
+
+*(Nota de método: una mutación no aplicada por patrón inexistente se descarta como inválida en lugar de contarse como "no detectada" — de ahí verificar la aplicación.)*
+
+### 8.3 Líneas exactas del guard `_provider_sync` (HIGH #1)
+
+Para el contrato de regresión pendiente del §4/§6, el guard está en **`src/bytia_kode/tui.py`**, en 10 sitios y sin un solo test:
+
+| Línea | Uso |
+|---|---|
+| `tui.py:456` | declaración `_provider_sync: bool = False` + comentario del contrato |
+| `tui.py:558` | `_on_provider_changed` — `if self._provider_sync: return` (**el núcleo del fix**) |
+| `tui.py:586-590`, `1014-1018`, `1028-1032`, `1108-1112` | los 4 puntos de sync display-only (`try/finally`) |
+
+El test mínimo que faltaría: provocar un cambio de `active_provider` con `_provider_sync = True` y afirmar que `agent.providers.pinned` **no** cambia.
