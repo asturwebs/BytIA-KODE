@@ -122,7 +122,8 @@ def test_commit_is_resolved_once_per_process(monkeypatch, tmp_path):
 # --- forma de la etiqueta y header de la TUI ---------------------------------
 
 def test_version_label_shape():
-    assert re.fullmatch(r"\d+\.\d+\.\d+a\d+(\+[0-9a-f]{4,12})?", version_label())
+    # Acepta release final (0.8.0) y pre-release (0.8.0a1), con estampa hex opcional.
+    assert re.fullmatch(r"\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:\+[0-9a-f]{4,12})?", version_label())
 
 
 def test_tui_info_line_carries_build_id(monkeypatch):
