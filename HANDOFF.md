@@ -1,7 +1,7 @@
 # HANDOFF — BytIA-KODE (B-KODE)
 
 > Memoria transferible del repo. Leer ANTES de asumir contexto. Actualizar al cerrar sesión significativa.
-> Última actualización: 2026-09-27 (release v0.8.0 — AST-21; antes: revisión AST — parche documental D1-D22)
+> Última actualización: 2026-09-27 (post-PyPI — AST-22: instalación canónica + release OIDC; antes: release v0.8.0 — AST-21)
 >
 > Cambios del **2026-09-21** incorporados: guardarraíl **JEVAL** (`cf66bec`, modos `off`/`shadow`/`enforce`, default `off`), modo **shadow** fire-and-forget (`ab6554b`), TTS local vía **`bytia-tts` + piper** — sustituye al TTS en la nube de la era WSL (`4b12ca7`), y botón de audio que vuelve a "Escuchar" al terminar (`768d3ff`). Sesiones anteriores a esta oleada: ver `docs/devlog/` y `reports/`.
 
@@ -17,8 +17,10 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 - **Hotfix 2026-09-16** (`3a1b9ee`): failover vivo — pin solo en F3 (guard `_provider_sync`), router pineable de nuevo (`list_pinnable()`; F3→primary pina el router). 2 bugs HIGH hallados por OpenCodeReview revisando `ae97b37`. Detalle: `docs/devlog/2026-09-16.md`
 - **Auto-sanado verificado (16-sep, auditoría)**: sin pin, cada chat camina desde la cabeza (`get_healthy`) y el half-open del breaker reintenta el Studio a los 60 s — se recupera solo, sin F3 ni reinicio (`test_self_heal_returns_to_chain_head_after_recovery`). Residual real: el reintento half-open puede costar un arranque en frío del Studio; el failover en-chat continúa y el mensaje no se pierde.
 - **Selección directa de providers (2026-09-16)**: **F1 = modo AUTO** (pin(None), reversible desde cualquier pin) · F4 Studio · F5 Ollama · F6 Z.ai · F7 DeepSeek · F8 Router (pin manual, aviso de circuito) · F3 cicla. Resuelve el "slot Auto" pendiente del re-review ocr.
-- **CI**: `.github/workflows/ci.yml` — solo validación (metadata + tests + wheel + twine). Push a main NO deploya.
-- **Lanzador**: `~/.local/bin/bytia-kode` (wrapper bash → `.venv/bin/bytia-kode`)
+- **CI**: `.github/workflows/ci.yml` — validación (metadata + tests + wheel + twine). Push a main NO deploya.
+- **Release**: `.github/workflows/release.yml` (AST-22) — push de tag `v*` → gates + `uv build` → `pypa/gh-action-pypi-publish` por **OIDC/Trusted Publishers** en el environment `pypi` (required reviewer = PROD GATE del Socio). Cero secretos en el repo. **Fail-closed**: hasta que el Socio registre el Trusted Publisher en PyPI (owner `asturwebs`, repo `BytIA-KODE`, workflow `release.yml`, environment `pypi`), el job publish falla en el intercambio OIDC — eso es por diseño.
+- **Instalación canónica (AST-22)**: `pip install bytia-kode` / `uv tool install bytia-kode` (PyPI). `install.sh` hace bootstrap de uv → instala desde PyPI → configura `~/.bytia-kode/.env`. El clone es SOLO desarrollo.
+- **Lanzador**: `~/.local/bin/bytia-kode` — console script real (entry `bytia_kode.__main__:main`, AST-22: despacha `--bot`; antes apuntaba a `tui:run_tui` y `--bot` arrancaba la TUI en silencio). El wrapper bash de la era clone ya no existe.
 - **Cerebro**: `~/.bytia-kode/` (config, sesiones SQLite, temas, `mcp_servers.json`)
 
 ## Arquitectura en 30 segundos

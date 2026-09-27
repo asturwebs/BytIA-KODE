@@ -4,6 +4,13 @@
 
 > Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
 
+## Post-PyPI (AST-22, 2026-09-27) — instalación canónica + release automática
+
+- [x] **Camino canónico**: `pip install bytia-kode` / `uv tool install bytia-kode` (PyPI). `install.sh` reescrito (uv → PyPI → `~/.bytia-kode/.env`), sin clone. Clone = solo desarrollo.
+- [x] **`release.yml`**: tag `v*` → gates + `uv build` → publish OIDC (`pypa/gh-action-pypi-publish`), environment `pypi` con required reviewer (PROD GATE del Socio), cero secretos.
+- [ ] **Pendiente del Socio**: registrar el Trusted Publisher en PyPI + crear el environment `pypi` en GitHub; tras el primer publish OIDC, rotar/borrar el token actual (checklist en AST-22).
+- [ ] **`bytia-kode --bot` nativo**: entra con la próxima release (console script → `bytia_kode.__main__:main`).
+
 ---
 
 ## v0.7.7 — Session Audit Fixes (COMPLETADO)

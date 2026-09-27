@@ -8,6 +8,7 @@
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Release](https://img.shields.io/badge/release-0.8.0-blue.svg)
+![PyPI](https://img.shields.io/pypi/v/bytia-kode.svg)
 ![Tests](https://img.shields.io/badge/tests-331%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
@@ -39,7 +40,7 @@
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram comparte la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes)).
 
-> Release actual: `0.8.0` · Identidad: `YAML` · Instalación: [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+> Release actual: `0.8.0` · Identidad: `YAML` · Instalación: [`pip install bytia-kode`](https://pypi.org/project/bytia-kode/) · Botón rápido: `install.sh` (abajo)
 
 > ⚠️ **Nota sobre las secciones "Novedades en vX.Y.Z" que siguen:** son **histórico de release**. No describen la versión actual — para eso está `pyproject.toml:3` y la línea "Release actual" de arriba.
 
@@ -156,40 +157,61 @@
 
 ## Instalación
 
+El paquete vive en [PyPI](https://pypi.org/project/bytia-kode/): `pip install bytia-kode` (o `uv tool install bytia-kode`) es el camino canónico. El `git clone` queda **solo para desarrollo** (ver [DESARROLLO](docs/DEVELOPMENT.md)).
+
 ### Instalación rápida (recomendada)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/asturwebs/BytIA-KODE/main/install.sh | bash
 ```
 
-Esto instala todo automáticamente: clona el repo, configura el entorno Python, crea el wrapper `bytia-kode` en `~/.local/bin`, y genera el `.env` con valores por defecto. Solo necesitas editar el `.env` con tu provider y API key.
+Esto instala todo automáticamente: bootstrap de [uv](https://docs.astral.sh/uv/getting-started/installation/) si falta, instalación de `bytia-kode` **desde PyPI** como tool aislada (`bytia-kode` en `~/.local/bin`), y genera `~/.bytia-kode/.env` con valores por defecto. Solo necesitas editar ese `.env` con tu provider y API key.
 
-### Instalación manual
+### Instalación manual (desde PyPI)
 
-Requiere [uv](https://docs.astral.sh/uv/getting-started/installation/).
+```bash
+# con uv (recomendado: entorno aislado, Python gestionado, binario en ~/.local/bin)
+uv tool install bytia-kode
+
+# o con pip, dentro de un venv
+pip install bytia-kode
+```
+
+Luego crea tu configuración global (el instalador rápido lo hace por ti):
+
+```bash
+mkdir -p ~/.bytia-kode
+cat > ~/.bytia-kode/.env << 'EOF'
+PROVIDER_BASE_URL=http://localhost:8080/v1
+PROVIDER_API_KEY=not-needed
+PROVIDER_MODEL=auto
+EOF
+# editar con tu provider y API key — todas las variables: .env.example del repo
+```
+
+> Un `.env` en el directorio de trabajo (proyecto) tiene precedencia sobre el global `~/.bytia-kode/.env`. Las skills vendor se siembran solas en `~/.bytia-kode/skills/vendor/` en el primer arranque.
+
+### Desarrollo (desde fuente)
 
 ```bash
 git clone https://github.com/asturwebs/BytIA-KODE.git
 cd BytIA-KODE
 uv sync
-cp .env.example .env   # editar con tu provider y API key
 uv run bytia-kode
 ```
 
-## Build como paquete
+## Publicación en PyPI
 
-```bash
-uv build
-uv pip install ./dist/*.whl
-bytia-kode
-```
+Las versiones se publican automáticamente por [Trusted Publishers (OIDC)](https://docs.pypi.org/trusted-publishers/): push de un tag `v*` → `.github/workflows/release.yml` corre los gates, construye con `uv build` y publica vía `pypa/gh-action-pypi-publish` en el environment `pypi` (aprobación manual). Cero secretos en el repo.
 
 ## Modos de ejecución
 
 ```bash
-uv run bytia-kode          # TUI (por defecto)
-uv run python -m bytia_kode --bot  # Telegram bot
+bytia-kode                # TUI (por defecto)
+bytia-kode --bot          # Telegram bot (desde la próxima release)
 ```
+
+> En `0.8.0` (publicado), el bot desde una instalación PyPI arranca con `uvx --from bytia-kode python -m bytia_kode --bot`; el despacho nativo `bytia-kode --bot` entra con la próxima release (el console script pasa por `bytia_kode.__main__:main`). En desarrollo: `uv run bytia-kode` y `uv run python -m bytia_kode --bot`.
 
 ## Bot de Telegram
 

@@ -47,7 +47,8 @@ mcp = ["mcp>=1.28.1,<2"]
 memory = ["sentence-transformers>=4.0", "faiss-cpu>=1.11"]
 
 [project.scripts]
-bytia-kode = "bytia_kode.tui:run_tui"
+# AST-22: el console script despacha --bot igual que `python -m bytia_kode`
+bytia-kode = "bytia_kode.__main__:main"
 
 [build-system]
 requires = ["hatchling"]
