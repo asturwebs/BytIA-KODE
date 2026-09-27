@@ -462,11 +462,14 @@ class BytIAKODEApp(App):
     # el pin solo cambia con acción manual del usuario (F3). Ver _on_provider_changed.
     _provider_sync: bool = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, agent: Agent | None = None, **kwargs):
         super().__init__(**kwargs)
         self.theme = _load_theme()
-        self.config = load_config()
-        self.agent = Agent(self.config)
+        # Inyección para tests de interrupción (AST-24): un agent falso con
+        # chat/interrupt/kill controlados permite pilotar el comportamiento
+        # de la TUI sin arrancar providers reales.
+        self.agent = agent if agent is not None else Agent(load_config())
+        self.config = self.agent.config
         self.agent.on_tool_call.append(self._on_agent_tool_call)
         self.agent.on_tool_done.append(self._on_agent_tool_done)
         self.agent.on_subprocess.append(self._on_agent_subprocess)
