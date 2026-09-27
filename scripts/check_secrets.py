@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import re
 import subprocess
 from pathlib import Path
@@ -36,6 +37,18 @@ def staged_files() -> list[Path]:
     return [ROOT / line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def tracked_files() -> list[Path]:
+    """Full tree: every file tracked by git (used by CI via --all)."""
+    result = subprocess.run(
+        ['git', 'ls-files'],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return [ROOT / line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
 def is_suspicious_line(line: str) -> bool:
     if SK_PATTERN.search(line):
         return True
@@ -53,9 +66,18 @@ def is_suspicious_line(line: str) -> bool:
     return False
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description='Scan tracked files for secrets.')
+    parser.add_argument(
+        '--all',
+        action='store_true',
+        help='scan every git-tracked file (full tree) instead of only the staged ones',
+    )
+    args = parser.parse_args(argv)
+    mode = 'full tree' if args.all else 'staged'
+    files = tracked_files() if args.all else staged_files()
     flagged: list[str] = []
-    for path in staged_files():
+    for path in files:
         if not path.is_file():
             continue
         if path.name in SKIP_FILES:
@@ -74,8 +96,8 @@ def main() -> None:
             if is_suspicious_line(stripped):
                 flagged.append(f'{path.relative_to(ROOT)}:{lineno}')
     if flagged:
-        raise SystemExit('Secret scan failed on: ' + ', '.join(flagged))
-    print('secret scan OK')
+        raise SystemExit(f'Secret scan failed ({mode}) on: ' + ', '.join(flagged))
+    print(f'secret scan OK ({mode}: {len(files)} files)')
 
 
 if __name__ == '__main__':
