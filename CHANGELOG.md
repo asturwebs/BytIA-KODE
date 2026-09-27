@@ -1,18 +1,46 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.1] - 2026-09-27
+
+Cierre de la 0.8.x: **estreno real del flujo OIDC de publicación** y saneado de la documentación. Publica el fix `--bot` que quedó en main tras v0.8.0 (AST-22) y añade `--version`, el auto-reseed real de skills vendor y la GitHub Release automática.
+
+### Fixed — el console script despacha `--bot` (AST-22, publicado aquí)
+
+- **`bytia-kode --bot` arranca el bot**: `bytia-kode = bytia_kode.__main__:main` (antes `tui:run_tui`). En 0.8.0, `bytia-kode --bot` arrancaba la TUI en silencio — el flag sólo funcionaba vía `python -m bytia_kode`. El fix estaba en main desde AST-22; esta release lo publica.
+
+### Fixed — skills vendor se actualizan en instalaciones de PyPI (AST-23)
+
+- **`.vendor-version` con la versión real**: `_get_package_version()` lee `importlib.metadata` (dist-info) antes que el `pyproject.toml` del checkout. En site-packages no hay pyproject: el sello decía `"unknown"` en TODA instalación de PyPI, así que `installed_version == current_version` se cumplía siempre y el auto-reseed por upgrade nunca disparaba — las skills vendor actualizadas no llegaban al usuario. Orden: dist-info → pyproject del checkout → `"unknown"`.
+
+### Added — `--version` (AST-23)
+
+- **Cortesía para usuarios de pip**: `bytia-kode --version` imprime `versión (+ build id si existe)` y sale 0 — nunca arranca la TUI ni el bot. Gana el primer flag (`--version --bot` imprime la versión igual).
+
+### Added — GitHub Release automática con notas del CHANGELOG (AST-23)
+
+- **Job `github-release`** en `release.yml` (`needs: build + publish`): tras publicar en PyPI crea la GitHub Release del tag con las notas **extraídas de `CHANGELOG.md`** — fuente única de verdad, nada de notas a mano ni PR-lists de GitHub. Fail-closed: tag sin entrada en el CHANGELOG → job rojo, nunca una Release vacía. Contexto: v0.7.8 siguió de "Latest" cinco horas después de publicar 0.8.0 porque la Release se creaba a mano. Permiso `contents: write` sólo en ese job.
+
+### Added — RELEASING.md: el proceso real (AST-23)
+
+- **El flujo de publicación vive en el repo**: preparación (CHANGELOG + pyproject + `uv.lock` bumpados juntos), tag `v*`, gates CI, PROD GATE (environment `pypi`, aprobación del Socio por UI), intercambio OIDC → PyPI, verificación post-publish (wheel en venv limpio, `--version`, `.vendor-version`, ficha de PyPI), camino manual de emergencia (el de v0.8.0, con rotación de token) y las reglas (publish aprobado por el Socio, CHANGELOG como única fuente de notas, un tag se publica una vez).
+
+### Changed — README profesional (AST-23)
+
+- **Fuera las 16 secciones "Novedades en vX.Y.Z"** (v0.5.0→v0.7.8, ~110 líneas) que duplicaban el CHANGELOG (= drift) — sustituidas por una línea: "Historial completo: CHANGELOG.md". También fuera el disclaimer ⚠️ sobre ellas.
+- **Reestructura**: qué es/para qué → badges → instalación (canónica PyPI) → quickstart → características → arquitectura → bot Telegram → desarrollo → docs.
+- **Badges dinámicos** (PyPI, CI) en vez del conteo de tests hardcodeado; **capturas con URL absoluta** (PyPI no resuelve rutas relativas del long_description); `--version`/`--bot` documentados como modos; fix de un fence huérfano que se tragaba la sección Validación.
+- **Guard tests**: cero secciones novedades, línea de historial al CHANGELOG, ninguna imagen con ruta relativa.
 
 ### Changed — instalación canónica desde PyPI (AST-22)
 
 - **`install.sh` reescrito**: bootstrap de uv → `uv tool install bytia-kode` (PyPI) → configuración de `~/.bytia-kode/.env` (preservado si existe) + skills dirs. **Ya no clona el repo** ni genera wrapper: el binario `bytia-kode` es el console script del paquete. El clone queda solo para desarrollo (`docs/DEVELOPMENT.md`).
 - **README/docs alineados**: sección Instalación = PyPI (`pip install bytia-kode` / `uv tool install bytia-kode`), badge PyPI, clone marcado como camino de desarrollo. `scripts/validate_metadata.py` ahora exige el camino PyPI como reflejo de la instalación oficial (antes exigía `uv run bytia-kode`).
-- **Console script despacha `--bot`**: `bytia-kode = bytia_kode.__main__:main` (antes `tui:run_tui`). En 0.8.0, `bytia-kode --bot` arrancaba la TUI en silencio — el flag sólo funcionaba vía `python -m bytia_kode`. El despacho nativo entra con la próxima release; mientras tanto, desde PyPI: `uvx --from bytia-kode python -m bytia_kode --bot`.
 
-### Added — release automática por Trusted Publishers (AST-22)
+### Added — release por Trusted Publishers, el workflow (AST-22)
 
 - **`.github/workflows/release.yml`**: push de tag `v*` → gates (secret scan + metadata + suite) → `uv build` → `twine check` → `pypa/gh-action-pypi-publish` **por OIDC** (`permissions: id-token: write`), **cero secretos en el repo**.
 - **PROD GATE en forma GitHub**: el job publish corre en el environment `pypi` con required reviewer — cada release la aprueba el Socio con un clic en la UI. **Fail-closed por diseño**: sin el Trusted Publisher registrado en PyPI, el publish falla en el intercambio OIDC y no publica nada.
-- **Tests de guarda**: `tests/test_canonical_install.py` (install.sh sin git, README refleja PyPI, entry point + despacho `--bot`) y `tests/test_release_workflow.py` (trigger solo tags `v*`, environment `pypi`, OIDC sin secretos, gates antes de build).
+- **Tests de guarda**: `tests/test_canonical_install.py` (install.sh sin git, README refleja PyPI, entry point + despacho `--bot`) y `tests/test_release_workflow.py` (trigger solo tags `v*`, environment `pypi`, OIDC sin secretos, gates antes de build, GitHub Release tras publish con notas del CHANGELOG).
 
 ## [0.8.0] - 2026-09-27
 

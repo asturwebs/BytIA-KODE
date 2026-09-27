@@ -1,15 +1,24 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.8.0 (Alpha) — publicada 2026-09-27
+## Estado actual: v0.8.1 (Alpha) — 2026-09-27
 
 > Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
+
+## v0.8.1 (AST-23, 2026-09-27) — README profesional + estreno del flujo OIDC
+
+- [x] **README profesional**: fuera las 16 secciones "Novedades" (duplicaban el CHANGELOG), reestructura completa, badges dinámicos, capturas con URL absoluta (renderizan en PyPI).
+- [x] **`--version`**: imprime `versión (+ build id)` y sale 0, nunca arranca la TUI.
+- [x] **`.vendor-version` real**: `importlib.metadata` → auto-reseed de skills vendor en upgrades de PyPI (antes "unknown", nunca disparaba).
+- [x] **`bytia-kode --bot` nativo**: console script → `bytia_kode.__main__:main` (fix AST-22, publicado en esta release).
+- [x] **GitHub Release automática**: `release.yml` la crea tras publicar, notas extraídas del CHANGELOG.
+- [x] **RELEASING.md**: el proceso real de publicación (tag → gates → environment `pypi` → OIDC → verificación).
+- [ ] **Pendiente del Socio**: registrar el Trusted Publisher en PyPI + crear el environment `pypi` en GitHub; tras el primer publish OIDC, rotar/borrar el token actual (checklist en AST-22/RELEASING.md).
 
 ## Post-PyPI (AST-22, 2026-09-27) — instalación canónica + release automática
 
 - [x] **Camino canónico**: `pip install bytia-kode` / `uv tool install bytia-kode` (PyPI). `install.sh` reescrito (uv → PyPI → `~/.bytia-kode/.env`), sin clone. Clone = solo desarrollo.
 - [x] **`release.yml`**: tag `v*` → gates + `uv build` → publish OIDC (`pypa/gh-action-pypi-publish`), environment `pypi` con required reviewer (PROD GATE del Socio), cero secretos.
-- [ ] **Pendiente del Socio**: registrar el Trusted Publisher en PyPI + crear el environment `pypi` en GitHub; tras el primer publish OIDC, rotar/borrar el token actual (checklist en AST-22).
-- [ ] **`bytia-kode --bot` nativo**: entra con la próxima release (console script → `bytia_kode.__main__:main`).
+- [x] **`bytia-kode --bot` nativo**: entró con v0.8.1 (console script → `bytia_kode.__main__:main`).
 
 ---
 
