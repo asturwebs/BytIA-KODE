@@ -7,12 +7,14 @@ skills vendor actualizadas no llegaban a los upgrades.
 """
 import importlib.metadata
 import shutil
+import tomllib
+from pathlib import Path
 
 import bytia_kode.config as config
-from bytia_kode import __version__ as BASE_VERSION
 from bytia_kode.config import AppConfig
 
 VENDOR_SKILLS = {"bytia-constitution", "bytia-memory", "graphify", "skills-manager"}
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _app(tmp_path, monkeypatch) -> AppConfig:
@@ -35,7 +37,11 @@ def test_fallback_to_pyproject_when_metadata_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(config.importlib.metadata, "version", _missing)
     app = _app(tmp_path, monkeypatch)
     # Sin dist-info, queda el pyproject del checkout (fuente sin instalar).
-    assert app._get_package_version() == BASE_VERSION
+    # Se lee directo del archivo — la metadata instalada puede quedar vieja
+    # entre el bump y el re-sync del entorno (lección AST-21).
+    with (ROOT / "pyproject.toml").open("rb") as fh:
+        expected = tomllib.load(fh)["project"]["version"]
+    assert app._get_package_version() == expected
 
 
 def test_vendor_version_file_carries_real_version(tmp_path, monkeypatch):
