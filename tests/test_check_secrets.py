@@ -33,9 +33,9 @@ _spec.loader.exec_module(check_secrets)
 DOC_PLACEHOLDER = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
 # Igual pero con el último carácter mutado: ya NO es el placeholder público;
 # un token real con esa pinta debe seguir cazándose.
-_MUTATED = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew1" + "2"
+_MUTATED = "123456:ABC-DEF1234ghIkl-zyx" + "57W2v1u123ew12"
 _SK = "sk-" + "AbCdEfGhIjK12345"
-_ENTROPY = "qW7xZ2mN9bV4cL8kJ5hG3fD6sA1pO0" + "tR"
+_ENTROPY = "qW7xZ2mN9bV4cL8kJ5hG" + "3fD6sA1pO0tR"
 
 
 class TestPlaceholderNotFlagged:
@@ -75,6 +75,18 @@ class TestNonSecretsNotFlagged:
 
 class TestCiInvocations:
     def test_full_tree_scan_passes_on_current_repo(self, capsys):
+        # Anti-verde-vacuo: `git ls-files` no ve ficheros untracked, así que un
+        # escaneo pre-commit no incluye ESTE fichero y el test pasaría sin
+        # probar nada (así se coló el verde falso del commit fa9ce29). Exigimos
+        # que el test esté trackeado para que el escaneo lo cubra de verdad.
+        tracked = {
+            str(p.relative_to(check_secrets.ROOT))
+            for p in check_secrets.tracked_files()
+        }
+        assert "tests/test_check_secrets.py" in tracked, (
+            "tests/test_check_secrets.py no está trackeado: el escaneo "
+            "full-tree no lo incluiría y este test pasaría en vacío"
+        )
         # La invocación exacta que fue ROJA en GitHub el 2026-09-27.
         check_secrets.main(["--all"])
         out = capsys.readouterr().out
