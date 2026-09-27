@@ -105,6 +105,12 @@ class SessionStore:
     """SQLite WAL-backed session store. Thread-safe via connection-per-method."""
 
     def __init__(self, db_path: Path | str):
+        # Path(mock) silently succeeds via os.fspath (mocks generate a fake
+        # "<MagicMock ...>" string), materializing junk dirs/dbs. Fail loudly.
+        if not isinstance(db_path, (str, Path)):
+            raise TypeError(
+                f"db_path must be str or Path, got {type(db_path).__name__}"
+            )
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()

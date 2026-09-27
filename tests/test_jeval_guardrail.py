@@ -18,6 +18,8 @@ def _reset_gate():
 
 def _gate(mode, monkeypatch):
     monkeypatch.setenv("JEVAL_MODE", mode)
+    # Hermetic: the suite must pass without TYPESAFE_API_KEY in the environment.
+    monkeypatch.setattr(guardrail, "_load_key", lambda: "test-key")
     return guardrail.JevalGate()
 
 
@@ -93,6 +95,9 @@ class TestAgentIntegration:
     def _agent(self, tmp_path):
         cfg = MagicMock()
         cfg.provider = MagicMock()
+        # Real Path: a MagicMock data_dir makes SessionStore materialize
+        # `MagicMock/...` dirs and a real SQLite db in the repo tree (QA §8).
+        cfg.data_dir = tmp_path / "data"
         cfg.skills_dir = tmp_path / "skills"
         with patch("bytia_kode.agent.load_system_prompt", return_value="You are BytIA."):
             return Agent(cfg)
