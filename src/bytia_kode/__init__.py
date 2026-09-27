@@ -23,6 +23,14 @@ try:
 except PackageNotFoundError:
     __version__ = _read_pyproject_version()
 
+# Hoja: sólo stdlib, no importa nada del paquete (ver _build_info docstring).
+from bytia_kode._build_info import version_suffix
+
+
+def version_label() -> str:
+    """Versión + commit del build: ``0.8.0a1+60bac33`` o ``0.8.0a1`` a secas."""
+    return f"{__version__}{version_suffix()}"
+
 
 def _setup_logging() -> None:
     if logging.getLogger().handlers:

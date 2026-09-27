@@ -7,7 +7,7 @@ from pathlib import Path
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
-from bytia_kode import __version__
+from bytia_kode import version_label
 from bytia_kode.agent import Agent
 from bytia_kode.config import AppConfig, load_config
 from bytia_kode.session import SessionStore
@@ -72,7 +72,7 @@ class TelegramBot:
             await self._deny(update)
             return
         await update.message.reply_text(
-                f"BytIA KODE v{__version__}\n"
+                f"BytIA KODE v{version_label()}\n"
                 f"Model: {self.config.provider.model}\n"
                 "Send me a message to start coding!"
         )
