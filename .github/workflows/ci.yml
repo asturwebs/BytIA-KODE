@@ -49,3 +49,22 @@ jobs:
           if output != 'True':
               raise SystemExit('kernel.default.yaml no está disponible como recurso empaquetado')
           PY
+      - name: Smoke test [mcp] extra
+        # Caza D2 (AST-8): con el extra [mcp] instalado, `import bytia_kode.mcp`
+        # debe funcionar aunque mcp/manager.py siga en WIP.
+        run: |
+          python - <<'PY'
+          import glob
+          import os
+          import subprocess
+          import tempfile
+          import venv
+          from pathlib import Path
+
+          wheel = sorted(glob.glob('dist/*.whl'))[-1]
+          env_dir = Path(tempfile.mkdtemp(prefix='bytia-mcp-smoke-'))
+          venv.create(env_dir, with_pip=True)
+          py = env_dir / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+          subprocess.check_call([str(py), '-m', 'pip', 'install', f'{wheel}[mcp]'])
+          subprocess.check_call([str(py), '-c', 'import bytia_kode.mcp; print("import bytia_kode.mcp OK")'])
+          PY

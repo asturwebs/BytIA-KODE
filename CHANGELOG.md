@@ -2,14 +2,16 @@
 
 ## [0.8.0a1] - 2026-05-24 (EN PROGRESO)
 
-### Added — MCP Client Support
+### WIP / experimental — MCP Client Support (no funcional)
 
-Nueva capacidad: B-KODE puede conectarse a servidores MCP externos y registrar sus tools dinámicamente en el `ToolRegistry`. El agente nunca distingue entre tools nativas y MCP.
+> **⚠️ Experimental (WIP), no anunciar como capacidad terminada.** El cliente MCP está a medio construir: **`McpTool.execute()` sigue siendo `NotImplementedError`** (`src/bytia_kode/mcp/tool.py:27-29`), no existe `mcp/manager.py` (lifecycle) ni wiring en `agent.py`/`tui.py` — ver "Pending (próxima sesión)" más abajo. El extra `[mcp]` (`pyproject.toml:46`) es **experimental**: instalarlo habilita el paquete `bytia_kode.mcp`, que hoy degrada a stubs no-op (soft-import guard en `mcp/__init__.py`). Sin el extra, B-KODE funciona igual con solo tools nativas.
+
+Código base presente (sin ejecución real todavía):
 
 - **`src/bytia_kode/mcp/config.py`**: `McpServerConfig` dataclass + `load_mcp_config()` desde `~/.bytia-kode/mcp_servers.json`. Formato compatible con Claude Code.
-- **`src/bytia_kode/mcp/__init__.py`**: Public API + soft-import guard. Si el SDK `mcp` no está instalado, exporta stub no-op.
+- **`src/bytia_kode/mcp/__init__.py`**: Public API + soft-import guard. Si el SDK `mcp` no está instalado (o `manager.py` sigue en WIP), exporta stub no-op.
 - **`src/bytia_kode/mcp/client.py`**: `McpClient` con transporte stdio + `AsyncExitStack` para lifecycle de context managers del SDK. Handshake (`initialize`), descubrimiento (`tools/list`), ejecución (`tools/call`) con timeouts.
-- **`src/bytia_kode/mcp/tool.py`**: `McpTool` (subclase de `Tool`) — puente Adapter Pattern. Naming: `mcp__{server}__{tool}`.
+- **`src/bytia_kode/mcp/tool.py`**: `McpTool` (subclase de `Tool`) — puente Adapter Pattern. Naming: `mcp__{server}__{tool}`. **`execute()` pendiente** (`NotImplementedError`).
 
 ### Architecture Decisions
 
