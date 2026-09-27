@@ -52,7 +52,10 @@ def test_publish_uses_oidc_without_secrets():
         assert not {"password", "api-token"} & set(with_block), (
             "el publish no debe llevar credenciales: sólo OIDC"
         )
-    assert "secrets." not in raw, "cero secretos referenciados en el workflow"
+    # Cero secretos: ni expresiones ${{ secrets.* }} ni credenciales en steps.
+    # (El escaneo busca la sintaxis de expresión, no la subcadena "secrets." —
+    # matchearía con `scripts/check_secrets.py` del job de gates.)
+    assert "${{ secrets." not in raw, "cero secretos referenciados en el workflow"
 
 
 def test_build_runs_gates_before_packaging():
