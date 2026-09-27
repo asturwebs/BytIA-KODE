@@ -1,5 +1,9 @@
 # Code Review — BytIA-KODE v0.7.7
 
+> 📁 **HISTÓRICO (v0.7.7, 2026-04-30)** — documento de archivo. Refleja el estado
+> del repo en esa fecha y **no** es la revisión vigente. Para el estado actual ver
+> `reports/` y `pyproject.toml:3`.
+
 **Fecha:** 2026-04-30
 **Revisor:** BytIA (Hermes Agent)
 **Commit:** `v0.7.7-2-g3576cb4`
@@ -151,7 +155,7 @@ El filtro excluye explícitamente `role="system"` del batch de compresión. Los 
 
 ---
 
-## v0.7.8 — Propuesta de contenido (actualizada tras triple review)
+## v0.7.8 — Propuesta de contenido (histórico · actualizada tras triple review)
 
 Priorización fusionada de Hermes + Peke + Claude:
 
@@ -162,7 +166,7 @@ Priorización fusionada de Hermes + Peke + Claude:
 | Fix race condition interrupt/kill | Baja | 15min |
 | tui.py refactor: extraer widgets a subdir | Tech debt | Medio |
 
-**No recomendado para v0.7.8** (fuera de scope):
+**No recomendado para v0.7.8** (histórico, fuera de scope):
 - Summary con modelo separado (trade-off deliberado, no bug — requiere redesign del provider manager)
 - `z`/`tmux`/`gh` en allowlist (sin valor real para el agente)
 - Symlink attack surface fix (bajo riesgo, alto esfuerzo)

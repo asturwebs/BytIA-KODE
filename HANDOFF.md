@@ -1,7 +1,9 @@
 # HANDOFF — BytIA-KODE (B-KODE)
 
 > Memoria transferible del repo. Leer ANTES de asumir contexto. Actualizar al cerrar sesión significativa.
-> Última actualización: 2026-09-16 (hotfix failover — bugs hallados por OpenCodeReview)
+> Última actualización: 2026-09-27 (revisión AST — parche documental D1-D22)
+>
+> Cambios del **2026-09-21** incorporados: guardarraíl **JEVAL** (`cf66bec`, modos `off`/`shadow`/`enforce`, default `off`), modo **shadow** fire-and-forget (`ab6554b`), TTS local vía **`bytia-tts` + piper** — sustituye al TTS en la nube de la era WSL (`4b12ca7`), y botón de audio que vuelve a "Escuchar" al terminar (`768d3ff`). Sesiones anteriores a esta oleada: ver `docs/devlog/` y `reports/`.
 
 ## Qué es
 
@@ -11,7 +13,7 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 ## Estado
 
 - **Versión**: `0.8.0a1` (EN PROGRESO — ver CHANGELOG.md para el detalle por feature)
-- **Tests**: 174/174 ✅ (`uv run pytest -q`)
+- **Tests**: **184/184 ✅** (`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m pytest -p no:cacheprovider -q`). La suite fue **hermetizada en esta oleada** (issue hermana **O0-A / AST-11**, commit `38f2053`): el gate JEVAL ya no exige `TYPESAFE_API_KEY` y desapareció la basura `MagicMock/` en el árbol. Antes del fix, 4 tests de JEVAL fallaban sin el secreto (180/184).
 - **Hotfix 2026-09-16** (`3a1b9ee`): failover vivo — pin solo en F3 (guard `_provider_sync`), router pineable de nuevo (`list_pinnable()`; F3→primary pina el router). 2 bugs HIGH hallados por OpenCodeReview revisando `ae97b37`. Detalle: `docs/devlog/2026-09-16.md`
 - **Auto-sanado verificado (16-sep, auditoría)**: sin pin, cada chat camina desde la cabeza (`get_healthy`) y el half-open del breaker reintenta el Studio a los 60 s — se recupera solo, sin F3 ni reinicio (`test_self_heal_returns_to_chain_head_after_recovery`). Residual real: el reintento half-open puede costar un arranque en frío del Studio; el failover en-chat continúa y el mensaje no se pierde.
 - **Selección directa de providers (2026-09-16)**: **F1 = modo AUTO** (pin(None), reversible desde cualquier pin) · F4 Studio · F5 Ollama · F6 Z.ai · F7 DeepSeek · F8 Router (pin manual, aviso de circuito) · F3 cicla. Resuelve el "slot Auto" pendiente del re-review ocr.
@@ -58,11 +60,13 @@ Kill-switch: `BYTIA_KODE_HERDR=0`. Detalles y gotcha del parser CLI 0.8.2
 
 ## Pendiente (próxima sesión)
 
-- MCP (v0.8.0a1): `mcp/manager.py` lifecycle, wiring bootstrap en agent+tui,
-  `McpTool.execute()` (TODO(human)), optional dep `[mcp]` en pyproject.
-  ⚠️ **Latente**: `mcp/__init__.py` ya importa `manager.py` → con el extra
-  `[mcp]` instalado, cualquier `import bytia_kode.mcp` explota (sin extra, el
-  soft-guard lo esconde). La TUI no depende del paquete mcp.
+- MCP (v0.8.0a1) — **WIP / experimental** (decisión del Socio, 2026-09-27):
+  la optional dep **`[mcp]` YA existe** en `pyproject.toml:46` (`mcp>=1.28.1,<2`),
+  y con ella instalada `import bytia_kode.mcp` **cae al stub** en lugar de romper
+  (fix de la issue hermana **O0-B / AST-12**, commit `5537803`, cerrada +
+  smoke de extras `[mcp]` en CI). Quedan pendientes `mcp/manager.py` lifecycle,
+  wiring bootstrap en agent+tui y `McpTool.execute()` (`TODO(human)`).
+  La TUI no depende del paquete mcp.
 - Dependabot: ✅ **36 vulns cerradas (2026-09-15, `uv lock` quirúrgico de 12
   paquetes; `mcp` pineado `>=1.28.1,<2` para evitar major 2.x sin tests)** —
   verificar que GitHub cierra las alerts tras el re-escaneo

@@ -1,6 +1,8 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.7.8 (Alpha estable)
+## Estado actual: v0.8.0a1 (Alpha, en progreso)
+
+> Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
 
 ---
 
@@ -15,9 +17,9 @@
 
 ---
 
-## v0.7.8 — Code Review Fixes (COMPLETADO)
+## v0.7.8 — Code Review Fixes (COMPLETADO · histórico)
 
-**Fuente:** Code Review triple (2026-04-30) — Hermes + Peke + Claude → `docs/CODE-REVIEW.md`
+**Fuente:** Code Review triple (2026-04-30) — Hermes + Peke + Claude → `docs/CODE-REVIEW.md` *(documento **histórico**, etiquetado como tal en su cabecera)*
 
 ### P0 — Inmediato
 
@@ -37,7 +39,7 @@
 - [ ] **TUI refactor: extraer widgets a subdir** — `ToolBlock`, `ThinkingBlock`, `StatusBar` → `src/bytia_kode/tui/widgets/`
   - *Archivo:* `src/bytia_kode/tui.py`
 
-### No incluido en v0.7.8 (trade-offs deliberados)
+### No incluido en v0.7.8 (trade-offs deliberados — histórico)
 
 - Summary con modelo separado — requiere redesign del provider manager
 - `z` / `tmux` / `gh` en allowlist — sin valor real para el agente
@@ -212,7 +214,7 @@
 
 ## v0.5.3 — TTS, Debug y Estabilidad
 
-- [x] **TTS (Text-to-Speech)** — edge-tts + mpv, botón 🔊/⏹ en respuestas del asistente, toggle play/stop
+- [x] **TTS (Text-to-Speech)** — edge-tts + mpv, botón 🔊/⏹ en respuestas del asistente, toggle play/stop *(stack **histórico** de v0.5.3; desde 2026-09-21 el TTS es local: `bytia-tts` + piper — `docs/ARCHITECTURE.md`)*
 - [x] **Logging HTTP en provider** — errores 400/500 loggeados antes de raise_for_status (chat + chat_stream)
 - [x] **Voz mexicana** — `es-MX-DaliaNeural` (femenina, friendly)
 - [x] **Limpieza TTS** — elimina código, Markdown, URLs, emojis; preserva tildes y puntuación española
@@ -365,7 +367,7 @@
 - [ ] **`mcp/manager.py`** — `McpManager`: lifecycle (`start_all`, `stop_all`, `restart_server`), registry integration
 - [ ] **`agent.py` wiring** — `McpManager` en `__init__`, `mcp_start()` desde TUI bootstrap, `stop_all()` en `close()`
 - [ ] **`tui.py` wiring** — Llamar `agent.mcp_start()` en `on_mount()`, status en banner
-- [ ] **`pyproject.toml`** — `[mcp]` optional dependency: `mcp>=1.6.0`
+- [x] **`pyproject.toml`** — `[mcp]` optional dependency: `mcp>=1.28.1,<2` *(parcheado; el resto de esta sección MCP sigue WIP)*
 - [ ] **Tests** — `test_mcp_config.py` (unit), `test_mcp_tool.py` (mock client)
 
 **Configuración:** `~/.bytia-kode/mcp_servers.json` (formato Claude Code compatible)

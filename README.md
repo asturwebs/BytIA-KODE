@@ -7,8 +7,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Release](https://img.shields.io/badge/release-0.7.8-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-145%20passing-brightgreen.svg)
+![Release](https://img.shields.io/badge/release-0.8.0a1-yellow.svg)
+![Tests](https://img.shields.io/badge/tests-184%20passing-brightgreen.svg)
 ![SQLite](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)
 ![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)
 ![Telegram](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)
@@ -39,15 +39,17 @@
 
 > **Nota:** Las capturas muestran la TUI. El bot de Telegram comparte la misma base de datos de sesiones (ver [Sesiones Persistentes](#sesiones-persistentes)).
 
-> Release actual: `0.7.8` · Identidad: `YAML` · Instalación: [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+> Release actual: `0.8.0a1` · Identidad: `YAML` · Instalación: [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
 
-### Novedades en v0.7.8 — Code Review Fixes
+> ⚠️ **Nota sobre las secciones "Novedades en vX.Y.Z" que siguen:** son **histórico de release**. No describen la versión actual — para eso está `pyproject.toml:3` y la línea "Release actual" de arriba.
+
+### Novedades en v0.7.8 — Code Review Fixes *(histórico)*
 
 - **Allowlist bash ampliada** — `rg`, `bat`, `eza`, `tokei`, `shellcheck` añadidos. El agente ya no necesita `python -c` como workaround para búsqueda y análisis de código.
 - **Race condition fix en kill()** — `_active_subprocess` capturado en variable local antes del check. Elimina ventana de race si callback sobrescribe durante terminate.
 - **Test: system message preservation** — Verifica que `role=system` sobrevive a compresión de contexto en cualquier posición. Regresión protegida.
 - **Session metadata persistence** — `model` y `token_count` se persisten en SQLite tras cada turno del agentic loop.
-- **1 test nuevo**: system messages survive compression. Total: 145.
+- **1 test nuevo**: system messages survive compression. Total: 145 *(cifra histórica de v0.7.8; la suite actual tiene 184 — ver badge)*.
 
 ### Novedades en v0.7.7 — Session Audit Fixes
 
@@ -234,7 +236,7 @@ agent.py
   ├─ tools/session.py              ← session_list, session_load, session_search
   └─ skills/loader.py
 
-audio.py                             ← TTS: edge-tts + mpv
+audio.py                             ← TTS: bytia-tts + piper (local)
 ```
 
 Documentación adicional:
@@ -486,8 +488,8 @@ BytIA KODE se construye sobre librerías open-source de terceros. Consulta [ARCH
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | Variables de entorno |
 | [python-telegram-bot](https://docs.python-telegram-bot.org/) | Bot de Telegram |
 | [sqlite3](https://docs.python.org/3/library/sqlite3.html) | Persistencia de sesiones (stdlib) |
-| [edge-tts](https://pypi.org/project/edge-tts/) | TTS: voz neuronal (CLI, no Python dep) |
-| [mpv](https://mpv.io/) | Reproductor de audio (sistema) |
+| `bytia-tts` | TTS: CLI local que invoca a piper (binario en `~/.local/bin`, **no está en PyPI**) |
+| `piper` | Motor TTS local, voz `es_AR-daniela-high` (binario del sistema) |
 
 ## Seguridad
 
@@ -501,6 +503,22 @@ Modelo de seguridad con defense-in-depth:
 | Sesiones cruzadas | Aislamiento por `chat_id` |
 
 Motor I/O asíncrono con benchmark: **4.90x speedup** frente a ejecución secuencial.
+
+### Guardarraíl JEVAL (pre-ejecución de tools)
+
+`src/bytia_kode/guardrail.py` clasifica **cada** llamada a tool antes de ejecutarla (TypeSafe System One) y puede bloquear las arriesgadas.
+
+| Modo (`JEVAL_MODE`) | Comportamiento |
+| --- | --- |
+| `off` | **Default.** Sin clasificación — coste casi nulo (una lectura de env cacheada) |
+| `shadow` | Clasifica y loguea en background (*fire-and-forget*, cero latencia añadida) — **nunca bloquea** |
+| `enforce` | Bloquea las tools clasificadas como de riesgo con `noul >= JEVAL_THRESHOLD` |
+
+- **Por defecto `off`** — el guardarraíl está apagado hasta que actives `JEVAL_MODE` explícitamente.
+- **Requiere `TYPESAFE_API_KEY`** (o `~/.config/typesafe/env`). Sin clave, el gate se desactiva **aunque** `JEVAL_MODE=enforce`.
+- **Fail-open**: cualquier error o timeout del clasificador **permite** la llamada — JEVAL nunca rompe el bucle.
+- Otras variables: `JEVAL_THRESHOLD` (`0..1`, default `0.7`), `JEVAL_TIMEOUT` (default `2.0` s).
+- Log de decisiones (JSONL, rotación 600): `~/.local/state/jev-router/kode-guardrail.jsonl`.
 
 ## Limitaciones conocidas
 
