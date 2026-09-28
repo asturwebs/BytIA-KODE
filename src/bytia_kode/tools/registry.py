@@ -461,8 +461,38 @@ def _validate_argv_workspace(argv: list[str], workdir: str) -> ToolResult | None
 
 
 _BASH_WRITE_FAMILY = frozenset(
-    {"cp", "mv", "rm", "touch", "mkdir", "rmdir", "chmod", "install"}
+    {"cp", "mv", "rm", "touch", "mkdir", "rmdir", "chmod", "install",
+     "tee", "ln", "sed", "truncate"}
 )
+
+# find writes only through these flags (`-exec` is separately refused by
+# _validate_argv_safety, which rejects it outright for find).
+_FIND_WRITE_FLAGS = frozenset({"-delete", "-fprint", "-fprint0", "-fprintf"})
+
+
+def _is_write_family_command(command_base: str, argv: list[str]) -> bool:
+    """Case-by-case sweep of the allowlist (AST-27 H1 remediation).
+
+    Direct writers {cp, mv, rm, touch, mkdir, rmdir, chmod} are in.
+    install, tee, ln, sed and truncate are NOT currently allowlisted but
+    join the family so a future EXTRA_BINARIES reintroduction does not
+    reopen the hole. `find` only writes through its destructive/print
+    flags — `-fprintf FILE`/`-fprint FILE` carry the target as a separate
+    token, which the whole-token check then covers — so it counts as a
+    writer when one is present. Deliberately OUT, with reasons:
+      - echo: create_subprocess_exec means no shell, so `>` is a literal
+        argv token, never a redirection — echo cannot write files here;
+      - git: refuses glued `-C<path>` itself, the separated `-C <path>`
+        form already faces the confined jail as a plain path token, and
+        steering a write onto the exact denylist paths would need a
+        crafted repository inside a trusted path — outside the T4 threat
+        model (prompt injection over the allowlisted tool surface);
+      - ls, pwd, date, df, du, wc, head, tail, grep, rg, bat, eza, tokei,
+        shellcheck: readers/reporters with no file-writing operands.
+    """
+    if command_base in _BASH_WRITE_FAMILY:
+        return True
+    return command_base == "find" and any(t in _FIND_WRITE_FLAGS for t in argv[1:])
 
 
 def _validate_argv_agent_writes(
@@ -481,10 +511,10 @@ def _validate_argv_agent_writes(
     is exactly where bypass bugs breed. Reads on non-write-family binaries
     are untouched (`cat config.yaml` stays allowed); to copy configuration
     OUT, use file_read + file_write — reads of the denylist are legitimate.
-    `install` is checked even though it is not currently allowlisted, so a
-    future EXTRA_BINARIES reintroduction does not reopen the hole.
+    Family membership is decided by _is_write_family_command (see its
+    docstring for the allowlist sweep).
     """
-    if command_base not in _BASH_WRITE_FAMILY:
+    if not _is_write_family_command(command_base, argv):
         return None
     try:
         base = _resolve_workspace_path(workdir)
