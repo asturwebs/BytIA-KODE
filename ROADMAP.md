@@ -1,8 +1,14 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.8.2 (Alpha) — 2026-09-28
+## Estado actual: v0.8.3 (Alpha) — 2026-09-28
 
 > Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
+
+## v0.8.3 (AST-26/AST-27, 2026-09-28) — política de workspace + blindaje content-plane
+
+- [x] **Política de workspace configurable (AST-26)**: `~/.bytia-kode/config.yaml` con `workspace.mode` (`confined`/`permissive`/`open`, default `permissive`) y `workspace.trusted_paths`; un solo jail para file tools y bash-confined con el mismo resolver; `/workspace` y Ctrl+P en la TUI, modo activo en la barra de estado; errores de bloqueo accionables (nombra modo, límites y las dos salidas); `config.yaml` se une a la denylist T4 — el agente no puede escribir su propia política.
+- [x] **Blindaje content-plane (AST-27, revisión cruzada + análisis de clase)**: la denylist T4 ata el plano bash — familia-escritura (`cp`/`mv`/`rm`/`touch`/`mkdir`/…, `find` destructivo, `git config -f`, `git clone`/`worktree add`/`archive -o`/`bundle create`) enfrenta la denylist en TODOS los modos (H1, R4); valores pegados a flags cortos (`cp -tDIR`) no escapan al jail (H2); `git apply --unsafe*` bloqueado por prefijo — el path de un parche viaja en su contenido, no en argv (H3); `-fls`/`-ok`/`-okdir` en `_FIND_WRITE_FLAGS` (H4). Residuales documentados: clase content-plane ausente de la allowlist (`rsync`/`tar`/`patch`/`cpio`), `--work-tree` con repo craftado.
+- [x] **Suite**: 466 (+89 sobre v0.8.2) — `tests/test_workspace_policy.py` y fixtures del blindaje content-plane.
 
 ## v0.8.2 (AST-24, 2026-09-28) — blindaje de cancelación
 

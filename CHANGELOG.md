@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.3] - 2026-09-28
+
+Tu agente no puede salir de su workspace sin permiso — y ahora tampoco
+escondiendo rutas dentro de ficheros. Dos entregas en una release: la
+política de workspace configurable (AST-26) y el blindaje content-plane
+de la denylist T4 sobre el plano bash (AST-27: H1–H4 + R4, hallazgos de
+la revisión cruzada de Seguridad & Auditoría).
 
 Política de workspace configurable (AST-26): poder BLINDAR el workspace o
 PERMITIR salir, conmutable. La política era asimétrica por accidente — file
