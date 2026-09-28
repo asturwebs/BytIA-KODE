@@ -6,7 +6,7 @@
 [![Tests](https://github.com/asturwebs/BytIA-KODE/actions/workflows/ci.yml/badge.svg)](https://github.com/asturwebs/BytIA-KODE/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/bytia-kode/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![SQLite WAL](https://img.shields.io/badge/SQLite%20WAL-3.44-orange.svg)](docs/ARCHITECTURE.md)
+[![SQLite WAL](https://img.shields.io/badge/SQLite%20WAL-enabled-orange.svg)](docs/ARCHITECTURE.md)
 [![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)](https://textual.textualize.io/)
 [![Telegram Bot](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)](https://docs.python-telegram-bot.org/)
 
@@ -62,9 +62,9 @@ La TUI pide lo mínimo: el `.env` con tu provider (ver [Instalación](#instalaci
 - **Sesiones persistentes** — todo se guarda en SQLite WAL (`~/.bytia-kode/sessions.db`), compartido entre TUI y Telegram: empieza un chat en una interfaz y résumelo en la otra. Auto-save O(1) por mensaje.
 - **Sistema de skills por capas** — procedimientos Markdown+YAML en `~/.bytia-kode/skills/` con prioridad bytia > user > vendor; las vendor se siembran y actualizan automáticamente con el paquete.
 - **Tools nativas con perímetro de seguridad** — 12 tools (bash, files, grep/glob/tree, web_fetch, sesiones) tras un modelo defense-in-depth: allowlist de binarios, jail de workspace configurable (confined/permissive/open, ver [Política de workspace](#política-de-workspace)), SSRF cerrada, redacción de secretos en logs.
-- **Identidad configurable en YAML** — `bytia.kernel.yaml` (identidad y valores) + `bytia.runtime.kode.yaml` (adaptación al entorno), empaquetados como recursos.
+- **Identidad configurable en YAML** — `kernel.default.yaml` (identidad y valores) + `runtime.default.yaml` (adaptación al entorno), empaquetados como recursos; overrides de usuario en `~/.bytia-kode/prompts/`.
 - **Bot de Telegram** — mismo cerebro y mismas sesiones, aislamiento por usuario, fail-secure sin allowlist.
-- **Motor I/O asíncrono** — benchmark 4.90x frente a ejecución secuencial.
+- **Motor I/O asíncrono** — benchmark 4.90x frente a ejecución secuencial (medición histórica 2026-04, `docs/devlog/2026-04-02.md`; no hay benchmark reproducible en el repo).
 
 ### Modos de ejecución
 
@@ -199,7 +199,7 @@ Por defecto `off`; requiere `TYPESAFE_API_KEY` (sin clave, el gate se desactiva 
 
 - `safe_mode` sigue siendo principalmente visual y no implementa aislamiento backend completo.
 - El cliente MCP es WIP declarado (stubs no-op sin el extra `[mcp]`; `McpTool.execute()` pendiente) — no anunciarlo como capacidad terminada.
-- El estimador de tokens es una heurística (chars/3), no un tokenizer real.
+- El estimador de tokens es una heurística (chars/3–3.5 según densidad ASCII), no un tokenizer real.
 - PromptTextArea no soporta Shift+Enter para newline (limitación de Textual).
 
 ## Arquitectura
@@ -210,7 +210,7 @@ __main__.py                     ← entry point: --version / --bot / TUI
   └─ telegram/bot.py
 
 agent.py
-  ├─ prompts/bytia.kernel.yaml + bytia.runtime.kode.yaml
+  ├─ prompts/kernel.default.yaml + runtime.default.yaml (identidad; overrides de usuario en ~/.bytia-kode/prompts/)
   ├─ session.py                 ← SQLite WAL persistence
   ├─ providers/manager.py
   ├─ providers/circuit.py       ← Circuit breaker (CLOSED/OPEN/HALF_OPEN)
@@ -239,7 +239,7 @@ audio.py                        ← TTS: bytia-tts + piper (local)
 
 ### Identidad: BytIA OS Kernel + Runtime
 
-El agente carga su identidad desde dos YAML empaquetados como recursos del paquete: `bytia.kernel.yaml` (identidad y valores inmutables) + `bytia.runtime.kode.yaml` (adaptación al entorno). Para personalizarla, edita los YAML en `src/bytia_kode/prompts/` y reconstruye el wheel (`uv build`).
+El agente carga su identidad desde dos YAML: los defaults empaquetados como recursos del paquete (`kernel.default.yaml` + `runtime.default.yaml` en `src/bytia_kode/prompts/`) y, encima, tus overrides `bytia.kernel.yaml` / `bytia.runtime.kode.yaml` en `~/.bytia-kode/prompts/` — deep-merge sobre los defaults, sin reconstruir nada. Para cambiar los defaults del paquete: edita los YAML en `src/bytia_kode/prompts/` y reconstruye el wheel (`uv build`).
 
 | Sección | Qué contiene | Personalizar |
 | --- | --- | --- |
@@ -264,8 +264,15 @@ El bot comparte la misma base de datos de sesiones que la TUI (`~/.bytia-kode/se
 | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | Token del bot (obtener de @BotFather) |
 | `TELEGRAM_ALLOWED_USERS` | User IDs permitidos (comma-separated), ej: `123456,789012` |
+| `TELEGRAM_API_BASE` | Endpoint alternativo del Bot API (servidor local auto-alojado); vacío = `api.telegram.org` |
 
 Sin `TELEGRAM_ALLOWED_USERS` configurado, el bot deniega todos los mensajes (fail-secure).
+
+Al arrancar, el bot imprime por stdout un banner con el token enmascarado y el número de usuarios permitidos, y queda a la escucha — se detiene limpio con **un** Ctrl+C:
+
+```text
+Bot de Telegram activo · token 123456789:AAF…x7Q · usuarios permitidos: 2 · esperando mensajes (Ctrl+C para parar)
+```
 
 ### Comandos del bot
 
@@ -277,6 +284,8 @@ Sin `TELEGRAM_ALLOWED_USERS` configurado, el bot deniega todos los mensajes (fai
 | `/model` | Mostrar provider y modelo activos |
 | `/sessions` | Listar sesiones del usuario |
 | `/context` | Regenerar contexto del workspace |
+| `/stop` | Interrumpir el mensaje en curso |
+| `/kill` | Matar el subprocess activo (sesión conservada) |
 
 ## TUI
 
