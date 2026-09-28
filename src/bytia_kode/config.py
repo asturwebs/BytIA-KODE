@@ -127,6 +127,10 @@ def _workspace_from_config(data: dict) -> WorkspaceConfig:
 
     mode = ws.get("mode", "permissive")
     if not isinstance(mode, str):
+        logger.warning(
+            "config.yaml: 'workspace.mode' must be a string, got %r — "
+            "falling back to 'permissive'", type(mode).__name__,
+        )
         mode = "permissive"
 
     raw_trusted = ws.get("trusted_paths") or []
