@@ -1,5 +1,37 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed — `bytia-kode --bot` ya no arranca mudo ni muere con traceback (AST-32)
+
+- El arranque anunciaba el polling con `logger.info` — sin handler, INFO no
+  llegaba a ningún sitio: el bot estaba vivo pero parecía muerto. Ahora
+  imprime por stdout `Bot de Telegram activo · token <máscara> · usuarios
+  permitidos: N · esperando mensajes (Ctrl+C para parar)` antes de empezar
+  a escuchar, con el token enmascarado (`123456789:AAF…x7Q`).
+- Un Ctrl+C (o SIGTERM) detiene el bot limpio, sin traceback: las señales
+  las gestiona un handler propio idempotente (`stop_signals=None` +
+  `Application.stop_running()`), de modo que un segundo Ctrl+C durante el
+  apagado es no-op en vez de interrumpir el teardown de python-telegram-bot
+  (la carrera que escupía "Event loop is closed").
+- Sin `TELEGRAM_ALLOWED_USERS`, el banner avisa del fail-secure.
+
+### Added — `TELEGRAM_API_BASE`
+
+- Variable para apuntar el bot a un endpoint alternativo del Bot API
+  (servidor `telegram-bot-api` auto-alojado, o stubs de test). Vacío =
+  `api.telegram.org`.
+
+### Docs — verdad ejecutable del README (AST-32)
+
+- Cada claim del README se ejecutó y verificó; correcciones donde mentía:
+  identidad YAML (los empaquetados son `kernel.default.yaml` +
+  `runtime.default.yaml`; `bytia.*` son los overrides de usuario en
+  `~/.bytia-kode/prompts/`, sin reconstruir el wheel), estimador de tokens
+  (chars/3–3.5), benchmark 4.90x atribuido a su medición histórica, badge
+  SQLite sin versión inventada, y la tabla de comandos del bot completa
+  (`/stop` y `/kill` existían en el código y no estaban documentados).
+
 ## [0.8.3] - 2026-09-28
 
 Tu agente no puede salir de su workspace sin permiso — y ahora tampoco
