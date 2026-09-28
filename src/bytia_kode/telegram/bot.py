@@ -21,7 +21,12 @@ class TelegramBot:
         self.session_store = SessionStore(config.data_dir / "sessions.db")
         self._agents: dict[str, Agent] = {}  # chat_id -> Agent
         self._processing: set[str] = set()  # chat_ids currently processing
-        self.app = Application.builder().token(config.telegram.bot_token).build()
+        builder = Application.builder().token(config.telegram.bot_token)
+        if config.telegram.api_base:
+            builder = builder.base_url(config.telegram.api_base).base_file_url(
+                config.telegram.api_base.rstrip("/") + "/file/bot"
+            )
+        self.app = builder.build()
         self._setup_handlers()
 
     def _get_agent(self, chat_id: str) -> Agent:
