@@ -39,7 +39,9 @@ logger = logging.getLogger(__name__)
 # ~/.bytia-kode/config.yaml). Do not confuse it with the agent-self-write
 # denylist in _agent_write_denied_paths (AST-15 T4): that list stays active
 # in ALL modes — trusted_paths grants access, the denylist then keeps agent
-# WRITEs off the agent's own persistence surface.
+# WRITEs off the agent's own persistence surface, file tools AND bash alike
+# (bash via _validate_argv_agent_writes, AST-27 H1: write-family binaries
+# only — reads like `cat config.yaml` stay legitimate).
 _TRUSTED_PATHS: list[Path] = []
 _WORKSPACE_ROOT: Path | None = None
 
@@ -385,6 +387,34 @@ def _looks_like_path_token(token: str) -> bool:
     return token.startswith(("/", "~", "./", "../")) or "/" in token
 
 
+def _argv_path_candidates(token: str) -> list[str]:
+    """Path candidates worth resolving from one argv token (AST-27 H2).
+
+    A plain token is its own candidate. Flag tokens contribute only their
+    VALUE part: `--flag=value` yields the text after `=`, and a short flag
+    cluster with a GLUED value (`cp -tDIR src`, `touch -rFILE dst` — GNU
+    getopt accepts both) yields the text from the first `/`, `~` or leading
+    `.`-component onward. Before H2 the whole glued form was skipped and the
+    value escaped every check. False positives are improbable (flags rarely
+    contain `/`); one documented over-block remains: a glued RELATIVE value
+    like `-tsub/dir` yields the absolute-looking `/dir` — the fix is to
+    unglue the flag, and the error message says so.
+    """
+    if not token.startswith("-") or token in ("-", "--"):
+        return [token]
+    if token.startswith("--"):
+        return [token.split("=", 1)[1]] if "=" in token else []
+    rest = token.lstrip("-")
+    for i, ch in enumerate(rest):
+        if ch in "/~":
+            return [rest[i:]]
+        if ch == "." and i + 1 < len(rest) and rest[i + 1] in "./":
+            return [rest[i:]]
+    if "=" in rest:
+        return [rest.split("=", 1)[1]]
+    return []
+
+
 def _validate_argv_workspace(argv: list[str], workdir: str) -> ToolResult | None:
     """Confined mode only: path-like argv tokens must stay inside the jail.
 
@@ -414,23 +444,70 @@ def _validate_argv_workspace(argv: list[str], workdir: str) -> ToolResult | None
     except PermissionError as exc:
         return ToolResult(output=str(exc), error=True)
     for token in argv[1:]:
-        candidate = token
-        if token.startswith("-"):
-            if "=" not in token:
+        for candidate in _argv_path_candidates(token):
+            if not _looks_like_path_token(candidate):
                 continue
-            candidate = token.split("=", 1)[1]
-        if not _looks_like_path_token(candidate):
-            continue
-        try:
-            _resolve_workspace_path(candidate, base=base)
-        except PermissionError as exc:
-            return ToolResult(
-                output=(
-                    f"{exc}\nBlocked bash argument: {token!r} "
-                    f"(command rejected before execution)."
-                ),
-                error=True,
-            )
+            try:
+                _resolve_workspace_path(candidate, base=base)
+            except PermissionError as exc:
+                return ToolResult(
+                    output=(
+                        f"{exc}\nBlocked bash argument: {token!r} "
+                        f"(command rejected before execution)."
+                    ),
+                    error=True,
+                )
+    return None
+
+
+_BASH_WRITE_FAMILY = frozenset(
+    {"cp", "mv", "rm", "touch", "mkdir", "rmdir", "chmod", "install"}
+)
+
+
+def _validate_argv_agent_writes(
+    argv: list[str], command_base: str, workdir: str
+) -> ToolResult | None:
+    """T4 for the bash plane (AST-27 H1): write-family binaries cannot touch
+    the agent's own config/skills surface, in ANY workspace mode.
+
+    Until H1 the denylist in _check_agent_write_allowed lived only in
+    file_write/file_edit: `cp payload ~/.bytia-kode/config.yaml` executed in
+    every mode (confined included — the data dir is a trusted path), letting
+    an injected session plant `mode: open` or EXTRA_BINARIES for the next
+    start. The bash-plane rule is deliberately blunter than the file tools':
+    for a write-family binary EVERY path-like token is checked — sources
+    included, because `mv` destroys its source and operand-position parsing
+    is exactly where bypass bugs breed. Reads on non-write-family binaries
+    are untouched (`cat config.yaml` stays allowed); to copy configuration
+    OUT, use file_read + file_write — reads of the denylist are legitimate.
+    `install` is checked even though it is not currently allowlisted, so a
+    future EXTRA_BINARIES reintroduction does not reopen the hole.
+    """
+    if command_base not in _BASH_WRITE_FAMILY:
+        return None
+    try:
+        base = _resolve_workspace_path(workdir)
+    except PermissionError as exc:
+        return ToolResult(output=str(exc), error=True)
+    for token in argv[1:]:
+        for candidate in _argv_path_candidates(token):
+            if not _looks_like_path_token(candidate):
+                continue
+            expanded = Path(candidate).expanduser()
+            if not expanded.is_absolute():
+                expanded = base / expanded
+            try:
+                _check_agent_write_allowed(expanded.resolve())
+            except PermissionError as exc:
+                return ToolResult(
+                    output=(
+                        f"{exc}\nBlocked bash argument: {token!r} on a "
+                        f"write-family command ('{command_base}'); command "
+                        f"rejected before execution."
+                    ),
+                    error=True,
+                )
     return None
 
 
@@ -610,6 +687,15 @@ class BashTool(Tool):
             workspace_check = _validate_argv_workspace(argv, workdir)
             if workspace_check is not None:
                 return workspace_check
+
+            # AST-27 H1: the T4 agent-config denylist also binds the bash
+            # plane — write-family binaries cannot touch the agent's own
+            # config/skills surface in ANY mode. Like the jail check above,
+            # it runs before binary resolution so the verdict never depends
+            # on what happens to be installed.
+            write_family_check = _validate_argv_agent_writes(argv, command_base, workdir)
+            if write_family_check is not None:
+                return write_family_check
 
             # T1-8: resolve the binary via PATH and require it to live in a
             # system directory. Validating only the basename let a malicious

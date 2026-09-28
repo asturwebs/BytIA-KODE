@@ -62,6 +62,36 @@ configura y se conmuta.
   superficie de persistencia propia del agente (`.env`, `mcp_servers.json`,
   skills, y ahora `config.yaml`) — pinado con tests en los tres modos.
 
+### Security — AST-27 (revisión cruzada): la T4 ata el plano bash; los flags pegados no escapan
+
+Dos hallazgos de la revisión cruzada de Seguridad & Auditoría sobre el
+commit inicial de AST-26, ambos remediados:
+
+- **H1 (alta) — la denylist T4 no existía en el plano bash**: el chequeo
+  vivía sólo en `file_write`/`file_edit`, así que `cp payload
+  ~/.bytia-kode/config.yaml` ejecutaba en TODOS los modos (confined
+  incluido: el data dir es trusted) y una sesión inyectada podía plantar
+  `mode: open` o `EXTRA_BINARIES` para el siguiente arranque. Ahora
+  `_validate_argv_agent_writes` aplica el denylist a los binarios de
+  familia escritura (`cp`, `mv`, `rm`, `touch`, `mkdir`, `rmdir`, `chmod`,
+  `install`) en TODOS los modos: todo token-ruta del comando (fuentes
+  incluidas — `mv` destruye su origen y parsear posiciones de operandos es
+  donde nacen los bypass) se resuelve y pasa por `_check_agent_write_allowed`.
+  Lecturas con binarios no-escritura intactas (`head config.yaml` sigue
+  permitido); para copiar configuración FUERA, file_read + file_write.
+- **H2 (media) — valor PEGADO a un flag corto escapaba al jail**: GNU
+  getopt acepta `cp -tDIR src` / `touch -rFILE dst`, y el validador saltaba
+  todo token con `-` salvo la forma `--flag=valor` — `cp -t<dir-fuera> src`
+  escribía fuera del jail en confined. Ahora `_argv_path_candidates` extrae
+  el valor pegado (desde la primera `/`, `~` o componente `.`) y lo pasa por
+  el mismo resolver (jail de confined Y denylist T4). Residual documentado:
+  un valor pegado RELATIVO con `/` (`-tsub/dir`) produce un candidato
+  absoluto — sobre-bloqueo aceptado, improbable (los flags rara vez
+  contienen `/`); el fix del usuario es despegar el flag.
+- **Menor — fallback non-string de `workspace.mode` ahora avisa**: era el
+  único silencioso de la tabla de fallbacks (ficha ausente, YAML malformado,
+  modo desconocido, no-mapping ya avisaban).
+
 ## [0.8.2] - 2026-09-28
 
 Blindaje de cancelación (AST-24, commit `13ccac7`, de GitHub issue #3): los

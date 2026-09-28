@@ -332,6 +332,19 @@ class TestConfigParsing:
         assert cfg.workspace.mode == "open"
         assert cfg.workspace.trusted_paths == [_jail["home"] / "src"]
 
+    def test_non_string_mode_falls_back_with_warning(self, _jail, caplog):
+        # AST-27 foco 1, nota menor: era el único fallback SILENCIOSO de la
+        # tabla del revisor — ahora avisa como los demás.
+        import logging
+
+        from bytia_kode.config import load_config
+
+        self._write_config(_jail["home"], "workspace:\n  mode: 5\n")
+        with caplog.at_level(logging.WARNING, logger="bytia_kode.config"):
+            cfg = load_config()
+        assert cfg.workspace.mode == "permissive"
+        assert "must be a string" in caplog.text
+
 
 class TestBootWiring:
     def test_agent_boot_applies_config(self, _jail, monkeypatch):
@@ -397,6 +410,185 @@ class TestAgentWriteDenylist:
         target.write_text("workspace:\n  mode: confined\n")
         result = _read(str(target))
         assert not result.error
+
+
+# --- AST-27 H1: la denylist T4 también ata el plano bash -------------------
+
+
+class TestBashPlaneAgentWriteDenylist:
+    """H1: `cp payload ~/.bytia-kode/config.yaml` ejecutaba en TODOS los
+    modos porque _check_agent_write_allowed sólo vivía en file_write/
+    file_edit. Ahora los binarios de familia escritura la consultan SIEMPRE
+    (readings con binarios no-escritura quedan intactos).
+    """
+
+    def _boot_like_agent(self, jail):
+        # como el arranque real: el data dir es trusted, así el jail de
+        # confined no puede falsear el veredicto T4 (que es mode-INDEPENDENT)
+        set_trusted_paths([jail["home"] / ".bytia-kode"])
+
+    def _config_surface(self, jail, name="config.yaml", content="workspace:\n  mode: confined\n"):
+        target = jail["home"] / ".bytia-kode" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+        return target
+
+    @pytest.mark.parametrize("mode", WORKSPACE_MODES)
+    def test_bash_cp_to_config_yaml_denied_in_all_modes(self, mode, _jail):
+        set_workspace_mode(mode)
+        self._boot_like_agent(_jail)
+        cfg = self._config_surface(_jail)
+        payload = _jail["ws"] / "payload.yaml"
+        payload.write_text("workspace:\n  mode: open\n")
+        result = _bash(f"cp {payload} {cfg}")
+        assert result.error
+        assert "cannot write" in result.output
+        assert "Blocked bash argument" in result.output
+        assert cfg.read_text() == "workspace:\n  mode: confined\n"  # intacto
+
+    def test_bash_cp_to_env_denied_even_in_open(self, _jail):
+        # `open` libera el jail, NUNCA la superficie T4 — tampoco vía bash.
+        set_workspace_mode("open")
+        self._boot_like_agent(_jail)
+        self._config_surface(_jail, name="config.yaml")
+        env = self._config_surface(_jail, name=".env", content="EXTRA_BINARIES=python\n")
+        payload = _jail["ws"] / "payload.env"
+        payload.write_text("EXTRA_BINARIES=python\n")
+        result = _bash(f"cp {payload} {env}")
+        assert result.error
+        assert "cannot write" in result.output
+        assert env.read_text() == "EXTRA_BINARIES=python\n"  # intacto
+
+    def test_bash_rm_and_mv_to_config_yaml_denied(self, _jail):
+        set_workspace_mode("permissive")  # sin jail: sólo la T4 puede bloquear
+        self._boot_like_agent(_jail)
+        cfg = self._config_surface(_jail)
+        r1 = _bash(f"rm {cfg}")
+        assert r1.error and "cannot write" in r1.output
+        assert cfg.exists()  # intacto
+        r2 = _bash(f"mv {cfg} {_jail['ws'] / 'stolen.yaml'}")
+        assert r2.error and "cannot write" in r2.output
+        assert cfg.exists()  # mv destruye el origen: también es escritura T4
+
+    def test_bash_glued_flag_to_skills_dir_denied(self, _jail):
+        # H2 ∩ H1: valor PEGADO al flag corto apuntando a la superficie T4
+        set_workspace_mode("permissive")
+        self._boot_like_agent(_jail)
+        skills = self._config_surface(_jail, name="skills/x.md", content=" planted\n").parent
+        payload = _jail["ws"] / "SKILL.md"
+        payload.write_text(" planted\n")
+        result = _bash(f"cp -t{skills} {payload}")
+        assert result.error
+        assert "cannot write" in result.output
+        assert "Blocked bash argument: '-t" in result.output
+        assert not (skills / "SKILL.md").exists()
+
+    def test_bash_touch_config_yaml_denied(self, _jail):
+        set_workspace_mode("permissive")
+        self._boot_like_agent(_jail)
+        cfg = self._config_surface(_jail)
+        result = _bash(f"touch {cfg}")
+        assert result.error and "cannot write" in result.output
+
+    @pytest.mark.parametrize("mode", WORKSPACE_MODES)
+    def test_bash_read_of_config_yaml_still_allowed(self, mode, _jail):
+        # lecturas de la superficie T4 siguen legítimas en cualquier modo
+        set_workspace_mode(mode)
+        self._boot_like_agent(_jail)
+        cfg = self._config_surface(_jail)
+        result = _bash(f"head {cfg}")
+        assert not result.error
+        assert "mode: confined" in result.output
+
+    def test_bash_write_family_inside_workspace_unaffected(self, _jail):
+        set_workspace_mode("confined")
+        src = _jail["ws"] / "a.txt"
+        src.write_text("hola\n")
+        result = _bash(f"cp {src} {_jail['ws'] / 'b.txt'}")
+        assert not result.error
+        assert (_jail["ws"] / "b.txt").read_text() == "hola\n"
+
+    def test_bash_cp_to_ordinary_data_path_allowed(self, _jail):
+        # la T4 es denylist, no manta sobre ~/.bytia-kode: una ruta de datos
+        # ordinaria (no denylisted) sigue siendo escribible por bash
+        set_workspace_mode("permissive")
+        self._boot_like_agent(_jail)
+        cfg_dir = _jail["home"] / ".bytia-kode"
+        cfg_dir.mkdir(exist_ok=True)
+        src = _jail["ws"] / "note.txt"
+        src.write_text("sesion\n")
+        target = cfg_dir / "session-note.txt"
+        result = _bash(f"cp {src} {target}")
+        assert not result.error
+        assert target.read_text() == "sesion\n"
+
+
+# --- AST-27 H2: valores PEGADOS a flags cortos no escapan al jail ----------
+
+
+class TestGluedShortFlagValues:
+    """H2: `cp -tDIR src` / `touch -rFILE dst` ejecutaban FUERA del jail en
+    confined porque el validador saltaba todo token con '-' salvo --flag=.
+    Ahora el valor pegado se extrae y pasa por el mismo resolver.
+    """
+
+    def _src(self, _jail, name="secret.md", content="secreto\n"):
+        src = _jail["ws"] / name
+        src.write_text(content)
+        return src
+
+    def test_confined_blocks_glued_cp_target_directory(self, _jail):
+        set_workspace_mode("confined")
+        outside = _jail["out"]
+        outside.mkdir(exist_ok=True)
+        src = self._src(_jail)
+        result = _bash(f"cp -t{outside} {src}")
+        assert result.error
+        assert "workspace mode: confined" in result.output
+        assert "Blocked bash argument: '-t" in result.output
+        assert not (outside / "secret.md").exists()  # nada salió del jail
+
+    def test_confined_blocks_glued_touch_reference(self, _jail):
+        set_workspace_mode("confined")
+        outside = _jail["out"]
+        outside.mkdir(exist_ok=True)
+        ref = outside / "notes.md"
+        ref.write_text("fuera\n")
+        dst = _jail["ws"] / "dst.md"
+        result = _bash(f"touch -r{ref} {dst}")
+        assert result.error
+        assert "workspace mode: confined" in result.output
+        assert not dst.exists()
+
+    def test_separated_flag_value_still_blocked_control(self, _jail):
+        # control B2 del revisor: la forma separada ya se bloqueaba
+        set_workspace_mode("confined")
+        outside = _jail["out"]
+        outside.mkdir(exist_ok=True)
+        src = self._src(_jail)
+        result = _bash(f"cp -t {outside} {src}")
+        assert result.error
+        assert not (outside / "secret.md").exists()
+
+    def test_glued_flag_with_inside_value_allowed(self, _jail):
+        # sin falso positivo: valor pegado DENTRO del jail ejecuta normal
+        set_workspace_mode("confined")
+        out_dir = _jail["ws"] / "out"
+        out_dir.mkdir()
+        src = self._src(_jail, name="a.txt", content="hola\n")
+        result = _bash(f"cp -t{out_dir} {src}")
+        assert not result.error
+        assert (out_dir / "a.txt").read_text() == "hola\n"
+
+    def test_glued_relative_dotted_value_extracted(self, _jail):
+        # `-t./sub` extrae `./sub` (no `/sub`): relativo al workdir efectivo
+        set_workspace_mode("confined")
+        sub = _jail["ws"] / "sub"
+        sub.mkdir()
+        src = self._src(_jail, name="a.txt", content="hola\n")
+        result = _bash(f"cp -t./sub {src}")
+        assert not result.error
+        assert (sub / "a.txt").read_text() == "hola\n"
 
 
 # --- demo funcional: escenario real tui_32e522c5 ----------------------------
