@@ -1,24 +1,33 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.2] - 2026-09-28
 
-Blindaje de cancelación (AST-24, de GitHub issue #3): los Panic Buttons se
-comportan como se espera incluso en los casos que daban miedo.
+Blindaje de cancelación (AST-24, commit `13ccac7`, de GitHub issue #3): los
+botones del pánico se comportan como se espera incluso en los casos que daban
+miedo. Interrumpir o matar al agente a mitad de tarea no deja subprocess vivos
+ni estado sucio: lo que ya se generó se conserva, lo que no llegó a correr no
+corre, y el turno siguiente nace limpio.
 
-### Fixed — un kill durante un lote de herramientas aborta el resto del lote
+### Fixed — interrumpir en mitad de la generación conserva lo parcial
 
-- **`_handle_tool_calls` comprueba la cancelación entre herramientas**: si el kill/interrupt aterriza mientras corre la herramienta 1 de N, las herramientas 2..N ya NO se ejecutan sobre un agente que el usuario mató. Los `tool_call` que no llegaron a ejecutarse reciben respuesta explícita `[cancelled by user]` (en memoria y en sesión) — sin tool_calls colgados en la transcripción.
+- **Escape (`/stop` en Telegram) ya no pierde el turno**: la parte de la respuesta que ya llegó al cortar se conserva en la conversación y queda persistida en la sesión en disco — al recargar la sesión, el turno cancelado sigue ahí. Un turno cortado antes de llegar el primer texto ahora deja `(respuesta cancelada)` en la transcripción; antes no dejaba nada.
 
-### Fixed — `kill()` ve el subprocess de bash en cualquier embedding
+### Fixed — un kill durante un lote de herramientas aborta el resto
 
-- **Kill-wiring centralizado en el Agent** (`_track_subprocess`): el registro del subprocess vivo en `_active_subprocess` ya no depende de que cada embedding (TUI, Telegram) duplique el callback — un Agent a secas tenía un `kill()` que no podía terminar al hijo. Las duplicaciones existentes son inofensivas.
+- **Ctrl+K (`/kill`) mientras corre la herramienta 1 de N ya no ejecuta las herramientas 2..N** sobre un agente que el usuario mató: el lote restante se aborta y cada herramienta que no llegó a correr queda respondida `[cancelled by user]`, en memoria y en sesión — sin tool calls colgados en la transcripción.
+
+### Fixed — el kill termina el comando de bash en curso, con escalado
+
+- **Matar durante un comando largo de bash termina el subprocess**: primero `terminate`, y si el proceso ignora la señal, **escalado a SIGKILL**. El registro del subprocess vivo ya no depende de que cada interfaz (TUI, Telegram) lo conecte a mano — vive en el propio Agent y funciona en cualquier embedding.
 
 ### Changed — cleanup estructurado de la cancelación
 
-- **`AgentCancelledError`** (`bytia_kode.errors`): excepción propia que señala la cancelación observada mid-operación. Deliberadamente NO hereda de `RuntimeError` (chat() captura esa familia como fallo de provider con failover). El cleanup vive en el catcher: `chat()` persiste el parcial/placeholder en un solo sitio (`_persist_cancelled_response`) y responde los tool_calls pendientes.
-- **Un turno cortado antes del primer chunk ahora deja `(respuesta cancelada)`** en la transcripción — antes no dejaba nada; el turno cancelado queda registrado.
-- Las invariantes H1 (clear una vez por turno) y H2 (kill() NO limpia el evento) se conservan intactas y quedan blindadas por tests.
-- **Tests de TUI arrancados** (Pilot integrado de Textual, sin dependencia nueva): Esc/Ctrl+K llaman a interrupt/kill, sin streaming widget colgado, flujo `_process_message` cortado. 100% coverage de `tui.py` sigue siendo deuda declarada.
+- **`AgentCancelledError`** (`bytia_kode.errors`): excepción propia que señala "el usuario canceló aquí". El cleanup vive en un solo sitio: persistir la respuesta parcial y responder los tool calls pendientes. Detalle deliberado: NO hereda de `RuntimeError` — `chat()` trata esa familia como fallo de provider con failover, y una cancelación no es un fallo.
+- **El turno siguiente nace limpio**: el estado de cancelación se limpia al entrar en cada turno; las invariantes del agente (limpieza una vez por turno; `kill()` no limpia el evento, porque puede retornar antes de que el loop lo observe) quedan blindadas por tests.
+
+### Added — primeros tests de la TUI
+
+- **Tests de interrupción de la TUI** con el Pilot integrado de Textual (`App.run_test()`, sin dependencia nueva): Escape llama a interrupt, Ctrl+K a kill, sin widgets de streaming colgados y con el flujo de mensaje cortado a mitad. El 100% de cobertura de `tui.py` sigue siendo deuda declarada.
 
 ## [0.8.1] - 2026-09-27
 
