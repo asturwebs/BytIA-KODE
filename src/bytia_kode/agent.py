@@ -191,10 +191,22 @@ class Agent:
         self.providers = ProviderManager(config.provider)
         self.tools = ToolRegistry()
 
-        from bytia_kode.tools.registry import set_trusted_paths, set_workspace_root
+        from bytia_kode.tools.registry import (
+            set_trusted_paths,
+            set_workspace_mode,
+            set_workspace_root,
+        )
 
+        # AST-26: the jail globals are seeded from config instead of falling
+        # back to cwd-by-default. data_dir + ~/bytia stay trusted (session
+        # data, T4 denylist still guards agent writes there); the operator's
+        # workspace.trusted_paths valve extends them; the mode decides who
+        # is jailed (see the workspace policy block in registry.py).
         set_trusted_paths([config.data_dir, Path.home() / "bytia"])
+        if config.workspace.trusted_paths:
+            set_trusted_paths(config.workspace.trusted_paths)
         set_workspace_root(Path.cwd())
+        set_workspace_mode(config.workspace.mode)
 
         self.skills = SkillLoader(
             skills_home=config.skills_dir, bytia_home=Path.home() / "bytia"
@@ -343,19 +355,21 @@ class Agent:
         return payload
 
     def _workspace_context_block(self) -> str:
-        from bytia_kode.tools.registry import _TRUSTED_PATHS, _WORKSPACE_ROOT
+        from bytia_kode.tools.registry import workspace_policy_state
 
-        workspace = str(_WORKSPACE_ROOT or Path.cwd().resolve())
-        trusted = [str(p) for p in _TRUSTED_PATHS] if _TRUSTED_PATHS else []
+        state = workspace_policy_state()
+        trusted = state["trusted"]
         trusted_lines = "\n".join(f"  - {p}" for p in trusted) if trusted else "  (none)"
 
         return dedent(f"""\
             # Workspace Context (auto-injected)
-            - CWD: {workspace}
-            - File tools are sandboxed to CWD and trusted paths
-            - Trusted paths beyond CWD:
+            - CWD: {state['workspace']}
+            - Workspace mode: {state['mode']} (confined = file tools AND bash jailed; permissive = file tools jailed, bash free; open = all free)
+            - Trusted paths beyond the workspace:
             {trusted_lines}
-            - Commands outside sandbox will be rejected""")
+            - A workspace violation error names the active mode and the exits
+              (extend workspace.trusted_paths in ~/.bytia-kode/config.yaml or
+              switch the mode with /workspace) — follow it instead of guessing.""")
 
     def _build_system_prompt(self) -> str:
         msg_count = len(self.messages)

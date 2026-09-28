@@ -1,6 +1,7 @@
 """H3 (parcial) + H4: TelegramBot wiring — per-chat agents track their bash
 subprocess (so /kill reaches children, like the TUI does) and resume one
 deterministic session per chat_id across restarts."""
+from bytia_kode.config import WorkspaceConfig
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,6 +15,8 @@ def bot(tmp_path):
 
     cfg = MagicMock()
     cfg.provider = MagicMock()
+    # AST-26: el arranque del Agent lee la política de workspace del config
+    cfg.workspace = WorkspaceConfig()
     # Real Paths: a MagicMock data_dir would make SessionStore materialize
     # junk dirs (see test_jeval_guardrail QA §8 note).
     cfg.data_dir = tmp_path / "data"

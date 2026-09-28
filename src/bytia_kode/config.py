@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import importlib.metadata
+import logging
 import os
 import shutil
 from pathlib import Path
 from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Load .env: CWD first, then global config. Neither may override variables
 # already present in the environment, and the project .env (loaded first)
@@ -93,6 +96,76 @@ class TelegramConfig:
     )
 
 
+def _load_yaml_config() -> dict:
+    """Read ~/.bytia-kode/config.yaml if present (AST-26).
+
+    Missing file → {}. Malformed YAML or a non-mapping document → {} with a
+    warning: a broken config must not brick the agent, it falls back to
+    defaults. (Fail-open on *availability*, never on policy — the registry
+    still applies whatever mode ends up configured, and the file itself is
+    agent-write-denied, see T4.)
+    """
+    path = Path.home() / ".bytia-kode" / "config.yaml"
+    if not path.exists():
+        return {}
+    try:
+        import yaml
+
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception as exc:
+        logger.warning("Failed to parse %s, using defaults: %s", path, exc)
+        return {}
+
+
+def _workspace_from_config(data: dict) -> WorkspaceConfig:
+    """Build the WorkspaceConfig from the parsed config.yaml document."""
+    ws = data.get("workspace") or {}
+    if not isinstance(ws, dict):
+        logger.warning("config.yaml: 'workspace' must be a mapping, ignoring it")
+        ws = {}
+
+    mode = ws.get("mode", "permissive")
+    if not isinstance(mode, str):
+        mode = "permissive"
+
+    raw_trusted = ws.get("trusted_paths") or []
+    if isinstance(raw_trusted, str):
+        raw_trusted = [raw_trusted]
+    trusted = [
+        Path(str(item).strip()).expanduser()
+        for item in raw_trusted
+        if isinstance(item, str) and item.strip()
+    ]
+    return WorkspaceConfig(mode=mode.strip().lower() or "permissive", trusted_paths=trusted)
+
+
+@dataclass
+class WorkspaceConfig:
+    """Workspace jail policy (AST-26).
+
+    mode: 'confined' (file tools AND bash jailed), 'permissive' (file tools
+    jailed, bash free — the historical default, now explicit) or 'open'
+    (nothing jailed). trusted_paths is the operator's precision valve out of
+    the jail. An unknown mode falls back to 'permissive' with a warning:
+    fail-closed would lock the user out of their own agent over a typo, and
+    'permissive' is the documented pre-AST-26 behaviour.
+    """
+
+    mode: str = "permissive"
+    trusted_paths: list[Path] = field(default_factory=list)
+
+    def __post_init__(self):
+        from bytia_kode.tools.registry import WORKSPACE_MODES  # lazy: registry imports config at module load
+
+        if self.mode not in WORKSPACE_MODES:
+            logger.warning(
+                "config.yaml: unknown workspace mode %r, falling back to 'permissive' "
+                "(valid: %s)", self.mode, ", ".join(WORKSPACE_MODES),
+            )
+            self.mode = "permissive"
+
+
 @dataclass
 class AppConfig:
     provider: ProviderConfig = field(default_factory=ProviderConfig)
@@ -120,6 +193,11 @@ class AppConfig:
     skills_dir: Path = field(init=False)
     bytia_dir: Path = field(init=False)
     vendor_skills_installed: bool = field(init=False, default=False)
+    # AST-26: workspace jail policy from ~/.bytia-kode/config.yaml
+    # (missing/malformed file → defaults: permissive, no extra trusted paths)
+    workspace: WorkspaceConfig = field(
+        default_factory=lambda: _workspace_from_config(_load_yaml_config())
+    )
 
     def __post_init__(self):
         self.data_dir.mkdir(parents=True, exist_ok=True)

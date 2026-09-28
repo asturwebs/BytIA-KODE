@@ -208,18 +208,30 @@ class ActivityIndicator(Static):
         except Exception:
             pass
 
+        # AST-26: the active jail mode is always visible in the status bar —
+        # green when locked down, amber when half-free, red when open.
+        ws_info = ""
+        try:
+            from bytia_kode.tools.registry import get_workspace_mode
+
+            mode = get_workspace_mode()
+            style = {"confined": a, "permissive": w, "open": e}.get(mode, w)
+            ws_info = f" | [bold {style}]ws:{mode}[/]"
+        except Exception:
+            pass
+
         if self._status == "ready":
-            self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}{ws_info}[/]")
         elif self._status == "thinking":
-            self.update(f"  [bold {w}]\u25d0 Thinking...{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {w}]\u25d0 Thinking...{model_info}{ctx_info}{ws_info}[/]")
         elif self._status == "tool":
-            self.update(f"  [bold {a}]\u2699 {self._detail}{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {a}]\u2699 {self._detail}{model_info}{ctx_info}{ws_info}[/]")
         elif self._status == "error":
             self.update(f"  [bold {e}]\u2717 Error[/]")
         elif self._status == "skill":
-            self.update(f"  [bold {w}]\u270e {self._detail}{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {w}]\u270e {self._detail}{model_info}{ctx_info}{ws_info}[/]")
         else:
-            self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}[/]")
+            self.update(f"  [bold {a}]\u25cf Ready{model_info}{ctx_info}{ws_info}[/]")
 
 
 class ThinkingBlock(Static):
@@ -371,6 +383,30 @@ class InputScreen(ModalScreen):
         self.dismiss("")
 
 
+class ConfirmScreen(ModalScreen):
+    """Yes/No confirmation modal (AST-26)."""
+
+    BINDINGS = [
+        Binding("escape", "no", "Cancel", show=False),
+        Binding("y", "yes", "Yes", show=False),
+        Binding("n", "no", "No", show=False),
+    ]
+
+    def __init__(self, title: str, **kwargs):
+        super().__init__(**kwargs)
+        self._title = title
+
+    def compose(self) -> ComposeResult:
+        yield Label(self._title, id="confirm-label")
+        yield Label("[dim]y = confirm · n / Esc = cancel[/]", id="confirm-hint")
+
+    def action_yes(self) -> None:
+        self.dismiss(True)
+
+    def action_no(self) -> None:
+        self.dismiss(False)
+
+
 class CommandMenuScreen(ModalScreen):
     """Ctrl+P popup with available commands."""
 
@@ -399,6 +435,7 @@ class CommandMenuScreen(ModalScreen):
         ("\u26a1  Toggle safe mode", "toggle_safe_mode"),
         ("\U0001f9e0  Toggle reasoning", "toggle_reasoning"),
         ("\U0001f3a8  Change theme", "change_theme"),
+        ("\U0001f512  Workspace mode", "cycle_workspace_mode"),
         ("\u21c4  Switch provider", "switch_provider"),
         ("\U0001f4cb  Copy last code block", "copy_last_code"),
         ("\U0001f4cc  Copy last full response", "copy_last_response"),
@@ -852,6 +889,12 @@ class BytIAKODEApp(App):
             )
         elif cmd == "/safe":
             self.action_toggle_safe_mode()
+        elif cmd.startswith("/workspace"):
+            arg = cmd_raw.split(None, 1)[1].strip() if len(cmd_raw.split(None, 1)) > 1 else ""
+            if arg:
+                self._request_workspace_mode(arg)
+            else:
+                self._show_workspace()
         elif cmd == "/session":
             sid = self.agent._current_session_id or "No active session"
             n_msgs = len(self.agent.messages)
@@ -867,6 +910,78 @@ class BytIAKODEApp(App):
             self._use_model(model_name)
         else:
             self._add_system_message(f"Unknown command: {cmd_raw}  |  /help for list")
+
+    def _show_workspace(self):
+        """AST-26: /workspace — muestra la política de jail activa."""
+        from bytia_kode.tools.registry import workspace_policy_state
+
+        state = workspace_policy_state()
+        table = Table(title="Workspace policy", box=box.SIMPLE_HEAVY, padding=(0, 1))
+        table.add_column("Key", style="bold cyan", min_width=14)
+        table.add_column("Value", min_width=30)
+        meanings = {
+            "confined": "file tools AND bash jailed to workspace + trusted",
+            "permissive": "file tools jailed, bash free (default)",
+            "open": "nothing jailed",
+        }
+        table.add_row("mode", f"{state['mode']} — {meanings.get(state['mode'], '?')}")
+        table.add_row("workspace", state["workspace"])
+        trusted = "\n".join(f"  {p}" for p in state["trusted"]) or "  (none)"
+        table.add_row("trusted_paths", trusted)
+        chat = self.query_one("#chat-area", VerticalScroll)
+        chat.mount(Static(table))
+        chat.scroll_end(animate=False)
+        self._add_system_message(
+            "Switch: /workspace <confined|permissive|open> · cycle: Ctrl+P → Workspace mode.\n"
+            "Session-scoped: the switch applies now and reverts on restart. To persist, set "
+            "workspace.mode in ~/.bytia-kode/config.yaml (operator-owned; the agent cannot write it)."
+        )
+
+    def _request_workspace_mode(self, mode: str):
+        """AST-26: conmuta el modo de workspace con confirmación explícita."""
+        from bytia_kode.tools.registry import (
+            WORKSPACE_MODES,
+            get_workspace_mode,
+            set_workspace_mode,
+        )
+
+        mode = mode.strip().lower()
+        if mode not in WORKSPACE_MODES:
+            self._add_system_message(
+                f"Unknown workspace mode: {mode!r}. Valid: {', '.join(WORKSPACE_MODES)}."
+            )
+            return
+        current = get_workspace_mode()
+        if mode == current:
+            self._add_system_message(f"Workspace mode is already '{mode}'.")
+            return
+
+        def on_confirm(confirmed):
+            if not confirmed:
+                self._add_system_message(f"Cancelled — workspace mode stays '{current}'.")
+                return
+            set_workspace_mode(mode)
+            self.query_one(ActivityIndicator)._refresh()
+            self._add_system_message(
+                f"Workspace mode: {current} → {mode} (this session only; not persisted — "
+                "edit workspace.mode in ~/.bytia-kode/config.yaml to make it permanent)."
+            )
+
+        self.push_screen(
+            ConfirmScreen(
+                f"Switch workspace mode '{current}' → '{mode}'?\n"
+                f"This changes what the agent may touch for the REST of the session."
+            ),
+            on_confirm,
+        )
+
+    def action_cycle_workspace_mode(self):
+        """Ctrl+P entry: confined → permissive → open → confined (AST-26)."""
+        from bytia_kode.tools.registry import WORKSPACE_MODES, get_workspace_mode
+
+        current = get_workspace_mode()
+        idx = WORKSPACE_MODES.index(current)
+        self._request_workspace_mode(WORKSPACE_MODES[(idx + 1) % len(WORKSPACE_MODES)])
 
     def _regenerate_context(self):
         from bytia_kode.context import context_path, generate_context, CONTEXTS_DIR
@@ -898,6 +1013,7 @@ class BytIAKODEApp(App):
             ("/skills show <name>", "Show skill content", ""),
             ("/skills verify <name>", "Mark skill verified", ""),
             ("/safe", "Toggle safe mode", "Ctrl+E"),
+            ("/workspace [mode]", "Show/switch workspace jail mode", ""),
             ("", "Toggle reasoning view", "Ctrl+D"),
             ("/models", "List local models", ""),
             ("/use <model>", "Select local model", ""),

@@ -61,7 +61,7 @@ La TUI pide lo mínimo: el `.env` con tu provider (ver [Instalación](#instalaci
 - **Multi-provider con failover automático** — cadena local-first (router → Ollama → nube) con circuit breaker (CLOSED → OPEN → HALF_OPEN): si el primario cae, el agente cambia solo y se recupera a los 60 s. Pin manual por teclas F1–F8.
 - **Sesiones persistentes** — todo se guarda en SQLite WAL (`~/.bytia-kode/sessions.db`), compartido entre TUI y Telegram: empieza un chat en una interfaz y résumelo en la otra. Auto-save O(1) por mensaje.
 - **Sistema de skills por capas** — procedimientos Markdown+YAML en `~/.bytia-kode/skills/` con prioridad bytia > user > vendor; las vendor se siembran y actualizan automáticamente con el paquete.
-- **Tools nativas con perímetro de seguridad** — 12 tools (bash, files, grep/glob/tree, web_fetch, sesiones) tras un modelo defense-in-depth: allowlist de binarios, sandbox de paths, SSRF cerrada, redacción de secretos en logs.
+- **Tools nativas con perímetro de seguridad** — 12 tools (bash, files, grep/glob/tree, web_fetch, sesiones) tras un modelo defense-in-depth: allowlist de binarios, jail de workspace configurable (confined/permissive/open, ver [Política de workspace](#política-de-workspace)), SSRF cerrada, redacción de secretos en logs.
 - **Identidad configurable en YAML** — `bytia.kernel.yaml` (identidad y valores) + `bytia.runtime.kode.yaml` (adaptación al entorno), empaquetados como recursos.
 - **Bot de Telegram** — mismo cerebro y mismas sesiones, aislamiento por usuario, fail-secure sin allowlist.
 - **Motor I/O asíncrono** — benchmark 4.90x frente a ejecución secuencial.
@@ -93,6 +93,32 @@ En desarrollo: `uv run bytia-kode` y `uv run python -m bytia_kode --bot`.
 | `LOG_LEVEL` | Nivel de logging (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `LOG_FILE` | Path custom para logs (vacío = `~/.bytia-kode/logs/bytia-kode.log`) | vacío |
 | `EXTRA_BINARIES` | Binarios adicionales para BashTool (comma-separated) | vacío |
+
+Además de las variables de entorno, `~/.bytia-kode/config.yaml` configura la política de workspace (ver abajo).
+
+### Política de workspace
+
+El agente corre tras un jail de intención configurable: `~/.bytia-kode/config.yaml` decide qué puede tocar.
+
+```yaml
+workspace:
+  mode: confined          # confined | permissive | open (default: permissive)
+  trusted_paths:          # válvula de precisión: rutas permitidas además del workspace
+    - ~/Projects
+    - ~/bytia
+```
+
+| Modo | File tools (`file_read`/`file_write`/`file_edit`/`grep`/`glob`/`tree`) | `bash` |
+| --- | --- | --- |
+| `confined` | jailed a workspace + trusted | jailed: `workdir` y todo argumento-que-parece-ruta se valida igual que los file tools |
+| `permissive` (default) | jailed a workspace + trusted | libre (el `workdir` sigue validándose) |
+| `open` | libre | libre |
+
+- **Es una política de intención, no un sandbox de kernel**: se rechaza lo que el agente pide *por nombre* (rutas absolutas, `~/…`, rutas relativas con `/`; los saltos por symlink se canonicalizan con `Path.resolve()`). Un binario permitido que recorra el árbol por su cuenta (p. ej. git leyendo `~/.gitconfig`) o un fichero dentro del workspace enlazado hacia fuera quedan fuera de lo que esto puede garantizar. Sin namespaces/chroot por diseño.
+- **Conmutación en caliente**: `/workspace` en la TUI (o Ctrl+P → *Workspace mode*) muestra el modo activo —también visible en la barra de estado (`ws:confined` en verde, `ws:permissive` en ámbar, `ws:open` en rojo)— y conmuta con confirmación. El cambio aplica a la sesión en curso y **no se persiste**: para hacerlo permanente, edítalo tú en `config.yaml`.
+- **Errores accionables**: cada bloqueo nombra el modo activo, los límites del jail y las dos salidas (ampliar `trusted_paths` o conmutar el modo) — el agente no tiene que adivinar.
+- **`config.yaml` es del operador**: el agente no puede escribirlo (denylist T4, igual que `.env` o `mcp_servers.json`) — una sesión inyectada no puede silenciosamente pasar el jail a `open` para el siguiente arranque. Ese denylist sigue activo en los tres modos: `open` libera el workspace, nunca la superficie de configuración propia del agente.
+- Sin `config.yaml` (o malformado) el arranque es `permissive` — el comportamiento histórico, ahora explícito y documentado.
 
 ### Sesiones persistentes
 
@@ -277,12 +303,14 @@ Sin `TELEGRAM_ALLOWED_USERS` configurado, el bot deniega todos los mensajes (fai
 | `/cwd` | Directorio actual |
 | `/safe` | Estado visual de safe mode |
 | `/context` | Regenerar contexto del workspace |
+| `/workspace` | Mostrar política de workspace (modo + trusted) |
+| `/workspace <modo>` | Conmutar el jail: `confined` \| `permissive` \| `open` (con confirmación, sesión en curso) |
 
 ### Atajos
 
 | Atajo | Acción |
 | --- | --- |
-| `Ctrl+P` | Menú de comandos |
+| `Ctrl+P` | Menú de comandos (incluye *Workspace mode*: cicla confined→permissive→open con confirmación) |
 | `Ctrl+Q` | Salir |
 | `Ctrl+R` | Reset conversación |
 | `Ctrl+L` | Limpiar chat |

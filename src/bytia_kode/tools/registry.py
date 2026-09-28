@@ -20,17 +20,53 @@ from bytia_kode.providers.client import ToolDef
 
 logger = logging.getLogger(__name__)
 
+# --- Workspace policy (AST-26) ---------------------------------------------
+# Three modes, one jail. The mode decides WHO is jailed to
+# workspace ∪ trusted_paths:
+#
+#   confined   — file tools AND bash (workdir + path-like argv tokens)
+#   permissive — file tools jailed, bash free (the historical behaviour,
+#                now an explicit, documented choice instead of an accident)
+#   open       — nothing is jailed
+#
+# IMPORTANT: this is an INTENTION POLICY, not a kernel sandbox. It refuses
+# what the agent *asks for by name*; it cannot contain a binary that walks
+# outside on its own (git reading ~/.gitconfig, rg its config file, a file
+# inside the workspace symlinked to outside). No namespaces/chroot here by
+# design (AST-26 scope).
+#
+# trusted_paths is the precision valve OUT of the jail (operator-declared in
+# ~/.bytia-kode/config.yaml). Do not confuse it with the agent-self-write
+# denylist in _agent_write_denied_paths (AST-15 T4): that list stays active
+# in ALL modes — trusted_paths grants access, the denylist then keeps agent
+# WRITEs off the agent's own persistence surface.
 _TRUSTED_PATHS: list[Path] = []
 _WORKSPACE_ROOT: Path | None = None
 
+WORKSPACE_MODES = ("confined", "permissive", "open")
+_workspace_mode: str = "permissive"
+
+_MODE_HINTS = {
+    "confined": "file tools AND bash are jailed",
+    "permissive": "file tools are jailed, bash is free",
+    "open": "nothing is jailed",
+}
+
 
 def set_trusted_paths(paths: list[Path]) -> None:
-    """Add trusted directories that file tools can access beyond the workspace.
+    """Add trusted directories that file tools (and confined bash) can access
+    beyond the workspace.
 
-    Used to allow the agent to write to its own data directory (e.g. ~/.bytia-kode/)
-    regardless of the current working directory.
+    Used to allow the agent to write to its own data directory (e.g.
+    ~/.bytia-kode/) regardless of the current working directory, and to wire
+    the operator's workspace.trusted_paths valve from config (AST-26).
+    Idempotent: re-declaring an already-trusted path is a no-op, so repeated
+    Agent construction cannot grow the list with duplicates.
     """
-    _TRUSTED_PATHS.extend(p.resolve() for p in paths)
+    for p in paths:
+        resolved = p.expanduser().resolve()
+        if resolved not in _TRUSTED_PATHS:
+            _TRUSTED_PATHS.append(resolved)
 
 
 def set_workspace_root(root: Path) -> None:
@@ -41,6 +77,62 @@ def set_workspace_root(root: Path) -> None:
     """
     global _WORKSPACE_ROOT
     _WORKSPACE_ROOT = root.resolve()
+
+
+def set_workspace_mode(mode: str) -> None:
+    """Set the workspace jail mode (AST-26): 'confined' | 'permissive' | 'open'.
+
+    Session-scoped by design: switching here changes the live process only.
+    The persistent source is workspace.mode in ~/.bytia-kode/config.yaml,
+    which the operator owns (the path is agent-write-denied, see T4).
+    """
+    global _workspace_mode
+    if mode not in WORKSPACE_MODES:
+        raise ValueError(
+            f"Unknown workspace mode: {mode!r}. Valid modes: {', '.join(WORKSPACE_MODES)}."
+        )
+    _workspace_mode = mode
+
+
+def get_workspace_mode() -> str:
+    return _workspace_mode
+
+
+def workspace_policy_state() -> dict:
+    """Snapshot of the live jail policy for the system prompt and the TUI."""
+    return {
+        "mode": _workspace_mode,
+        "workspace": str(_WORKSPACE_ROOT or Path.cwd().resolve()),
+        "trusted": [str(p) for p in _TRUSTED_PATHS],
+    }
+
+
+def _path_inside_jail(resolved: Path) -> bool:
+    workspace = _WORKSPACE_ROOT or Path.cwd().resolve()
+    if workspace == resolved or workspace in resolved.parents:
+        return True
+    return any(t == resolved or t in resolved.parents for t in _TRUSTED_PATHS)
+
+
+def _escape_error(what: str, path: str) -> PermissionError:
+    """Actionable escape error (AST-26): name the active mode and the exits.
+
+    The session that motivated this (tui_32e522c5) failed with a bare
+    "path escapes workspace" while bash read the same file fine — the agent
+    had no way to know why or what to ask for. Every block now carries the
+    mode, the jail boundaries and the two remedies.
+    """
+    state = workspace_policy_state()
+    trusted = ", ".join(state["trusted"]) or "(none)"
+    return PermissionError(
+        f"Security violation: {what} escapes the workspace "
+        f"(workspace mode: {state['mode']} — {_MODE_HINTS[state['mode']]}): {path}\n"
+        f"  workspace: {state['workspace']}\n"
+        f"  trusted: {trusted}\n"
+        f"Exits: ask the user to add the path to workspace.trusted_paths in "
+        f"~/.bytia-kode/config.yaml, or to switch the workspace mode with "
+        f"/workspace in the TUI (permissive frees bash; open frees everything)."
+    )
 
 # Default allowlist for the bash tool.
 #
@@ -197,28 +289,37 @@ class Tool:
         raise NotImplementedError
 
 
-def _resolve_workspace_path(path: str) -> Path:
-    workspace = _WORKSPACE_ROOT or Path.cwd().resolve()
+def _resolve_workspace_path(path: str, base: Path | None = None) -> Path:
+    """Resolve `path` under the workspace jail, honouring the AST-26 mode.
+
+    Relative paths anchor to `base` when given (bash resolves argv tokens
+    against the effective workdir) and to the workspace root otherwise.
+    `open` mode returns the resolved path unchecked; `confined`/`permissive`
+    require workspace ∪ trusted_paths membership. Path.resolve() runs in both
+    cases, so symlink hops are canonicalized before the containment check.
+    """
+    workspace = base or (_WORKSPACE_ROOT or Path.cwd().resolve())
     candidate = Path(path).expanduser()
     if not candidate.is_absolute():
         candidate = workspace / candidate
     resolved = candidate.resolve()
-    if workspace == resolved or workspace in resolved.parents:
+    if _workspace_mode == "open" or _path_inside_jail(resolved):
         return resolved
-    for trusted in _TRUSTED_PATHS:
-        if trusted in resolved.parents:
-            return resolved
-    raise PermissionError(f"Security violation: path escapes workspace: {path}")
+    raise _escape_error("path", path)
 
 
 def _agent_write_denied_paths() -> list[Path]:
     """Agent-owned persistence surface that agent writes must never touch (T4).
 
     Computed against the live Path.home() on every check so tests can pin $HOME.
+    config.yaml joined the list with AST-26: it carries the workspace mode, so
+    an agent-writable config would let an injected session flip itself to
+    `mode: open` for the next start — the T4 attack class one plane up.
     """
     home = Path.home()
     return [
         home / ".bytia-kode" / ".env",
+        home / ".bytia-kode" / "config.yaml",
         home / ".bytia-kode" / "mcp_servers.json",
         home / ".bytia-kode" / "skills",
         home / "bytia" / "skills",
@@ -232,10 +333,13 @@ def _check_agent_write_allowed(resolved: Path) -> None:
     config/skills is legitimate and leaks nothing the session could not learn
     otherwise. A WRITE, however, is a persistence primitive: a prompt-injected
     session could plant PROVIDER_*/EXTRA_BINARIES/JEVAL_MODE in
-    ~/.bytia-kode/.env, spawn commands in mcp_servers.json, or a SKILL.md that
-    is re-loaded as binding system prompt on the next start. Trusted paths
-    (agent.py: set_trusted_paths([data_dir, ~/bytia])) therefore grant
-    read-write on ordinary session data but read-only on this denylist.
+    ~/.bytia-kode/.env, spawn commands in mcp_servers.json, flip the workspace
+    jail to `mode: open` in ~/.bytia-kode/config.yaml (AST-26), or plant a
+    SKILL.md that is re-loaded as binding system prompt on the next start.
+    Trusted paths (agent.py: set_trusted_paths([data_dir, ~/bytia])) therefore
+    grant read-write on ordinary session data but read-only on this denylist.
+    The denylist is mode-INDEPENDENT: `open` frees the workspace jail, never
+    the agent's own configuration surface.
     """
     for denied in _agent_write_denied_paths():
         if resolved == denied or denied in resolved.parents:
@@ -267,6 +371,67 @@ def _create_backup(path: Path) -> Path:
     backup = path.parent / f"{path.name}.backup-{timestamp}"
     shutil.copy2(path, backup)
     return backup
+
+
+def _looks_like_path_token(token: str) -> bool:
+    """Heuristic gate for argv tokens worth resolving as filesystem paths.
+
+    Flags (leading '-') are skipped except for their `=value` part when that
+    value is absolute (`--path=/etc/x`); bare words without a slash stay
+    unchecked (they resolve inside the jailed cwd anyway).
+    """
+    if token in (".", ".."):
+        return True
+    return token.startswith(("/", "~", "./", "../")) or "/" in token
+
+
+def _validate_argv_workspace(argv: list[str], workdir: str) -> ToolResult | None:
+    """Confined mode only: path-like argv tokens must stay inside the jail.
+
+    This is the piece that closed the AST-26 asymmetry: bash validated its
+    workdir (registry.py, `_resolve_workspace_path(workdir)`) but not its
+    arguments, so `bat /home/user/secret` sailed through while file_read on
+    the same path was refused (session tui_32e522c5).
+
+    Each candidate token goes through the SAME resolver as the file tools —
+    expanduser, Path.resolve() (canonicalizes symlink hops) and the
+    workspace ∪ trusted containment check — resolved against the effective
+    workdir so relative tokens keep their real meaning.
+
+    Intention policy, not a kernel sandbox (see the workspace policy block
+    above). Known residual bypass families, documented and accepted:
+      - binaries reading their own config outside the jail (git ~/.gitconfig);
+      - a file INSIDE the workspace symlinked to outside: the token itself
+        resolves inside, the binary follows the link at open time;
+      - argv the policy cannot see (env expansion does not apply here —
+        create_subprocess_exec passes `$HOME/x` literally — but nothing
+        stops an allowed binary from walking the tree on its own).
+    """
+    if _workspace_mode != "confined":
+        return None
+    try:
+        base = _resolve_workspace_path(workdir)
+    except PermissionError as exc:
+        return ToolResult(output=str(exc), error=True)
+    for token in argv[1:]:
+        candidate = token
+        if token.startswith("-"):
+            if "=" not in token:
+                continue
+            candidate = token.split("=", 1)[1]
+        if not _looks_like_path_token(candidate):
+            continue
+        try:
+            _resolve_workspace_path(candidate, base=base)
+        except PermissionError as exc:
+            return ToolResult(
+                output=(
+                    f"{exc}\nBlocked bash argument: {token!r} "
+                    f"(command rejected before execution)."
+                ),
+                error=True,
+            )
+    return None
 
 
 class BashTool(Tool):
@@ -438,6 +603,13 @@ class BashTool(Tool):
             argv_check = self._validate_argv_safety(argv)
             if argv_check is not None:
                 return argv_check
+
+            # AST-26: in confined mode, path-like argv tokens face the same
+            # jail as the file tools. Runs before binary resolution so the
+            # policy verdict never depends on what happens to be installed.
+            workspace_check = _validate_argv_workspace(argv, workdir)
+            if workspace_check is not None:
+                return workspace_check
 
             # T1-8: resolve the binary via PATH and require it to live in a
             # system directory. Validating only the basename let a malicious

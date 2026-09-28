@@ -121,6 +121,25 @@ CommandMenuScreen {
     background: $boost;
 }
 
+/* Confirm modal (AST-26) — same visual language as the command list */
+ConfirmScreen {
+    align: center middle;
+}
+
+#confirm-label {
+    width: 48;
+    padding: 1 2;
+    background: $surface;
+    border: tall $warning;
+}
+
+#confirm-hint {
+    width: 48;
+    padding: 0 2 1 2;
+    background: $surface;
+    border-top: none;
+}
+
 /* Panels — compact */
 Panel {
     padding: 0 1;
