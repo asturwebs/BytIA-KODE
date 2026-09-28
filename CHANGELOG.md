@@ -126,6 +126,34 @@ remediación H1+H2 (que quedó verificada 7/7), remediados:
   prestada). Ahora `git config` con `-f`/`--file` es familia-escritura: el
   destino viaja en argv y enfrenta la denylist T4 en todos los modos.
 
+### Security — AST-27 R4 (análisis de clase): subcomandos git que escriben en paths argv-visibles
+
+El análisis de clase pedido sobre H3 ("que no se parchee sólo el síntoma")
+encontró un hermano argv-visible: el barrido R2 dejaba a git fuera de la
+familia-escritura como "lector/reportero" salvo `config -f`, pero tres
+subcomandos ESCRIBEN en paths que sí viajan en argv (sonda sobre `8e2603e`:
+los tres ejecutaban en los tres modos):
+
+- **`git clone <repo> <dst>` y `git worktree add <path>` plantan un árbol
+  CRUDO en el destino** — un `SKILL.md` válido bajo `skills/` es
+  persistencia que el loader carga (mismo impacto que H1/H3).
+- **`git archive -o <file>` (y `bundle create <file>`)** escriben un
+  binario en un path nombrado — destrucción de la superficie T4 (falla
+  cerrado al parsear, pero rompe la invariante "T4 en todos los modos").
+
+Esos subcomandos (más `checkout-index --prefix` y `fast-import
+--export-marks`) entran en la familia-escritura por SUBCOMANDO completo, no
+por flag: las formas separada/pegada/`=` del flag de salida quedan cubiertas
+de una vez y no hay whack-a-mole de formas. Controles: clonar o archivar a
+destinos ordinarios dentro del workspace sigue permitido (`git worktree
+list` o `git archive` a stdout también matchean, sin tokens-ruta que
+inspeccionar — no-op). La clase content-plane que el análisis del Socio
+nombró (`rsync --files-from`, `tar -f`, `patch -p0`, `cpio`) sigue cerrada
+por ausencia: ninguno está en la allowlist; sólo una reintroducción vía
+`EXTRA_BINARIES` la reabriría (amenaza documentada, igual que los belt
+members). `git init <dir>` queda fuera: sólo crea un esqueleto `.git` sin
+contenido plantable.
+
 ## [0.8.2] - 2026-09-28
 
 Blindaje de cancelación (AST-24, commit `13ccac7`, de GitHub issue #3): los
