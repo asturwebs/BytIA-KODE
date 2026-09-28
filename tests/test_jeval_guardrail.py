@@ -1,6 +1,7 @@
 """Tests for the JEVAL guardrail (Jev pre-execution classifier)."""
 import asyncio
 import json
+from bytia_kode.config import WorkspaceConfig
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -152,6 +153,7 @@ class TestAgentIntegration:
     def _agent(self, tmp_path):
         cfg = MagicMock()
         cfg.provider = MagicMock()
+        cfg.workspace = WorkspaceConfig()  # AST-26
         # Real Path: a MagicMock data_dir makes SessionStore materialize
         # `MagicMock/...` dirs and a real SQLite db in the repo tree (QA §8).
         cfg.data_dir = tmp_path / "data"

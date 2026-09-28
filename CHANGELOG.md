@@ -1,5 +1,67 @@
 # Changelog
 
+## [Unreleased]
+
+Política de workspace configurable (AST-26): poder BLINDAR el workspace o
+PERMITIR salir, conmutable. La política era asimétrica por accidente — file
+tools jailed al cwd y bash tocando lo que quisiera (la sesión real
+tui_32e522c5: `file_read` bloqueó `~/bytia` mientras bash con bat/ls lo leía
+sin problema). Ahora hay un solo jail con tres modos y el modo se ve, se
+configura y se conmuta.
+
+### Added — `~/.bytia-kode/config.yaml` con `workspace.mode`
+
+- **Tres modos, un jail**: `confined` (file tools Y bash jailed a
+  workspace+trusted), `permissive` (file tools jailed, bash libre — el
+  comportamiento histórico, ahora explícito y documentado; default) y `open`
+  (todo libre). Sin config (o malformada) el arranque es `permissive`; un
+  modo desconocido cae a `permissive` con warning.
+- **`workspace.trusted_paths`**: la válvula de precisión del operador
+  (`~/Projects`, `~/bytia`…) — amplía el jail para file tools y bash-confined.
+  El arranque cablea config → jail (`set_workspace_root` +
+  `set_trusted_paths`, idempotente) en vez de dejar los globals a
+  cwd-por-defecto.
+- **Bash confined valida argumentos-que-parecen-rutas** con el MISMO
+  resolver que los file tools (expanduser, `Path.resolve()` — canonicaliza
+  saltos por symlink — y contención workspace ∪ trusted), resueltos contra el
+  workdir efectivo; también la forma `--flag=/ruta/fuera`. **Política de
+  intención, no sandbox de kernel**: rechaza lo que el agente pide por
+  nombre; un binario que recorra el árbol por su cuenta queda fuera (familias
+  residuales documentadas en el docstring de `_validate_argv_workspace`).
+
+### Added — TUI: `/workspace`, Ctrl+P y barra de estado
+
+- **`/workspace`** muestra modo, workspace y trusted; **`/workspace <modo>`**
+  conmuta con confirmación explícita (modal y/n). Entrada *Workspace mode* en
+  Ctrl+P que cicla confined→permissive→open.
+- **El modo activo vive en la barra de estado**: `ws:confined` (verde),
+  `ws:permissive` (ámbar), `ws:open` (rojo).
+- **Decisión de persistencia**: el toggle es **sólo sesión en curso** y no
+  escribe `config.yaml` — la fuente persistente es el operador editando el
+  fichero (así el agent nunca muta su propia política; ver el punto de
+  seguridad). Documentado en la TUI, el README y el docstring.
+
+### Changed — errores accionables en vez de adivinar
+
+- **Todo bloqueo nombra el modo activo, los límites y las dos salidas**
+  ("amplía `workspace.trusted_paths` en config.yaml o conmuta el modo con
+  `/workspace`") — en la sesión real el agente recibía un "path escapes
+  workspace" seco sin forma de saber por qué bash sí podía.
+- El bloque de Workspace Context del system prompt ahora lleva el modo
+  activo y las salidas, para que el modelo siga el mensaje de bloqueo en vez
+  de reintentar a ciegas.
+
+### Security — el nuevo fichero de política se blinda solo
+
+- **`~/.bytia-kode/config.yaml` se une al denylist T4 de auto-escritura**:
+  es una primitiva de persistencia nueva (una sesión inyectada podría
+  escribir `mode: open` y desactivar su propio jail en el siguiente arranque)
+  y vive en un trusted path — el denylist era la única barrera. Lectura
+  sigue permitida, como en el resto del denylist.
+- **`open` NO levanta el denylist**: liberar el workspace jail no libera la
+  superficie de persistencia propia del agente (`.env`, `mcp_servers.json`,
+  skills, y ahora `config.yaml`) — pinado con tests en los tres modos.
+
 ## [0.8.2] - 2026-09-28
 
 Blindaje de cancelación (AST-24, commit `13ccac7`, de GitHub issue #3): los

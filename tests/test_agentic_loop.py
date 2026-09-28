@@ -2,6 +2,7 @@
 import asyncio
 import pytest
 from pathlib import Path
+from bytia_kode.config import WorkspaceConfig
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from bytia_kode.providers.client import Message
@@ -13,6 +14,8 @@ def agent(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     cfg = MagicMock()
     cfg.provider = MagicMock()
+    # AST-26: el arranque del Agent lee la política de workspace del config
+    cfg.workspace = WorkspaceConfig()
     cfg.data_dir = tmp_path / "data"
     cfg.skills_dir = Path(tmp_path / "skills")
     with patch("bytia_kode.agent.load_system_prompt", return_value="You are BytIA."):
@@ -497,12 +500,14 @@ class TestWorkspaceContextInSystemPrompt:
         assert str(tmp_path) in sp
 
     def test_system_prompt_contains_sandbox_warning(self, agent, tmp_path):
-        """The system prompt must mention sandbox constraints."""
+        """The system prompt must mention sandbox constraints (AST-26: also
+        the active mode and the exits named in the block errors)."""
         agent._identity_dirty = True
         sp = agent._build_system_prompt()
 
-        assert "sandboxed" in sp
+        assert "Workspace mode: permissive" in sp
         assert "trusted paths" in sp
+        assert "workspace.trusted_paths" in sp
 
     def test_workspace_context_with_trusted_paths(self, agent, tmp_path):
         """Trusted paths beyond CWD should appear in the system prompt."""

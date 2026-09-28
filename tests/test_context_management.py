@@ -1,6 +1,7 @@
 """Tests for Agent context management — summarization and token estimation."""
 import pytest
 from pathlib import Path
+from bytia_kode.config import WorkspaceConfig
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from bytia_kode.providers.client import Message
@@ -12,6 +13,8 @@ def agent(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     cfg = MagicMock()
     cfg.provider = MagicMock()
+    # AST-26: el arranque del Agent lee la política de workspace del config
+    cfg.workspace = WorkspaceConfig()
     cfg.data_dir = tmp_path / "data"
     cfg.skills_dir = Path(tmp_path / "skills")
     with patch("bytia_kode.agent.load_system_prompt", return_value="You are a helpful assistant."):

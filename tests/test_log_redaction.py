@@ -2,6 +2,7 @@
 import json
 import logging
 from pathlib import Path
+from bytia_kode.config import WorkspaceConfig
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -18,6 +19,8 @@ def agent(tmp_path, monkeypatch):
     monkeypatch.setattr(guardrail, "_gate", None)
     cfg = MagicMock()
     cfg.provider = MagicMock()
+    # AST-26: el arranque del Agent lee la política de workspace del config
+    cfg.workspace = WorkspaceConfig()
     cfg.data_dir = tmp_path / "data"
     cfg.skills_dir = Path(tmp_path / "skills")
     with patch("bytia_kode.agent.load_system_prompt", return_value="You are BytIA."):
