@@ -1,8 +1,17 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.8.1 (Alpha) — 2026-09-27
+## Estado actual: v0.8.2 (Alpha) — 2026-09-28
 
 > Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
+
+## v0.8.2 (AST-24, 2026-09-28) — blindaje de cancelación
+
+- [x] **Interrumpir (Escape) en mitad de la generación conserva lo parcial** y lo persiste en la sesión (un turno cortado antes del primer texto deja `(respuesta cancelada)`).
+- [x] **Kill (Ctrl+K) aborta el lote restante de herramientas**: las no ejecutadas quedan respondidas `[cancelled by user]`, sin tool calls colgados.
+- [x] **Kill termina el subprocess de bash en cualquier embedding**, con escalado terminate → SIGKILL.
+- [x] **`AgentCancelledError`** con cleanup estructurado: persistencia del parcial y tool calls pendientes resueltos en un solo sitio.
+- [x] **El turno siguiente nace limpio**: limpieza una vez por turno (H1) conservando que `kill()` no limpia el evento (H2) — ambas invariantes blindadas por tests.
+- [x] **Primeros tests de la TUI** (Pilot integrado de Textual, sin dependencia nueva). Suite: **377** (+17 sobre v0.8.1).
 
 ## v0.8.1 (AST-23, 2026-09-27) — README profesional + estreno del flujo OIDC
 
