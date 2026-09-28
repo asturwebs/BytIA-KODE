@@ -177,7 +177,7 @@ Modelo de seguridad con defense-in-depth:
 | --- | --- |
 | Command injection | Allowlist de binarios + `shell=False` + `shlex.split()` + guards de argv |
 | Path traversal | `_resolve_workspace_path()` con sandbox a CWD + trusted paths |
-| Escritura en trusted paths | Denylist sobre `.env`, `mcp_servers.json`, `skills/**` |
+| Escritura en trusted paths | Denylist sobre `.env`, `mcp_servers.json`, `config.yaml`, `skills/**` |
 | SSRF | `web_fetch` rechaza hosts privados/loopback, redirects re-validados |
 | Telegram abierto | Fail-secure por defecto (deniega sin allowlist) |
 | Sesiones cruzadas | Aislamiento por `chat_id` |
