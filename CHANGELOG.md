@@ -5,8 +5,8 @@
 Tu agente no puede salir de su workspace sin permiso — y ahora tampoco
 escondiendo rutas dentro de ficheros. Dos entregas en una release: la
 política de workspace configurable (AST-26) y el blindaje content-plane
-de la denylist T4 sobre el plano bash (AST-27: H1–H4 + R4, hallazgos de
-la revisión cruzada de Seguridad & Auditoría).
+de la denylist T4 sobre el plano bash (AST-27, H1–H4 + R4 — hallazgos de
+Seguridad & Auditoría).
 
 Política de workspace configurable (AST-26): poder BLINDAR el workspace o
 PERMITIR salir, conmutable. La política era asimétrica por accidente — file
@@ -68,9 +68,9 @@ configura y se conmuta.
   superficie de persistencia propia del agente (`.env`, `mcp_servers.json`,
   skills, y ahora `config.yaml`) — pinado con tests en los tres modos.
 
-### Security — AST-27 (revisión cruzada): la T4 ata el plano bash; los flags pegados no escapan
+### Security — la denylist T4 también ata el plano bash; los flags pegados no escapan (AST-27, H1+H2)
 
-Dos hallazgos de la revisión cruzada de Seguridad & Auditoría sobre el
+Dos hallazgos de la revisión de Seguridad & Auditoría sobre el
 commit inicial de AST-26, ambos remediados:
 
 - **H1 (alta) — la denylist T4 no existía en el plano bash**: el chequeo
@@ -101,10 +101,10 @@ commit inicial de AST-26, ambos remediados:
   único silencioso de la tabla de fallbacks (ficha ausente, YAML malformado,
   modo desconocido, no-mapping ya avisaban).
 
-### Security — AST-27 R3 (re-verificación): el path del parche y los flags de find
+### Security — ni un parche ni el listing de find escriben donde no deben (AST-27, H3+H4)
 
-Tres hallazgos de la re-verificación de Seguridad & Auditoría sobre la
-remediación H1+H2 (que quedó verificada 7/7), remediados:
+Tres hallazgos de la segunda pasada de Seguridad & Auditoría sobre la
+remediación H1+H2, remediados:
 
 - **H3 (alta) — `git apply -p0 --unsafe-paths` plantaba `mode: open` en los
   tres modos**: el destino de un parche viaja en su CONTENIDO, no en argv,
@@ -132,13 +132,13 @@ remediación H1+H2 (que quedó verificada 7/7), remediados:
   prestada). Ahora `git config` con `-f`/`--file` es familia-escritura: el
   destino viaja en argv y enfrenta la denylist T4 en todos los modos.
 
-### Security — AST-27 R4 (análisis de clase): subcomandos git que escriben en paths argv-visibles
+### Security — los subcomandos de git que escriben ficheros también enfrentan la denylist (AST-27, R4)
 
-El análisis de clase pedido sobre H3 ("que no se parchee sólo el síntoma")
-encontró un hermano argv-visible: el barrido R2 dejaba a git fuera de la
+El análisis de clase sobre H3 ("que no se parchee sólo el síntoma")
+encontró un hermano argv-visible: el barrido inicial dejaba a git fuera de la
 familia-escritura como "lector/reportero" salvo `config -f`, pero tres
-subcomandos ESCRIBEN en paths que sí viajan en argv (sonda sobre `8e2603e`:
-los tres ejecutaban en los tres modos):
+subcomandos ESCRIBEN en paths que sí viajan en argv (antes del fix, los tres
+ejecutaban en los tres modos):
 
 - **`git clone <repo> <dst>` y `git worktree add <path>` plantan un árbol
   CRUDO en el destino** — un `SKILL.md` válido bajo `skills/` es
