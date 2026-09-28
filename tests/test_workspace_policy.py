@@ -490,6 +490,39 @@ class TestBashPlaneAgentWriteDenylist:
         result = _bash(f"touch {cfg}")
         assert result.error and "cannot write" in result.output
 
+    def test_write_family_sweep_membership(self, _jail):
+        # barrido caso-por-caso de la allowlist (docstring de
+        # _is_write_family_command). Los belt-members no-allowlisted
+        # (install/tee/ln/sed/truncate) no son testeables end-to-end — la
+        # allowlist T1 los rechaza antes — así que se fija el predicado.
+        from bytia_kode.tools.registry import _is_write_family_command
+
+        for b in ("cp", "mv", "rm", "touch", "mkdir", "rmdir", "chmod"):
+            assert _is_write_family_command(b, [b, "x"]), b
+        for b in ("install", "tee", "ln", "sed", "truncate"):  # belt EXTRA_BINARIES
+            assert _is_write_family_command(b, [b, "x"]), b
+        # find: escritor SÓLO con flags destructivos
+        assert _is_write_family_command("find", ["find", ".", "-delete"])
+        assert _is_write_family_command("find", ["find", ".", "-fprint", "/x"])
+        assert not _is_write_family_command("find", ["find", ".", "-name", "x"])
+        # lectores/reporteros y echo (sin shell, `>` es literal): fuera
+        for b in ("ls", "head", "tail", "grep", "rg", "bat", "wc", "git",
+                  "echo", "date", "df", "du", "pwd", "eza", "tokei", "shellcheck"):
+            assert not _is_write_family_command(b, [b, "x"]), b
+
+    def test_bash_find_delete_on_skills_denied(self, _jail):
+        # find SÓLO es familia-escritura con flags destructivos; sin ellos,
+        # caminar la superficie T4 es lectura legítima
+        set_workspace_mode("permissive")
+        self._boot_like_agent(_jail)
+        skills = self._config_surface(_jail, name="skills/x.md").parent
+        result = _bash(f"find {skills} -name x.md -delete")
+        assert result.error and "cannot write" in result.output
+        assert (skills / "x.md").exists()  # intacto
+        walk = _bash(f"find {skills} -name x.md")
+        assert not walk.error  # sin flag destructivo: lectura normal
+        assert "x.md" in walk.output
+
     @pytest.mark.parametrize("mode", WORKSPACE_MODES)
     def test_bash_read_of_config_yaml_still_allowed(self, mode, _jail):
         # lecturas de la superficie T4 siguen legítimas en cualquier modo

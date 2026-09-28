@@ -74,7 +74,10 @@ commit inicial de AST-26, ambos remediados:
   `mode: open` o `EXTRA_BINARIES` para el siguiente arranque. Ahora
   `_validate_argv_agent_writes` aplica el denylist a los binarios de
   familia escritura (`cp`, `mv`, `rm`, `touch`, `mkdir`, `rmdir`, `chmod`,
-  `install`) en TODOS los modos: todo token-ruta del comando (fuentes
+  `install`, `tee`, `ln`, `sed`, `truncate`; `find` sólo con flags
+  destructivos `-delete`/`-fprint*` — barrido caso-por-caso de la allowlist
+  documentado en `_is_write_family_command`) en TODOS los modos: todo
+  token-ruta del comando (fuentes
   incluidas — `mv` destruye su origen y parsear posiciones de operandos es
   donde nacen los bypass) se resuelve y pasa por `_check_agent_write_allowed`.
   Lecturas con binarios no-escritura intactas (`head config.yaml` sigue
