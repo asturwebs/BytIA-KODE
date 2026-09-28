@@ -505,6 +505,20 @@ class TestBashPlaneAgentWriteDenylist:
         assert _is_write_family_command("find", ["find", ".", "-delete"])
         assert _is_write_family_command("find", ["find", ".", "-fprint", "/x"])
         assert not _is_write_family_command("find", ["find", ".", "-name", "x"])
+        # find R3/H4: -fls ESCRIBE el listing en FILE; -ok/-okdir entran por
+        # política explícita (hoy los mata el gate de string del ';', pero
+        # por accidente de sintaxis de find, no por decisión nuestra)
+        assert _is_write_family_command("find", ["find", ".", "-fls", "/x"])
+        assert _is_write_family_command("find", ["find", ".", "-ok", "rm", "{}", ";"])
+        assert _is_write_family_command("find", ["find", ".", "-okdir", "rm", "{}", ";"])
+        # git R3: SÓLO `config -f FILE` es familia (destino por argv);
+        # `apply` va por el gate de flags de _validate_argv_safety (H3),
+        # no por familia — el resto de subcomandos queda fuera
+        assert _is_write_family_command("git", ["git", "config", "-f", "/x/.env", "a.b", "c"])
+        assert _is_write_family_command("git", ["git", "config", "--file", "/x", "a.b", "c"])
+        assert _is_write_family_command("git", ["git", "-C", "/w", "config", "-f", "/x"])
+        assert not _is_write_family_command("git", ["git", "config", "user.name", "x"])
+        assert not _is_write_family_command("git", ["git", "apply", "p.diff"])
         # lectores/reporteros y echo (sin shell, `>` es literal): fuera
         for b in ("ls", "head", "tail", "grep", "rg", "bat", "wc", "git",
                   "echo", "date", "df", "du", "pwd", "eza", "tokei", "shellcheck"):
@@ -622,6 +636,142 @@ class TestGluedShortFlagValues:
         result = _bash(f"cp -t./sub {src}")
         assert not result.error
         assert (sub / "a.txt").read_text() == "hola\n"
+
+
+# --- AST-27 R3/H3: el path puede viajar en el CONTENIDO del parche ---------
+
+
+class TestGitApplyPatchContentEscape:
+    """H3 (alta): `git apply -p0 --unsafe-paths` plantaba `mode: open` en
+    ~/.bytia-kode/config.yaml en TODOS los modos — ningún token de argv es
+    path-like, así que ni el jail confined ni la T4 del plano bash tenían
+    nada que inspeccionar: el destino viaja en el CONTENIDO del parche.
+    Ahora _validate_argv_safety rechaza los flags --unsafe* de git apply.
+    Semántica 2×2 (verificada en shell plano): `-p0` solo → git mismo
+    rechaza '../'; `--unsafe-paths` solo → el strip -p1 por defecto desarma
+    la ruta; el escape necesita AMBOS — matar el habilitador basta, y `-p0`
+    queda permitido (es la forma normal de aplicar `diff -u` plano).
+    """
+
+    def _boot_like_agent(self, jail):
+        set_trusted_paths([jail["home"] / ".bytia-kode"])  # como el arranque real
+
+    def _config_surface(
+        self, jail, name="config.yaml", content="workspace:\n  mode: confined\n"
+    ):
+        target = jail["home"] / ".bytia-kode" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+        return target
+
+    def _escape_patch(self, jail):
+        # unified diff cuyos headers apuntan FUERA vía ../ (PoC del revisor):
+        # file_write del parche es legítimo (dentro del ws, no denegado)
+        cfg = self._config_surface(jail)
+        rel = "../home/.bytia-kode/config.yaml"
+        patch = jail["ws"] / "p.diff"
+        patch.write_text(
+            f"--- {rel}\n+++ {rel}\n@@ -1,2 +1,2 @@\n workspace:\n"
+            "-  mode: confined\n+  mode: open\n"
+        )
+        return cfg, patch
+
+    @pytest.mark.parametrize("mode", WORKSPACE_MODES)
+    def test_git_apply_unsafe_paths_denied_in_all_modes(self, mode, _jail):
+        set_workspace_mode(mode)
+        self._boot_like_agent(_jail)
+        cfg, _patch = self._escape_patch(_jail)
+        result = _bash("git apply -p0 --unsafe-paths p.diff", workdir=str(_jail["ws"]))
+        assert result.error
+        assert "git apply" in result.output
+        assert "--unsafe" in result.output
+        assert cfg.read_text() == "workspace:\n  mode: confined\n"  # intacta
+
+    def test_git_apply_unsafe_abbreviation_denied(self, _jail):
+        # git acepta prefijos únicos de opciones largas: `--unsafe` cuenta
+        # como --unsafe-paths (verificado); el gate cubre el prefijo
+        set_workspace_mode("permissive")
+        self._boot_like_agent(_jail)
+        cfg, _patch = self._escape_patch(_jail)
+        result = _bash("git apply -p0 --unsafe p.diff", workdir=str(_jail["ws"]))
+        assert result.error and "--unsafe" in result.output
+        assert cfg.read_text() == "workspace:\n  mode: confined\n"
+
+    def test_git_apply_plain_patch_inside_workspace_allowed(self, _jail):
+        # sin falso positivo: parche normal (destino relativo dentro del ws,
+        # sin --unsafe) aplica igual que antes, confined incluido
+        set_workspace_mode("confined")
+        patch = _jail["ws"] / "create.diff"
+        patch.write_text("--- /dev/null\n+++ notes.md\n@@ -0,0 +1 @@\n+hola\n")
+        result = _bash("git apply -p0 create.diff", workdir=str(_jail["ws"]))
+        assert not result.error
+        assert (_jail["ws"] / "notes.md").read_text() == "hola\n"
+
+
+# --- AST-27 R3/H4: `-fls` falta en _FIND_WRITE_FLAGS -----------------------
+
+
+class TestFindFlsWritesDeniedPath:
+    """H4: `find <ws> -fls ~/.bytia-kode/mcp_servers.json` ejecutaba y
+    ESCRIBÍA el listing dentro del path denegado (corrupción de la
+    superficie T4 — JSON roto → parse falla → cae cerrado — no escalación,
+    pero rompe la invariante "T4 activo en TODOS los modos"). `-fls` se une
+    a _FIND_WRITE_FLAGS; `-ok`/`-okdir` también (por política, no por
+    accidente de sintaxis del ';' — ver el barrido del predicado).
+    """
+
+    def test_bash_find_fls_on_denied_path_denied(self, _jail):
+        set_workspace_mode("permissive")  # sin jail: sólo la T4 puede bloquear
+        set_trusted_paths([_jail["home"] / ".bytia-kode"])  # como el arranque real
+        target = _jail["home"] / ".bytia-kode" / "mcp_servers.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        src = _jail["ws"] / "a.txt"
+        src.write_text("x\n")
+        result = _bash(f"find {_jail['ws']} -fls {target}")
+        assert result.error and "cannot write" in result.output
+        assert not target.exists()  # nada se plantó
+
+    def test_bash_find_fls_inside_workspace_allowed(self, _jail):
+        # control: el listing a un fichero ordinario dentro del ws sigue ok
+        set_workspace_mode("confined")
+        listing = _jail["ws"] / "listing.txt"
+        src = _jail["ws"] / "a.txt"
+        src.write_text("x\n")
+        result = _bash(f"find {_jail['ws']} -fls {listing}")
+        assert not result.error
+        assert listing.exists()
+
+
+# --- AST-27 R3/nota: `git config -f` escribe FILE por argv ------------------
+
+
+class TestGitConfigFileFlag:
+    """Nota (baja) del veredicto R3, cerrada de paso: `git config -f FILE`
+    sobre un denegado AUSENTE lo crea en INI y dotenv tolera la línea de
+    sección (verificado: planta saltándose `[agent]`). El único freno era la
+    gramática de claves de git (defensa prestada), no nuestra política.
+    Ahora `git config` con -f/--file es familia-escritura: el destino viaja
+    en argv y enfrenta la denylist T4 en todos los modos.
+    """
+
+    def test_git_config_f_env_denied_even_in_open(self, _jail):
+        set_workspace_mode("open")
+        set_trusted_paths([_jail["home"] / ".bytia-kode"])  # como el arranque real
+        env = _jail["home"] / ".bytia-kode" / ".env"
+        env.parent.mkdir(parents=True, exist_ok=True)
+        result = _bash(f"git config -f {env} agent.planted yes")
+        assert result.error and "cannot write" in result.output
+        assert not env.exists()
+
+    def test_git_config_f_ordinary_file_allowed(self, _jail):
+        # control: fichero ordinario dentro del ws sigue ejecutando
+        set_workspace_mode("confined")
+        ini = _jail["ws"] / "local.ini"
+        result = _bash(
+            f"git config -f {ini} user.email x@y", workdir=str(_jail["ws"])
+        )
+        assert not result.error
+        assert ini.exists()
 
 
 # --- demo funcional: escenario real tui_32e522c5 ----------------------------

@@ -466,8 +466,52 @@ _BASH_WRITE_FAMILY = frozenset(
 )
 
 # find writes only through these flags (`-exec` is separately refused by
-# _validate_argv_safety, which rejects it outright for find).
-_FIND_WRITE_FLAGS = frozenset({"-delete", "-fprint", "-fprint0", "-fprintf"})
+# _validate_argv_safety, which rejects it outright for find). `-fls FILE`
+# writes the listing to FILE (AST-27 R3/H4 — it was missing and `find <ws>
+# -fls <denied>` planted the listing inside the T4 surface). `-ok`/`-okdir`
+# join by explicit policy, not by accident of find's syntax: today the
+# string-level `;` terminator already kills them in _validate_command_safety,
+# but if find ever grows a `+`-terminated form (like `-exec ... +`), family
+# membership — not token syntax — is what keeps them contained.
+_FIND_WRITE_FLAGS = frozenset(
+    {"-delete", "-fprint", "-fprint0", "-fprintf", "-fls", "-ok", "-okdir"}
+)
+
+# git global options whose VALUE arrives as the next argv token; needed to
+# locate the real subcommand past `git -C <dir> apply ...` (AST-27 H3).
+_GIT_VALUE_FLAGS = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix"}
+)
+
+
+def _git_subcommand(argv: list[str]) -> str | None:
+    """Subcommand of a git argv (first non-flag token past the globals), or
+    None for option-only invocations (`git --version`). Glued global forms
+    (`-C<dir>`, `--git-dir=<x>`) carry their own value in-token and are
+    skipped whole; the separated forms consume the next token."""
+    expect_value = False
+    for arg in argv[1:]:
+        if expect_value:
+            expect_value = False
+            continue
+        if arg.startswith("-"):
+            if arg in _GIT_VALUE_FLAGS:
+                expect_value = True
+            continue
+        return arg
+    return None
+
+
+def _git_config_targets_file(argv: list[str]) -> bool:
+    """True if `git config` carries -f/--file (separated, glued or =value)."""
+    for token in argv[2:]:
+        if token in ("-f", "--file"):
+            return True
+        if token.startswith("--file="):
+            return True
+        if token.startswith("-f") and len(token) > 2:
+            return True
+    return False
 
 
 def _is_write_family_command(command_base: str, argv: list[str]) -> bool:
@@ -477,22 +521,39 @@ def _is_write_family_command(command_base: str, argv: list[str]) -> bool:
     install, tee, ln, sed and truncate are NOT currently allowlisted but
     join the family so a future EXTRA_BINARIES reintroduction does not
     reopen the hole. `find` only writes through its destructive/print
-    flags — `-fprintf FILE`/`-fprint FILE` carry the target as a separate
-    token, which the whole-token check then covers — so it counts as a
-    writer when one is present. Deliberately OUT, with reasons:
+    flags (`-fls FILE` included, R3/H4) — `-fprintf FILE`/`-fprint FILE`
+    carry the target as a separate token, which the whole-token check then
+    covers — so it counts as a writer when one is present. `git` is
+    CONDITIONAL (R3): `git config -f FILE` creates/rewrites FILE and the
+    destination travels in argv, so it faces the T4 denylist like any other
+    writer (its INI output is dotenv-tolerated, so planting into `.env` is
+    real — only git's key grammar held it back, a borrowed defense).
+    Deliberately OUT, with reasons:
+      - git apply: it writes files NAMED BY THE PATCH — the destination does
+        not travel in argv, so no argv-family can see it (the H3 class).
+        Containment lives in _validate_argv_safety instead: `--unsafe-paths`
+        is rejected outright, and without that flag git itself refuses
+        `..`/absolute patch targets and absolute/`..` `--directory` roots
+        ("invalid path", verified 2×2) — `-p0` alone stays allowed because
+        it is the normal way to apply plain `diff -u` output and cannot
+        escape without the enabler flag. Residual of the same class,
+        documented: a crafted repository inside a trusted path (e.g.
+        `--work-tree` steering) remains outside the T4 threat model;
+      - git (other subcommands): reads/reporters; glued `-C<path>` is
+        refused by git itself and the separated form already faces the
+        confined jail as a plain path token;
       - echo: create_subprocess_exec means no shell, so `>` is a literal
         argv token, never a redirection — echo cannot write files here;
-      - git: refuses glued `-C<path>` itself, the separated `-C <path>`
-        form already faces the confined jail as a plain path token, and
-        steering a write onto the exact denylist paths would need a
-        crafted repository inside a trusted path — outside the T4 threat
-        model (prompt injection over the allowlisted tool surface);
       - ls, pwd, date, df, du, wc, head, tail, grep, rg, bat, eza, tokei,
         shellcheck: readers/reporters with no file-writing operands.
     """
     if command_base in _BASH_WRITE_FAMILY:
         return True
-    return command_base == "find" and any(t in _FIND_WRITE_FLAGS for t in argv[1:])
+    if command_base == "find":
+        return any(t in _FIND_WRITE_FLAGS for t in argv[1:])
+    if command_base == "git":
+        return _git_subcommand(argv) == "config" and _git_config_targets_file(argv)
+    return False
 
 
 def _validate_argv_agent_writes(
@@ -512,7 +573,13 @@ def _validate_argv_agent_writes(
     are untouched (`cat config.yaml` stays allowed); to copy configuration
     OUT, use file_read + file_write — reads of the denylist are legitimate.
     Family membership is decided by _is_write_family_command (see its
-    docstring for the allowlist sweep).
+    docstring for the allowlist sweep). Boundary of this gate (AST-27 H3
+    class): it can only see destinations that travel in ARGV. Writes whose
+    target rides the CONTENT of an argument file — a patch applied by
+    `git apply`, a tarball an archiver unpacks — are invisible here and are
+    contained by flag-level rejection in _validate_argv_safety instead
+    (`git apply --unsafe-paths`); see the docstring of
+    _is_write_family_command for the documented residuals of that class.
     """
     if not _is_write_family_command(command_base, argv):
         return None
@@ -616,6 +683,12 @@ class BashTool(Tool):
         2. git: runtime alias definitions ('-c alias.*') and shell-escape alias
            values (arguments starting with '!') run commands through sh.
         3. Generic '--exec'/'-exec' passthrough (find -exec, -execdir, ...).
+        4. git apply + any '--unsafe*' flag (AST-27 H3): the write target of
+           a patch rides the patch CONTENT, not argv — argv-based gates
+           (confined jail, T4 write-family) are blind to it, and
+           --unsafe-paths is the only switch that makes git accept
+           `..`/absolute patch targets. Rejected by prefix (git accepts
+           unique long-option abbreviations, e.g. `--unsafe`).
 
         Returns None if safe, or a ToolResult(error=True) with the reason.
         """
@@ -675,6 +748,29 @@ class BashTool(Tool):
                         ),
                         error=True,
                     )
+            # AST-27 H3: the write target of `git apply` rides the patch
+            # CONTENT, not argv — no argv-based gate (jail or T4 family) can
+            # see it. --unsafe-paths is the only switch that makes git accept
+            # `..`/absolute patch targets (verified: without it git itself
+            # refuses them with "invalid path"), so rejecting the flag closes
+            # the class in every workspace mode. Matched by prefix because
+            # git accepts unique long-option abbreviations (`--unsafe`).
+            if _git_subcommand(argv) == "apply":
+                for arg in argv[1:]:
+                    if arg.startswith("--unsafe"):
+                        return ToolResult(
+                            output=(
+                                "Security policy: 'git apply --unsafe-paths' is "
+                                "not allowed (AST-27 H3). That flag's only "
+                                "meaning is to let the patch write outside the "
+                                "working tree — the target path travels in the "
+                                "patch CONTENT, not in argv, so neither the "
+                                "confined jail nor the agent-config denylist "
+                                "can see it. Apply patches that stay inside the "
+                                "workspace ('-p<n>' alone remains allowed)."
+                            ),
+                            error=True,
+                        )
 
         for arg in argv[1:]:
             if arg.startswith(("-exec", "--exec")):

@@ -95,6 +95,37 @@ commit inicial de AST-26, ambos remediados:
   único silencioso de la tabla de fallbacks (ficha ausente, YAML malformado,
   modo desconocido, no-mapping ya avisaban).
 
+### Security — AST-27 R3 (re-verificación): el path del parche y los flags de find
+
+Tres hallazgos de la re-verificación de Seguridad & Auditoría sobre la
+remediación H1+H2 (que quedó verificada 7/7), remediados:
+
+- **H3 (alta) — `git apply -p0 --unsafe-paths` plantaba `mode: open` en los
+  tres modos**: el destino de un parche viaja en su CONTENIDO, no en argv,
+  así que ni el jail confined ni la T4 del plano bash tenían nada que
+  inspeccionar; con ambos flags git aceptaba headers `../fuera` y escribía
+  la superficie de persistencia propia del agente (y fuera del jail en
+  confined). Ahora `_validate_argv_safety` rechaza todo flag `--unsafe*` de
+  `git apply` (por prefijo: git acepta abreviaturas únicas como `--unsafe`),
+  en todos los modos. `-p0` queda PERMITIDO: sin `--unsafe-paths` el propio
+  git rechaza targets `..`/absolutos y roots `--directory` absolutos o con
+  `..` ("invalid path", verificado 2×2) — matar el habilitador cierra la
+  clase, y `-p0` es la forma normal de aplicar `diff -u` plano. Clase
+  documentada en los docstrings: ninguna familia-escritura de argv puede
+  cerrar escrituras cuyo path no viaja en argv (parches; `--work-tree` con
+  repo craftado queda como residual documentado).
+- **H4 (media-baja) — `-fls` falta en `_FIND_WRITE_FLAGS`**: `find <ws>
+  -fls ~/.bytia-kode/mcp_servers.json` ejecutaba y escribía el listing
+  dentro del path denegado (corrupción de superficie T4, no escalación).
+  `-fls` se une al frozenset; `-ok`/`-okdir` también — hoy los mata el gate
+  de string del `;`, pero por accidente de sintaxis de find, no por
+  política.
+- **Nota (baja) cerrada de paso — `git config -f FILE`**: sobre un denegado
+  AUSENTE lo crea en INI y dotenv tolera la línea de sección (plantado
+  verificado); el único freno era la gramática de claves de git (defensa
+  prestada). Ahora `git config` con `-f`/`--file` es familia-escritura: el
+  destino viaja en argv y enfrenta la denylist T4 en todos los modos.
+
 ## [0.8.2] - 2026-09-28
 
 Blindaje de cancelación (AST-24, commit `13ccac7`, de GitHub issue #3): los
