@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import signal
 from pathlib import Path
 
 from telegram import Update
@@ -13,6 +14,17 @@ from bytia_kode.config import AppConfig, load_config
 from bytia_kode.session import SessionStore
 
 logger = logging.getLogger(__name__)
+
+
+def _mask_token(token: str) -> str:
+    """Enmascara un token `<bot_id>:<secreto>` para el banner: conserva el
+    bot_id y 3+3 caracteres del secreto — reconocible para el operador,
+    inútil para quien le eche un ojo a la pantalla."""
+    if ":" in token:
+        bot_id, secret = token.split(":", 1)
+        if len(secret) >= 8:
+            return f"{bot_id}:{secret[:3]}…{secret[-3:]}"
+    return "***"
 
 
 class TelegramBot:
@@ -224,8 +236,57 @@ class TelegramBot:
             self._processing.discard(chat_id)
 
     def run(self):
-        logger.info("Starting BytIA KODE Telegram bot...")
-        self.app.run_polling(allowed_updates=Update.ALL_TYPES)
+        """Arranca el polling con banner visible y apagado limpio (AST-32).
+
+        Antes: el arranque se anunciaba con `logger.info` — sin handler, INFO
+        no llegaba a ningún sitio y el bot parecía muerto con el polling vivo.
+        El doble Ctrl+C interrumpía el teardown de PTB (SystemExit dentro del
+        `finally`) y escupía el traceback "Event loop is closed".
+
+        Ahora: banner REAL por stdout antes del polling, y las señales las
+        gestionamos nosotros con `stop_signals=None` — un handler idempotente
+        que en la fase de polling llama `Application.stop_running()` (parada
+        graceful documentada de PTB) e IGNORA señales adicionales: el teardown
+        corre de principio a fin sin carrera posible. Antes de entrar en
+        `run_forever` (bootstrap) se conserva la semántica por defecto
+        (KeyboardInterrupt) porque aún no hay nada que desmontar.
+        """
+        allowed = self.config.telegram.allowed_users
+        print(
+            f"Bot de Telegram activo · token {_mask_token(self.config.telegram.bot_token)} · "
+            f"usuarios permitidos: {len(allowed)} · esperando mensajes (Ctrl+C para parar)",
+            flush=True,
+        )
+        if not allowed:
+            print(
+                "⚠ TELEGRAM_ALLOWED_USERS vacío: el bot deniega todos los mensajes "
+                "(fail-secure).",
+                flush=True,
+            )
+
+        stop_requested = False
+
+        def _handle_stop(signum, frame):
+            nonlocal stop_requested
+            if stop_requested:
+                return  # 2º Ctrl+C durante el apagado: ya está corriendo, ignorar
+            stop_requested = True
+            if self.app.running:
+                self.app.stop_running()
+            else:
+                raise KeyboardInterrupt  # bootstrap: semántica por defecto
+
+        previous = {}
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            previous[sig] = signal.signal(sig, _handle_stop)
+        try:
+            self.app.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
+        except (KeyboardInterrupt, SystemExit):
+            pass  # parada por señal — el teardown de PTB ya corrió en su `finally`
+        finally:
+            for sig, handler in previous.items():
+                signal.signal(sig, handler)
+        print("Bot detenido.", flush=True)
 
 
 def main():
