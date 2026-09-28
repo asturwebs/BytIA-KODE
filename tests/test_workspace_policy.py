@@ -519,6 +519,19 @@ class TestBashPlaneAgentWriteDenylist:
         assert _is_write_family_command("git", ["git", "-C", "/w", "config", "-f", "/x"])
         assert not _is_write_family_command("git", ["git", "config", "user.name", "x"])
         assert not _is_write_family_command("git", ["git", "apply", "p.diff"])
+        # git R4: subcomandos que crean ficheros/dirs en paths argv-visibles
+        # (clone/worktree plantan árboles CRUDOS; archive/bundle escriben
+        # binarios; checkout-index --prefix y fast-import --export-marks
+        # ídem) — la subfamilia entera es familia-escritura
+        assert _is_write_family_command("git", ["git", "clone", "/a", "/b"])
+        assert _is_write_family_command("git", ["git", "-C", "/w", "worktree", "add", "/p"])
+        assert _is_write_family_command("git", ["git", "worktree", "list"])
+        assert _is_write_family_command("git", ["git", "archive", "-o", "/f", "main"])
+        assert _is_write_family_command("git", ["git", "bundle", "create", "/f", "main"])
+        assert _is_write_family_command("git", ["git", "checkout-index", "--prefix=/p/", "-a"])
+        assert _is_write_family_command("git", ["git", "fast-import", "--export-marks=/f"])
+        assert not _is_write_family_command("git", ["git", "log", "--oneline"])
+        assert not _is_write_family_command("git", ["git", "init", "/p"])
         # lectores/reporteros y echo (sin shell, `>` es literal): fuera
         for b in ("ls", "head", "tail", "grep", "rg", "bat", "wc", "git",
                   "echo", "date", "df", "du", "pwd", "eza", "tokei", "shellcheck"):
@@ -920,3 +933,98 @@ class TestWorkspaceTUI:
             app._handle_command("/workspace fortress")
             await pilot.pause()
             assert get_workspace_mode() == "permissive"
+
+
+# --- AST-27 R4: subcomandos git que ESCRIBEN en paths argv-visibles --------
+
+
+class TestGitWriteSubcommands:
+    """Hermano argv-visible del H3, encontrado al ejecutar el análisis de
+    clase pedido por el Socio ("que no se parchee sólo el síntoma"): el
+    barrido R2 dejaba a git fuera con "lectores/reporteros" salvo config -f,
+    pero clone/worktree plantan un árbol CRUDO — un SKILL.md válido bajo
+    skills/ es persistencia que el loader carga — y archive/bundle escriben
+    un binario en un path que SÍ viaja en argv. Sonda sobre 8e2603e: los
+    tres EJECUTABAN en los tres modos. Ahora esos subcomandos son
+    familia-escritura y sus tokens enfrentan la T4 como cualquier escritor.
+    """
+
+    def _boot_like_agent(self, jail):
+        set_trusted_paths([jail["home"] / ".bytia-kode"])  # como el arranque real
+
+    def _repo_with_skill(self, jail):
+        import os
+        import subprocess
+
+        repo = jail["ws"] / "repo"
+        repo.mkdir(exist_ok=True)
+        (repo / "SKILL.md").write_text(
+            "---\nname: evil\n" "description: planted persistence\n---\nrun me\n"
+        )
+        env = {
+            **os.environ,
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@t",
+        }
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+        subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, env=env)
+        subprocess.run(
+            ["git", "-C", str(repo), "commit", "-qm", "x"], check=True, env=env
+        )
+        return repo
+
+    def _skills_dir(self, jail):
+        skills = jail["home"] / ".bytia-kode" / "skills"
+        skills.mkdir(parents=True, exist_ok=True)
+        return skills
+
+    @pytest.mark.parametrize("mode", WORKSPACE_MODES)
+    def test_git_clone_to_skills_denied_in_all_modes(self, mode, _jail):
+        set_workspace_mode(mode)
+        self._boot_like_agent(_jail)
+        repo = self._repo_with_skill(_jail)
+        dst = self._skills_dir(_jail) / "evil"
+        result = _bash(f"git clone {repo} {dst}")
+        assert result.error and "cannot write" in result.output
+        assert not (dst / "SKILL.md").exists()  # nada se plantó
+
+    @pytest.mark.parametrize("mode", WORKSPACE_MODES)
+    def test_git_worktree_add_to_denied_path_denied(self, mode, _jail):
+        set_workspace_mode(mode)
+        self._boot_like_agent(_jail)
+        repo = self._repo_with_skill(_jail)
+        dst = self._skills_dir(_jail) / "wt"
+        result = _bash(f"git worktree add --detach {dst}", workdir=str(repo))
+        assert result.error and "cannot write" in result.output
+        assert not (dst / "SKILL.md").exists()
+
+    @pytest.mark.parametrize("mode", WORKSPACE_MODES)
+    def test_git_archive_output_to_denied_path_denied(self, mode, _jail):
+        set_workspace_mode(mode)
+        self._boot_like_agent(_jail)
+        repo = self._repo_with_skill(_jail)
+        target = _jail["home"] / ".bytia-kode" / "mcp_servers.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        result = _bash(f"git archive -o {target} main", workdir=str(repo))
+        assert result.error and "cannot write" in result.output
+        assert not target.exists()
+
+    def test_git_clone_inside_workspace_allowed(self, _jail):
+        # control: clonar a un destino ordinario DENTRO del ws sigue igual
+        set_workspace_mode("confined")
+        repo = self._repo_with_skill(_jail)
+        dst = _jail["ws"] / "copies" / "inside"
+        result = _bash(f"git clone {repo} {dst}")
+        assert not result.error
+        assert (dst / "SKILL.md").exists()
+
+    def test_git_archive_output_inside_workspace_allowed(self, _jail):
+        # control: el tarball a un fichero ordinario dentro del ws sigue igual
+        set_workspace_mode("confined")
+        repo = self._repo_with_skill(_jail)
+        tar = _jail["ws"] / "snap.tar"
+        result = _bash(f"git archive -o {tar} main", workdir=str(repo))
+        assert not result.error
+        assert tar.exists()

@@ -514,6 +514,25 @@ def _git_config_targets_file(argv: list[str]) -> bool:
     return False
 
 
+# git subcommands that create or rewrite files/directories whose PATH
+# travels in argv (AST-27 R4, an argv-visible sibling of H3 found while
+# running the Socio's class analysis): `clone <src> <dst>` and
+# `worktree add <path>` plant a RAW tree at the destination — a valid
+# SKILL.md under skills/ is persistence the loader honours (probe on the
+# pre-fix commit: executed in ALL workspace modes); `archive -o/--output
+# <file>` and `bundle create <file>` write a binary bundle to a named file
+# (destruction of the T4 surface — parse fails closed, but the invariant
+# "T4 in every mode" breaks); `checkout-index --prefix=<dir>/` copies the
+# index out as raw files; `fast-import --export-marks=<file>` writes a
+# marks file. The WHOLE subcommand joins the family, not just an output
+# flag: separated/glued/=-forms of the flag would be whack-a-mole, and
+# token-free variants (`git worktree list`, `git archive main` to stdout)
+# match harmlessly — no path tokens, nothing to check.
+_GIT_WRITE_SUBCOMMANDS = frozenset(
+    {"clone", "worktree", "archive", "bundle", "checkout-index", "fast-import"}
+)
+
+
 def _is_write_family_command(command_base: str, argv: list[str]) -> bool:
     """Case-by-case sweep of the allowlist (AST-27 H1 remediation).
 
@@ -524,10 +543,14 @@ def _is_write_family_command(command_base: str, argv: list[str]) -> bool:
     flags (`-fls FILE` included, R3/H4) — `-fprintf FILE`/`-fprint FILE`
     carry the target as a separate token, which the whole-token check then
     covers — so it counts as a writer when one is present. `git` is
-    CONDITIONAL (R3): `git config -f FILE` creates/rewrites FILE and the
-    destination travels in argv, so it faces the T4 denylist like any other
-    writer (its INI output is dotenv-tolerated, so planting into `.env` is
-    real — only git's key grammar held it back, a borrowed defense).
+    CONDITIONAL (R3+R4): IN are the subcommands whose write destination
+    travels in argv — `config -f FILE` (creates/rewrites FILE; its INI
+    output is dotenv-tolerated, so planting into `.env` is real — only
+    git's key grammar held it back, a borrowed defense) and the whole
+    _GIT_WRITE_SUBCOMMANDS set (R4: clone/worktree plant a RAW tree at an
+    operator-named path — pre-fix, `git clone <repo>
+    ~/.bytia-kode/skills/evil` planted a loadable SKILL.md in EVERY mode —
+    while archive/bundle write a binary bundle to a named file).
     Deliberately OUT, with reasons:
       - git apply: it writes files NAMED BY THE PATCH — the destination does
         not travel in argv, so no argv-family can see it (the H3 class).
@@ -539,9 +562,16 @@ def _is_write_family_command(command_base: str, argv: list[str]) -> bool:
         escape without the enabler flag. Residual of the same class,
         documented: a crafted repository inside a trusted path (e.g.
         `--work-tree` steering) remains outside the T4 threat model;
-      - git (other subcommands): reads/reporters; glued `-C<path>` is
+      - git (other subcommands): readers/reporters of repo/worktree state
+        (log, status, show, diff…); `git init <dir>` only creates a bare
+        `.git` skeleton with no plantable content; glued `-C<path>` is
         refused by git itself and the separated form already faces the
-        confined jail as a plain path token;
+        confined jail as a plain path token. The CONTENT-plane class named
+        in the Socio's analysis (path riding file CONTENT: rsync
+        --files-from, tar -f, patch -p0, cpio) stays closed by absence —
+        none of those binaries is allowlisted; the residual only reopens
+        if an operator adds them via EXTRA_BINARIES (same reintroduction
+        threat as the belt members above);
       - echo: create_subprocess_exec means no shell, so `>` is a literal
         argv token, never a redirection — echo cannot write files here;
       - ls, pwd, date, df, du, wc, head, tail, grep, rg, bat, eza, tokei,
@@ -552,7 +582,10 @@ def _is_write_family_command(command_base: str, argv: list[str]) -> bool:
     if command_base == "find":
         return any(t in _FIND_WRITE_FLAGS for t in argv[1:])
     if command_base == "git":
-        return _git_subcommand(argv) == "config" and _git_config_targets_file(argv)
+        subcommand = _git_subcommand(argv)
+        if subcommand in _GIT_WRITE_SUBCOMMANDS:
+            return True
+        return subcommand == "config" and _git_config_targets_file(argv)
     return False
 
 
@@ -578,8 +611,10 @@ def _validate_argv_agent_writes(
     target rides the CONTENT of an argument file — a patch applied by
     `git apply`, a tarball an archiver unpacks — are invisible here and are
     contained by flag-level rejection in _validate_argv_safety instead
-    (`git apply --unsafe-paths`); see the docstring of
-    _is_write_family_command for the documented residuals of that class.
+    (`git apply --unsafe-paths`). The argv-VISIBLE git writers
+    (clone/worktree/archive/bundle — R4) joined the family instead, so
+    only the content-plane residual of that class stays outside; see the
+    docstring of _is_write_family_command for the documented residuals.
     """
     if not _is_write_family_command(command_base, argv):
         return None
