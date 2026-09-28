@@ -94,6 +94,9 @@ class TelegramConfig:
             u.strip() for u in _env("TELEGRAM_ALLOWED_USERS").split(",") if u.strip()
         ]
     )
+    # Override del endpoint del Bot API (p. ej. un servidor local
+    # `telegram-bot-api --local`, o un stub en tests). Vacío = api.telegram.org.
+    api_base: str = field(default_factory=lambda: _env("TELEGRAM_API_BASE"))
 
 
 def _load_yaml_config() -> dict:
