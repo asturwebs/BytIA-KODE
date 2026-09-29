@@ -7,6 +7,7 @@ Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para la guía completa: estr
 ```bash
 uv run pytest -q                          # Tests
 uv run python scripts/validate_metadata.py # Metadata check
+uv run python scripts/check_readme_claims.py # Gate de claims del README
 uv build                                   # Build wheel
 uv pip install ./dist/*.whl --force-reinstall  # Instalar
 ```

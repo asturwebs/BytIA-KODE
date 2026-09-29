@@ -25,6 +25,10 @@ jobs:
         run: python scripts/check_secrets.py --all
       - name: Validate metadata
         run: python scripts/validate_metadata.py
+      - name: README claims gate
+        # AST-33: verdad ejecutable del README — fail cerrado. Sin credenciales;
+        # única red permitida: pypi.org (API JSON).
+        run: python scripts/check_readme_claims.py
       - name: Run tests
         run: python -m pytest -q
       - name: Build wheel

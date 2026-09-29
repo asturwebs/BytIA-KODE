@@ -354,6 +354,7 @@ uv run bytia-kode
 
 ```bash
 uv run python scripts/validate_metadata.py
+uv run python scripts/check_readme_claims.py
 uv run pytest -q
 uv build
 uv run python -m twine check dist/*
