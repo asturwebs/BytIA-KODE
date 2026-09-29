@@ -1,8 +1,14 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.8.3 (Alpha) — 2026-09-28
+## Estado actual: v0.8.4 (Alpha) — 2026-09-29
 
 > Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
+
+## v0.8.4 (AST-32/AST-33, 2026-09-29) — gate CI de verdad ejecutable del README + fix --bot
+
+- [x] **Gate de claims del README (AST-33)**: `scripts/check_readme_claims.py` verifica SIN credenciales (red: sólo PyPI) lo que el README afirma — comandos reales, rutas citadas, defaults vs código, tablas (comandos/temas/tools), paquetes en PyPI (incluida la ausencia de `bytia-tts`). Fail cerrado: claim que no casa con nada = CI roja citándola. Lo interactivo/credencial queda en lista explícita de no-verificables con causa. Cableado en `ci.yml` + gates de `release.yml` + hook pre-commit (offline).
+- [x] **Fix `--bot` + `TELEGRAM_API_BASE` (AST-32)**: banner real de arranque por stdout (token enmascarado), apagado limpio con UN Ctrl+C (handler idempotente), endpoint del Bot API configurable. README con verdad sección-por-sección verificada.
+- [x] **Suite**: 477 (+11 sobre v0.8.3) — `tests/test_bot_lifecycle.py` (+6, AST-32) y `tests/test_check_readme_claims.py` (+5, AST-33).
 
 ## v0.8.3 (AST-26/AST-27, 2026-09-28) — política de workspace + blindaje content-plane
 

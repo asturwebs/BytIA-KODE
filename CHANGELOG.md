@@ -1,6 +1,35 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.4] - 2026-09-29
+
+El README ya no puede mentirte sin que se note: lo que dice se comprueba
+en cada integración continua. Esta release estrena el **gate de verdad
+ejecutable del README** y embarca el fix del bot de Telegram (arranque
+mudo, apagado sucio con Ctrl+C) y el endpoint configurable del Bot API.
+
+### Added — gate CI de verdad ejecutable del README (AST-33)
+
+- **`scripts/check_readme_claims.py`**: un gate que LEE el README y
+  verifica lo que puede **de verdad, sin credenciales** — comandos con
+  `--version` del paquete real, rutas y ficheros citados, defaults de
+  configuración contra el código, tablas de comandos/temas/tools contra
+  las fuentes, y paquetes citados contra PyPI (incluida la AUSENCIA:
+  `bytia-tts` debe dar 404, como dice el README). Única red permitida:
+  la API de pypi.org.
+- **Fail cerrado**: una claim del README que no verifique o que no case
+  con ninguna cobertura (comando nuevo, variable nueva, enlace roto) rompe
+  la CI citando la claim exacta. No hay warnings.
+- **Nada de credenciales ni fingimientos**: lo interactivo o con
+  credenciales (TUI, bot contra Telegram, install.sh end-to-end,
+  fork→PR…) queda en una lista EXPLÍCITA de no-verificables con su causa,
+  impresa en la salida del gate. Lo no verificado se declara, no se
+  disimula.
+- **Cableado**: paso nuevo en `ci.yml` y en los gates de `release.yml`
+  (tras `validate_metadata`), y en el hook pre-commit en modo offline.
+  La semilla es la tabla de verdad sección-por-sección de AST-32: todo
+  lo verificado a mano allí quedó cubierto por el script.
+- De paso, el gate ya cazó su primera mentirilla: `LOG_FILE` documentado
+  en el README pero ausente de `.env.example` — añadido.
 
 ### Fixed — `bytia-kode --bot` ya no arranca mudo ni muere con traceback (AST-32)
 
@@ -31,6 +60,9 @@
   (chars/3–3.5), benchmark 4.90x atribuido a su medición histórica, badge
   SQLite sin versión inventada, y la tabla de comandos del bot completa
   (`/stop` y `/kill` existían en el código y no estaban documentados).
+- El gate nuevo entra en la sección Validación del README, en
+  CONTRIBUTING y en RELEASING; `.env.example` gana `LOG_FILE` para
+  cumplir el "todas las variables" del README.
 
 ## [0.8.3] - 2026-09-28
 
