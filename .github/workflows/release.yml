@@ -45,6 +45,10 @@ jobs:
       - name: Validate metadata
         # Fail si README/CHANGELOG/pyproject divergen (doctrina de fuente única)
         run: uv run python scripts/validate_metadata.py
+      - name: README claims gate
+        # AST-33: mismo gate que ci.yml — el tag que se publica lleva el
+        # README verdad. Sin credenciales; única red: pypi.org.
+        run: uv run python scripts/check_readme_claims.py
       - name: Run tests
         run: uv run pytest -q
       - name: Build distributions

@@ -11,4 +11,5 @@ fi
 
 "$PYTHON_BIN" scripts/validate_metadata.py
 "$PYTHON_BIN" scripts/check_secrets.py
+"$PYTHON_BIN" scripts/check_readme_claims.py --offline-pypi
 "$PYTHON_BIN" -m pytest -q
