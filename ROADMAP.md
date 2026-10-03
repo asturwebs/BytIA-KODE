@@ -1,8 +1,14 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.8.4 (Alpha) — 2026-09-29
+## Estado actual: v0.8.5 (Alpha) — 2026-10-03
 
 > Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
+
+## v0.8.5 (2026-10-03) — la versión nunca se inventa + docstrings del build id
+
+- [x] **Fallback de versión honesto (anexo DEVOPS §5)**: `_read_pyproject_version()` ya no devuelve el número muerto `"0.3.0"` sino `"unknown"`. Cierra el último ❌ de la tabla de consistencia versión ↔ docs del anexo; el resto de esa tabla ya estaba alineado (README sin versión hardcodeada, ROADMAP y tags al día).
+- [x] **Docstrings del build id corregidos**: `hatch_build.py` y `_build_info.py` afirmaban que un wheel de PyPI sale sin sufijo de commit. El wheel publicado lleva `_commit.txt` (`0.8.4+91fb426`) y **sí** lo muestra; degradan sólo los builds sin repo **y** sin estampa. Verificado construyendo el wheel.
+- [x] **Suite**: 482 (+5 sobre v0.8.4) — `tests/test_version_fallback.py` (los cinco casos del fallback).
 
 ## v0.8.4 (AST-32/AST-33, 2026-09-29) — gate CI de verdad ejecutable del README + fix --bot
 

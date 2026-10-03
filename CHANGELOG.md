@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.8.5] - 2026-10-03
+
+Mantenimiento corto para cerrar el último ❌ del anexo de auditoría DevOps
+(§5, consistencia versión ↔ docs): el último recurso de la versión
+devolvía un número muerto que acababa impreso en el header del TUI y en el
+menú del bot, mintiendo sobre la versión real. Con esto **la §5 entera
+queda cerrada** — README, ROADMAP, tags y `pyproject` ya estaban alineados,
+y el fallback era el único hallazgo vivo que quedaba en esa tabla.
+
+### Fixed — la versión nunca se inventa (anexo DEVOPS §5)
+
+- **`_read_pyproject_version()`** (`src/bytia_kode/__init__.py`): el fallback
+de último recurso devolvía `"0.3.0"`, un valor muerto de la era 0.3. Ahora
+degrada a **`"unknown"`**: honesto y detectable. La rama sólo se alcanza sin
+`dist-info` y sin `pyproject`, pero su salida entra directa en
+`version_label()` → header del TUI y menú del bot.
+- **Docstrings del build id** (`hatch_build.py`, `src/bytia_kode/_build_info.py`):
+los dos afirmaban que un wheel de PyPI sale **sin** sufijo de commit. Es falso
+— el hook re-incluye la estampa heredada pese al VCS-ignore, y el wheel
+publicado la lleva (`0.8.4+91fb426`). Lo que degrada es el build sin repo
+**y** sin estampa. Verificado construyendo el wheel: `_commit.txt` =
+`91fb426`.
+
+### Added — tests
+
+- **`tests/test_version_fallback.py`** (+5): `pyproject` ausente, sin línea de
+versión, ilegible (directorio) y con versión, más un caso que fija que el
+entorno instalado nunca pasa por el fallback.
+
 ## [0.8.4] - 2026-09-29
 
 El README ya no puede mentirte sin que se note: lo que dice se comprueba
