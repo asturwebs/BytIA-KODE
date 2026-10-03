@@ -8,6 +8,14 @@ from pathlib import Path
 
 
 def _read_pyproject_version() -> str:
+    """Versión desde el ``pyproject.toml`` del checkout, o ``"unknown"``.
+
+    Último recurso: sólo entra cuando ``importlib.metadata`` no encuentra la
+    distribución (fuente sin instalar). Nunca devuelve un número inventado —
+    el antiguo ``"0.3.0"`` era un valor muerto que acababa impreso en el
+    header del TUI y en el menú del bot, mintiendo sobre la versión real
+    (hallazgo del anexo de auditoría ``reports/DEVOPS-devops-annex-de57bd59.md``).
+    """
     try:
         pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
         for line in pyproject.read_text(encoding="utf-8").splitlines():
@@ -15,7 +23,7 @@ def _read_pyproject_version() -> str:
                 return line.split("=", 1)[1].strip().strip('"')
     except Exception:
         pass
-    return "0.3.0"
+    return "unknown"
 
 
 try:

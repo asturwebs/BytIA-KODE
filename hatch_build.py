@@ -5,8 +5,12 @@ terminar para no ensuciar el árbol de trabajo (queda en ``.gitignore`` como
 red de seguridad si un build aborta entre medias). En runtime,
 ``bytia_kode._build_info`` lo lee como fuente autoritativa del build id.
 
-Sin git (o fuera de un repo): sin estampa y el build sigue — el paquete
-degrada a la versión sin sufijo, igual que un wheel de PyPI (AST-20).
+Sin git (o fuera de un repo): no se estampa hash nuevo y el build sigue
+— degrada a la versión sin sufijo **sólo si tampoco hereda una estampa**
+del sdist. OJO: un wheel sí puede salir con sufijo, porque más abajo se
+re-incluye la estampa heredada pese al VCS-ignore; el wheel publicado de
+PyPI la lleva (p.ej. ``0.8.4+91fb426``). Lo que degrada es el build sin
+repo **y** sin estampa (AST-20).
 
 La validación del hash vive duplicada en ``_build_info._clean_commit`` a
 propósito: este fichero no puede importar el paquete en build time (el

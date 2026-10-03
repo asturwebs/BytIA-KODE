@@ -11,7 +11,10 @@ añade el sufijo `+<hash>` resolviendo el commit por este orden:
    en un checkout (instalación editable). Dentro de site-packages nunca se
    consulta git: un wheel de PyPI en un venv dentro de un repo ajeno no
    debe heredar el hash de ese repo.
-3. Sin estampa ni git (wheel de PyPI): sin sufijo. Nunca falla.
+3. Sin estampa ni git: sin sufijo. Nunca falla. No es el caso del wheel
+   publicado de PyPI, que lleva ``_commit.txt`` del repo y **sí** muestra
+   sufijo; degradan sólo los builds hechos fuera de un repo o desde un
+   sdist sin estampa.
 
 La resolución se cachea por proceso (`lru_cache`): ni git ni disco en cada
 render del header.
