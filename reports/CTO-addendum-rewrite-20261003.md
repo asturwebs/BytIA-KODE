@@ -1,7 +1,7 @@
 # Addendum de trazabilidad — el corte de SHAs del rewrite de historia
 
 **Aplica a:** todos los reports de este directorio (AST-1…AST-4 y pasadas de rol).
-**Verificado:** 2026-10-03, AST-34, contra `main@c760ce7` con corrida propia: inventario **por contexto** de las citas de commit de los 8 reports + orfandad `git cat-file` token a token en clon fresco post-rewrite (0/34 strings resuelven), verificación cruzada triple (terminal PI contra el bundle, terminal Claude Code, CTO), API de GitHub, y artefactos PyPI descargados. *v3 — sustituye el titular numérico de la v2, no reproducible (ver §"Historial del error")*.
+**Verificado:** 2026-10-03, AST-34, contra `main@c760ce7` con corrida propia: inventario **por contexto** de las citas de commit de los 8 reports + orfandad `git cat-file` token a token en clon fresco post-rewrite (0/34 strings resuelven), verificación cruzada triple (terminal PI contra el bundle, terminal Claude Code, CTO), API de GitHub, y artefactos PyPI descargados. *v3 — retira el titular numérico de la v2, no reproducible (§"Historial del error"); v4 — añade la atribución causal (3 clases) y la tabla de traducción completa de las 19 citas, emparejadas y verificadas por patch-id (19/19)*.
 
 ## Qué pasó (resumen; detalle en HANDOFF §"Rewrite de historia")
 
@@ -29,7 +29,11 @@ fuente autoritativa es el bundle, no GitHub.
 post-rewrite. Verificado token a token con `git cat-file` por tres vías
 independientes (terminal PI contra el bundle, terminal Claude Code, CTO contra
 clon fresco — mismo resultado). Este titular no depende de ningún filtro de
-conteo: es cierto bajo cualquiera.
+conteo: es cierto bajo cualquiera. Pero "huérfana" tiene **dos causas
+distintas** (§"Atribución causal" abajo): solo **7** lo son *por el rewrite*;
+las otras **12** nunca fueron commits de main — son hashes nacidos en el
+workspace de Paperclip. Y cada una de las 19 tiene un reemplazo vivo en main
+hoy (§"Tabla de traducción").
 
 ### Por qué NO hay titular numérico (desglose por forma)
 
@@ -56,13 +60,54 @@ Cita de commit = token en una línea que nombra commit/SHA/tag, o fila de tabla
 con columna Commit. Con ese criterio, los 8 reports citan **19 commits**,
 todos huérfanos (`git cat-file`, 0 resuelven):
 
-- oleada O0: `2341a78` `38f2053` `5537803` `6541aba`
-- oleada O1: `a2cb332` `a4f9da1` `f6143f9`
-- estado-real: `edff66d` `28d89e6` `594098d` `3505b7b` `68cf37a`
-- reports de rol: `768d3ff` `4b12ca7` `ab6554b` `cf66bec` `16407a0` `5fe9c1f` `3a1b9ee`
+- oleada O0 (clase 2): `2341a78` `38f2053` `5537803` `6541aba`
+- oleada O1 (clase 2): `a2cb332` `a4f9da1` `f6143f9`
+- estado-real (clase 2): `edff66d` `28d89e6` `594098d` `3505b7b` `68cf37a`
+- reports de rol (clase 1): `768d3ff` `4b12ca7` `ab6554b` `cf66bec` `16407a0` `5fe9c1f` `3a1b9ee`
 
 Más citados (nº de informes que los mencionan): `768d3ff` (6), `ab6554b` (5),
 `cf66bec` (4), `4b12ca7` (4), `5fe9c1f` (3).
+
+### Atribución causal (v4) — quién huérfanó a quién
+
+"0 resuelven" es cierto, pero la causa no es una. Resolviendo cada token
+contra las fuentes autoritarias — PI: bundle pre-rewrite del host + checkout
+del workspace; CTO: checkout del workspace (las 19 resuelven ahí) + clon
+post-rewrite (0 resuelven), gemelos verificados por **patch-id 19/19**:
+
+| Clase | Nº | Qué son | ¿Las tocó el rewrite? |
+|---|---|---|---|
+| Commits reales del repo | **7** | los citados por las pasadas de rol: resuelven en el bundle pre-rewrite (PI) y en la rama `main` del workspace (línea pre-rewrite sincronizada, CTO: 7/7 ancestros de main); todos con gemelo de hash en la historia nueva | **Sí** — las únicas huérfanas-por-rewrite |
+| Commits nacidos en el workspace de Paperclip | **12** | oleadas O0/O1 + informes estado-real: hashes creados por `git am`/commits locales en el workspace (`git am` recrea hashes propios); alcanzables solo desde ramas `paperclip/*`, jamás desde `main` (CTO: 12/12 no-ancestros) | **No — nunca fueron commits de main**: esos hashes nunca resolvieron allí; su contenido llegó por transferencia (gemelo de contenido, no de hash) |
+| No son commits de nada | **15** | 10 ids de objetos MagicMock de las tablas QA/DEVOPS + 4 fragmentos UUID de pasadas DevOps + `d284fe7c` (UUID del agente Researcher) | N/A |
+
+Es la diferencia entre "no resuelven" (cierto para las 19) y "el rewrite las
+huérfanó" (falso para 12): el rewrite no les quitó a las 12 nada que hubieran
+tenido en main.
+
+### Tabla de traducción — las 19 citas con reemplazo vivo en main (patch-id 19/19)
+
+Cada par verificado por identidad de parche (`git diff-tree -p <c> | git
+patch-id --stable`, CTO); los 7 de clase 1 emparejados además por PI contra
+el bundle (asunto + fecha de autor):
+
+**Clase 1 — gemelos de hash** (el rewrite cambió el hash; mismo árbol,
+mensaje y fechas):
+
+`768d3ff→f40eeb1` · `ab6554b→7fe27ba` · `cf66bec→548753a` ·
+`4b12ca7→b38f0aa` · `5fe9c1f→9048a32` · `3a1b9ee→d55ab10` ·
+`16407a0→df71ffe`
+
+**Clase 2 — transferencias de contenido** (el hash citado nació en el
+workspace; el gemelo de main nació del apply del parche — mismo asunto, fecha
+de autor y parche):
+
+`2341a78→99cda61` · `38f2053→6ccb601` · `5537803→669b343` ·
+`6541aba→d4af06f` · `a2cb332→57cff55` · `a4f9da1→1f93520` ·
+`f6143f9→c041256` · `edff66d→d199bf2` · `28d89e6→0dd41a4` ·
+`594098d→2781b19` · `3505b7b→ab135ce` · `68cf37a→b6df33c`
+
+Quien cite estos commits en el futuro: usar el hash nuevo de la derecha.
 
 ### Historial del error (para el registro)
 
@@ -93,8 +138,9 @@ inventario por contexto y titular = hecho verificable.
 - **GitHub `main` post-rewrite:** los tags apuntan a los gemelos nuevos —
   `v0.8.4→e1366d1`, `v0.8.5→9e912aa`, `v0.8.6→0417e76` (peeled).
 - **Workspaces Paperclip:** la historia pre-rewrite sigue viva en el checkout
-  compartido (los SHAs de commit citados arriba resuelven ahí) — válida para
-  arqueología local, nunca como base de entrega.
+  compartido — las 19 citas resuelven ahí (las 12 de clase 2 nacieron en el
+  workspace; las 7 de clase 1 viven en su rama `main`, línea pre-rewrite
+  sincronizada) — válida para arqueología local, nunca como base de entrega.
 - **Bundle del Socio:** la única fuente completa y estable old→new.
 
 ## Artefactos publicados en PyPI (verificado descargándolos)
@@ -122,5 +168,6 @@ citas de commit son huérfanas, 0 resuelven".
 
 v1 — matriz de visibilidad API (retirada: confundía visibilidad del servidor
 con resolución). v2 — titular "32/32 huérfanos" (retirado: número no
-reproducible, ver §"Historial del error"). v3 — esta: inventario por
-contexto, 19 citas, todas huérfanas.
+reproducible, ver §"Historial del error"). v3 — inventario por contexto, 19
+citas, todas huérfanas. v4 — esta: atribución causal (7 huérfanas-por-rewrite
++ 12 hashes de workspace) y tabla de traducción completa (patch-id 19/19).
