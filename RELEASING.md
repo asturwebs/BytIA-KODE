@@ -11,7 +11,7 @@
 - `CHANGELOG.md`: entrada `## [X.Y.Z] - YYYY-MM-DD` (la entrada `## [Unreleased]` se convierte; no se reescribe el histórico).
 - `pyproject.toml` **y** `uv.lock` bumpados a `X.Y.Z` — el lock arrastra su propia entrada `version` y el residuo rompe el gate (lección AST-21).
 - README/badges al día. Los badges dinámicos (PyPI, CI) no requieren toque; cualquiera hardcodeado es drift.
-- Gates verdes **en el commit final** (skill gates-de-entrega): suite completa, `scripts/validate_metadata.py`, `scripts/check_readme_claims.py`, secret scan. Un gate corrido antes del último cambio es un gate no corrido.
+- Gates verdes **en el commit final** (skill gates-de-entrega): suite completa, `scripts/validate_metadata.py`, `scripts/check_readme_claims.py`, `scripts/check_report_citations.py`, secret scan. Un gate corrido antes del último cambio es un gate no corrido.
 
 ### 2. Tag
 
@@ -24,7 +24,7 @@ El tag dispara `.github/workflows/release.yml` (sólo tags `v*`, nunca branches)
 
 ### 3. Gates + build (job `build`)
 
-Secret scan full-tree → `validate_metadata.py` (falla si README/CHANGELOG/pyproject divergan) → `check_readme_claims.py` (gate de claims del README, fail cerrado) → suite → `uv build` → `twine check`. Sobre `ci.yml` también corre en el tag (`on: push` incluye tags).
+Secret scan full-tree → `validate_metadata.py` (falla si README/CHANGELOG/pyproject divergan) → `check_readme_claims.py` (gate de claims del README, fail cerrado) → `check_report_citations.py` (gate de citas SHA de `reports/`, fail cerrado) → suite → `uv build` → `twine check`. Sobre `ci.yml` también corre en el tag (`on: push` incluye tags).
 
 ### 4. PROD GATE — aprobación del Socio (job `publish`)
 

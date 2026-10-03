@@ -12,6 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # AST-35: el gate de citas SHA resuelve con git cat-file; con el
+          # shallow por defecto (depth 1) un commit citado que sí existe
+          # reportaría "no resuelve" — un rojo engañoso. Historia completa.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -29,6 +34,11 @@ jobs:
         # AST-33: verdad ejecutable del README — fail cerrado. Sin credenciales;
         # única red permitida: pypi.org (API JSON).
         run: python scripts/check_readme_claims.py
+      - name: Report citations gate
+        # AST-35: toda cita SHA de reports/ resuelve, está anotada
+        # (@ws/@bundle/@nocommit) o es un no-commit de patrón conocido.
+        # Sin red; falla con fichero:línea y token.
+        run: python scripts/check_report_citations.py
       - name: Run tests
         run: python -m pytest -q
       - name: Build wheel

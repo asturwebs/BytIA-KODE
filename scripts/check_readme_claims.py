@@ -63,6 +63,8 @@ COMMAND_RULES: list[tuple[str, str, str]] = [
      "ok", "este mismo gate corriendo"),
     (r"^uv run python scripts/validate_metadata\.py$",
      "ok", "ejecutada por este gate (metadata validation OK)"),
+    (r"^uv run python scripts/check_report_citations\.py$",
+     "ok", "ejecutada por este gate (subproceso — gate de citas SHA de reports, AST-35)"),
     (r"^bytia-kode$",
      "declared", "arranca la TUI: necesita TTY real (suite headless: tests/test_tui_interruption.py)"),
     (r"^bytia-kode --bot$",
@@ -156,6 +158,7 @@ DOCUMENTED_FILES = [
     ".github/workflows/ci.yml", ".github/workflows/release.yml",
     ".githooks/pre-commit",
     "scripts/validate_metadata.py", "scripts/check_readme_claims.py",
+    "scripts/check_report_citations.py",
     "src/bytia_kode/guardrail.py",
     "src/bytia_kode/prompts/kernel.default.yaml",
     "src/bytia_kode/prompts/runtime.default.yaml",
@@ -390,6 +393,17 @@ def check_cli(report: Report, version: str) -> None:
         report.ok("cli", "scripts/validate_metadata.py → metadata validation OK")
     else:
         report.fail("cli", f"validate_metadata falló (rc={proc.returncode}): {(proc.stdout or '') + (proc.stderr or '')}".strip()[:200])
+
+    # AST-35: gate de citas SHA de reports/ — mismo trato que validate_metadata.
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "check_report_citations.py")],
+        capture_output=True, text=True, timeout=300, cwd=ROOT,
+    )
+    if proc.returncode == 0 and "GATE EN VERDE" in (proc.stdout or ""):
+        report.ok("cli", "scripts/check_report_citations.py → GATE EN VERDE")
+    else:
+        tail = ((proc.stdout or "") + (proc.stderr or "")).strip()[-600:]
+        report.fail("cli", f"check_report_citations falló (rc={proc.returncode}): {tail}")
 
 
 def check_paths(report: Report) -> None:

@@ -33,6 +33,8 @@ tests/
 scripts/                      # Utilidades de validación
 ├── validate_metadata.py      # Check de versión, autoría, docs
 ├── check_secrets.py          # Scan de secrets en pre-commit
+├── check_readme_claims.py    # Gate de claims del README (fail cerrado)
+├── check_report_citations.py # Gate de citas SHA en reports/ (fail cerrado)
 └── benchmark_io.py           # Benchmark secuencial vs concurrente
 ```
 
@@ -49,6 +51,7 @@ cd ~/bytia/proyectos/BytIA-KODE
 uv run pytest -q
 uv run python scripts/validate_metadata.py
 uv run python scripts/check_secrets.py
+uv run python scripts/check_report_citations.py
 
 # 3. Probar (usa el .venv editable — cambios reflejados al reiniciar)
 uv run bytia-kode

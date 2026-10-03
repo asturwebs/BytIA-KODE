@@ -38,6 +38,11 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10
         with:
+          # AST-35: el gate de citas SHA necesita historia completa para
+          # resolver con git cat-file (mismo motivo que en ci.yml).
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
           python-version: '3.11'
           enable-cache: true
       - name: Secret scan (full tree)
@@ -49,6 +54,10 @@ jobs:
         # AST-33: mismo gate que ci.yml — el tag que se publica lleva el
         # README verdad. Sin credenciales; única red: pypi.org.
         run: uv run python scripts/check_readme_claims.py
+      - name: Report citations gate
+        # AST-35: mismo gate que ci.yml — el tag que se publica lleva los
+        # reports con sus citas resueltas o anotadas. Sin red.
+        run: uv run python scripts/check_report_citations.py
       - name: Run tests
         run: uv run pytest -q
       - name: Build distributions

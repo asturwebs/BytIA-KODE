@@ -8,6 +8,7 @@ Consulta [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para la guía completa: estr
 uv run pytest -q                          # Tests
 uv run python scripts/validate_metadata.py # Metadata check
 uv run python scripts/check_readme_claims.py # Gate de claims del README
+uv run python scripts/check_report_citations.py # Gate de citas SHA de reports/
 uv build                                   # Build wheel
 uv pip install ./dist/*.whl --force-reinstall  # Instalar
 ```
