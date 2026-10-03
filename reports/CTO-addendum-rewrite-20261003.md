@@ -1,7 +1,7 @@
 # Addendum de trazabilidad — el corte de SHAs del rewrite de historia
 
 **Aplica a:** todos los reports de este directorio (AST-1…AST-4 y pasadas de rol).
-**Verificado:** 2026-10-03, AST-34, contra `main@c760ce7` y la API de GitHub, con corrida propia.
+**Verificado:** 2026-10-03, AST-34, contra `main@c760ce7` con corrida propia: conteo y orfandad `git cat-file` en clon fresco post-rewrite (verificación cruzada con la del Socio, idéntico resultado), API de GitHub, y artefactos PyPI descargados.
 
 ## Qué pasó (resumen; detalle en HANDOFF §"Rewrite de historia")
 
@@ -18,39 +18,44 @@ runners Paperclip — declarado, no verificado aquí).
 
 ## Qué significa para estos reports
 
-**Ningún SHA citado abajo debe usarse como base de operaciones git** contra el
-repo (checkout, diff, cherry-pick, compare, bisect): parte ya no existe y parte
-existe pero pertenece a un universo desvinculado de la historia de main. Citar
-un SHA de estos es citar una **referencia de época**; si hay que resolverlo, la
+**Ningún SHA citado debe usarse como base de operaciones git** contra el repo
+(checkout, diff, cherry-pick, compare, bisect): **ninguno resuelve**. Citar un
+SHA de estos es citar una **referencia de época**; si hay que resolverlo, la
 fuente autoritativa es el bundle, no GitHub.
 
-### Estado real, verificado contra la API el 2026-10-03
+### La cuenta exacta (verificación cruzada Socio + CTO, 2026-10-03)
 
-El corte no es uniforme (la línea "todos los SHAs pre-rewrite quedaron huérfanos"
-de HANDOFF es cierta en espíritu pero no al SHA):
+Los `reports/*.md` citan **34 strings con forma de SHA** (incluido el fragmento
+del nombre del anexo DevOps). De ellos, **32 son SHAs de commit reales y los 32
+son huérfanos — 0 resuelven**: verificación del Socio contra el bundle (terminal
+PI, `git cat-file` uno a uno), reproducida por el CTO en un clon fresco
+post-rewrite con idéntico resultado (0/34). Los otros 2 (`de57bd59`, en el
+nombre del anexo, y `41962dab`) son fragmentos de UUID de las pasadas DevOps,
+no commits. Citas más frecuentes: `768d3ff` (6 informes), `ab6554b` (5),
+`cf66bec` (4), `4b12ca7` (4), `5fe9c1f` (3).
 
-| Estado | SHAs citados en reports |
-|---|---|
-| **No resuelven (404)** | `2341a78` `38f2053` `5537803` `6541aba` (oleada O0) · `a2cb332` `a4f9da1` `f6143f9` (O1) · `edff66d` `28d89e6` `594098d` `3505b7b` `68cf37a` (estado-real) |
-| **Resuelven hoy** | `768d3ff` `4b12ca7` `ab6554b` `cf66bec` `16407a0` `5fe9c1f` `3a1b9ee` (reports de rol) · `2521890` `91fb426` `64ce5c9` `7ee7b88` (era releases) |
+**Los 32, por origen** (todos huérfanos, `git cat-file` en clon): oleada O0
+`2341a78` `38f2053` `5537803` `6541aba` · oleada O1 `a2cb332` `a4f9da1`
+`f6143f9` · estado-real `edff66d` `28d89e6` `594098d` `3505b7b` `68cf37a` ·
+reports de rol `768d3ff` `4b12ca7` `ab6554b` `cf66bec` `16407a0` `5fe9c1f`
+`3a1b9ee` · era releases `2521890` `91fb426` `64ce5c9` `7ee7b88`.
 
-Los que aún resuelven lo hacen porque cuelgan de refs de PR heredadas
-(`refs/pull/4`–`refs/pull/7`) o son objetos colgantes que GitHub todavía no ha
-purgado — **estado volátil, sin garantía**: pueden desaparecer en cualquier gc.
-Que resuelvan NO significa que estén en la historia de main: p.ej. `7ee7b88`
-(el commit que construyó 0.8.6) y `0417e76` (el tag v0.8.6 actual) son gemelos
-con el mismo mensaje y fecha.
-
- Patrón observado: los SHAs de las oleadas O0/O1 (26–27 sep, densas en trailers
- no canónicos) cayeron todos; los de los reports de rol (15–21 sep) sobreviven
- por ahora.
+> **Nota para quien use la API/web de GitHub:** el día de la verificación, 11
+> de estos commits (`768d3ff` `4b12ca7` `ab6554b` `cf66bec` `16407a0`
+> `5fe9c1f` `3a1b9ee` `2521890` `91fb426` `64ce5c9` `7ee7b88`) aún eran
+> **visibles en el servidor** — la web los muestra — porque cuelgan de refs de
+> PR heredadas (`refs/pull/4`–`refs/pull/7`) o de objetos aún no purgados.
+> Es visibilidad volátil del lado servidor: en ningún clon resuelven y no
+> forman parte de la historia de main — `7ee7b88` (el commit que construyó
+> 0.8.6) y `0417e76` (el tag v0.8.6 actual) son gemelos con el mismo mensaje
+> y fecha. No confundir "la web lo muestra" con "resuelve".
 
 ### Dónde resuelve cada cosa (mapa práctico)
 
 - **GitHub `main` post-rewrite:** los tags apuntan a los gemelos nuevos —
   `v0.8.4→e1366d1`, `v0.8.5→9e912aa`, `v0.8.6→0417e76` (peeled).
 - **Workspaces Paperclip:** la historia pre-rewrite sigue viva en el checkout
-  compartido (los 19 SHAs citados arriba resuelven ahí) — válida para
+  compartido (los SHAs de commit citados arriba resuelven ahí) — válida para
   arqueología local, nunca como base de entrega.
 - **Bundle del Socio:** la única fuente completa y estable old→new.
 
