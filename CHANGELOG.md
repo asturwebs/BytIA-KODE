@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.8.6] - 2026-10-03
+
+### Security — 17 alertas Dependabot cerradas (2 críticas, 7 altas, 8 moderadas)
+
+Parcheo dirigido de las tres dependencias afectadas en `uv.lock` (diff
+quirúrgico: solo 3 versiones, nada más del árbol se movió):
+
+- **pyjwt 2.13.0 → 2.15.1** — 13 advisories (PEM detection bypass con
+  whitespace mutado, claves públicas DER aceptadas como secretos HMAC,
+  claves HMAC vacías en `PyJWK`, BOM bypass, ReDoS en `is_pem_format`,
+  recursion DoS en `jwt.decode()`…). Llega vía `mcp[crypto]` (extra `mcp`).
+- **urllib3 2.7.0 → 2.8.0** — 3 advisories (chunk-size sin límite en
+  streaming, configuración TLS de proxy HTTPS ignorada, loop infinito en
+  Deflate chunked). Vía `twine` (grupo dev) — sin exposición para usuarios.
+- **sentence-transformers 5.3.0 → 5.6.1** — 1 critical: la carga de
+  modelos locales bypassea `trust_remote_code`. Vía extra `memory`. Salto
+  mínimo dentro del major 5 (existe 6.1.0, pero cambia major).
+
+Además, **suelos de seguridad explícitos en los extras** para que los
+usuarios no hereden versiones vulnerables por resolución transitiva: el
+extra `mcp` añade `pyjwt>=2.15.1` y `memory` sube su suelo de
+`sentence-transformers>=4.0` a `>=5.6.1`. El paquete base (`pip install
+bytia-kode`) no depende de ninguno de los tres: la exposición era solo
+vía extras opcionales y tooling de desarrollo.
+
+Supera y cierra el PR #7 de Dependabot (pyjwt→2.15.0, incompleto).
+
 ## [0.8.5] - 2026-10-03
 
 Mantenimiento corto para cerrar el último ❌ del anexo de auditoría DevOps

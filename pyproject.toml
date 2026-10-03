@@ -1,6 +1,6 @@
 [project]
 name = "bytia-kode"
-version = "0.8.5"
+version = "0.8.6"
 description = "B-KODE: Agente + Skills + Terminal. La automatización empresarial cabe en tu CLI."
 authors = [{ name = "Pedro Luis Cuevas Villarrubia", email = "pedro@asturwebs.es" }]
 maintainers = [{ name = "BytIA" }]
@@ -43,8 +43,8 @@ dev = [
     "textual-dev>=1.8.0",
 ]
 local = ["llama-cpp-python>=0.3"]
-mcp = ["mcp>=1.28.1,<2"]
-memory = ["sentence-transformers>=4.0", "faiss-cpu>=1.11"]
+mcp = ["mcp>=1.28.1,<2", "pyjwt>=2.15.1"]
+memory = ["sentence-transformers>=5.6.1", "faiss-cpu>=1.11"]
 
 [project.scripts]
 # AST-22: el console script despacha --bot igual que `python -m bytia_kode`

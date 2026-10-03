@@ -1,8 +1,13 @@
 # Roadmap - BytIA KODE
 
-## Estado actual: v0.8.5 (Alpha) — 2026-10-03
+## Estado actual: v0.8.6 (Alpha) — 2026-10-03
 
 > Fuente de verdad de la versión: `pyproject.toml:3`. Las secciones `## vX.Y.Z` que siguen son **histórico de release** — qué se entregó en cada versión — y no describen el estado actual.
+
+## v0.8.6 (2026-10-03) — parcheo de seguridad de dependencias
+
+- [x] **17 alertas Dependabot cerradas** (2 críticas, 7 altas, 8 moderadas) con bump dirigido en `uv.lock`: `pyjwt 2.15.1`, `urllib3 2.8.0`, `sentence-transformers 5.6.1`. Ninguna tocaba al paquete base: pyjwt y sentence-transformers llegan por extras (`mcp`, `memory`), urllib3 por `twine` (dev).
+- [x] **Suelos de seguridad en los extras** (`pyproject.toml`): `mcp` añade `pyjwt>=2.15.1`; `memory` sube a `sentence-transformers>=5.6.1`. Cierra el PR #7 de Dependabot.
 
 ## v0.8.5 (2026-10-03) — la versión nunca se inventa + docstrings del build id
 
