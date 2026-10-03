@@ -1,6 +1,8 @@
 """Tests del propio gate de citas SHA de reports/ (AST-35).
 
-En CI el gate corre como paso de workflow; aquí se fija su contrato:
+En CI el gate corre como paso de workflow; aquí se fija su contrato de
+2 criterios (resuelve / anotada — nota de diseño de la PI, sin whitelist
+de patrones):
 
 1. Verde sobre los reports reales del repo.
 2. Fail cerrado: una cita SHA sin resolver y sin anotar rompe el gate
@@ -9,8 +11,10 @@ En CI el gate corre como paso de workflow; aquí se fija su contrato:
 3. La rama de resolución se ejercita de verdad: en un repo efímero con un
    commit real, el sha de ese commit resuelve y entra por la clase
    "resuelve", mientras que un sha inventado cae.
-4. Patrones de no-commit (id de MagicMock, fragmento de UUID) y el límite
-   fail-cado de fechas compactas.
+4. Sin atajo por forma: un id de mock se salva declarado con causa, pero
+   un decimal NO declarado en línea con MagicMock cae igual — el token no
+   pasa por git solo por parecerse a un mock. Y el límite fail-cerrado de
+   fechas compactas.
 """
 
 from __future__ import annotations
@@ -111,24 +115,63 @@ def test_resolution_branch_fails_on_invented_sha(tmp_path):
     assert "facade7" in proc.stdout and "GATE EN ROJO" in proc.stdout
 
 
-def test_pattern_non_commit_mocks_and_uuid():
-    line = "MagicMock/mock.data_dir.__truediv__()/138477722887104"
-    assert gate.pattern_non_commit("138477722887104", line, line.index("138")) is not None
+def test_declared_mock_id_passes_with_cause(tmp_path):
+    """El id de mock pasa por DECLARED_CITATIONS con causa, no por forma.
 
-    uuid_line = "| `41962dab-71fc-4101-8596-6666f530b1eb` | AST-8 |"
-    start = uuid_line.index("41962dab")
-    assert gate.pattern_non_commit("41962dab", uuid_line, start) is not None
-    start = uuid_line.index("6666f530b1eb")
-    assert gate.pattern_non_commit("6666f530b1eb", uuid_line, start) is not None
+    Los 10 ids de mock de las tablas QA/DEVOPS están declarados en el gate;
+    éste es el contrato mismo: declarado → verde con causa en el inventario.
+    """
+    # 138477722887104 es un id de mock real, declarado en DECLARED_CITATIONS.
+    reports = _write_report(
+        tmp_path, "MagicMock/mock.data_dir.__truediv__()/138477722887104\n"
+    )
+    proc = _run_gate("--reports-dir", str(reports))
+    assert proc.returncode == 0, proc.stdout[-3000:]
+    assert "138477722887104" in proc.stdout
+    assert "MagicMock" in proc.stdout  # la causa viaja en el inventario
 
-    # Un sha de commit en prosa no casa con ningún patrón.
-    prose = "el botón de audio vuelve a `768d3ff`"
-    assert gate.pattern_non_commit("768d3ff", prose, prose.index("768")) is None
+
+def test_undeclared_decimal_on_mock_line_still_fails(tmp_path):
+    """Sin atajo por forma: un decimal NO declarado cae aunque la línea diga MagicMock.
+
+    Es la fragilidad que la nota de la PI apuntaba sobre la whitelist de
+    patrones: clasificar por forma sin preguntarle a git. Con 2 criterios
+    el único camino de un token sin resolver es anotarlo con causa.
+    """
+    reports = _write_report(
+        tmp_path, "MagicMock/mock.data_dir.__truediv__()/998877665544332\n"
+    )
+    proc = _run_gate("--reports-dir", str(reports))
+    assert proc.returncode != 0, "decimal no declarado que el gate dejó pasar"
+    assert "998877665544332" in proc.stdout and "GATE EN ROJO" in proc.stdout
 
 
-def test_compact_date_is_fail_closed_not_ignored():
-    """Una fecha AAAAMMDD es cita hasta que se anota: no se salda en silencio."""
-    hits_before = gate.SHA_RE.findall("`20261003`")
-    assert hits_before == ["20261003"]
-    line = "Ver el addendum `20261003`"
-    assert gate.pattern_non_commit("20261003", line, line.index("2026")) is None
+def test_compact_date_is_fail_closed_not_ignored(tmp_path):
+    """Una fecha AAAAMMDD es cita hasta que se anota: no se salda en silencio.
+
+    `20991231` no está declarada (la del bundle del rewrite, `20261003`, sí —
+    ver test siguiente): cualquier otra fecha cae y pide causa.
+    """
+    assert gate.SHA_RE.findall("`20991231`") == ["20991231"]
+    assert "20991231" not in gate.DECLARED_CITATIONS
+    reports = _write_report(tmp_path, "Ver el addendum `20991231`.\n")
+    proc = _run_gate("--reports-dir", str(reports))
+    assert proc.returncode != 0, "fecha sin anotar que el gate dejó pasar"
+    assert "20991231" in proc.stdout and "GATE EN ROJO" in proc.stdout
+
+
+def test_corpus_residual_is_pre_registered_with_cause():
+    """El residual del corpus (addendum AST-34) está declarado con causa.
+
+    Los 4 stamps de release pre-rewrite no resuelven en ningún clon (verificado
+    con git cat-file en AST-35) y la fecha `20261003` vive dentro del nombre
+    literal del bundle — literales citados donde un sufijo falsearía el texto.
+    Pre-registrados → cuando el addendum entre en reports/, el gate pasa sin
+    tocar el documento.
+    """
+    for token in ("2521890", "91fb426", "64ce5c9", "7ee7b88"):
+        klass, cause = gate.DECLARED_CITATIONS[token]
+        assert klass == "bundle", (token, klass)
+        assert "stamp" in cause, (token, cause)
+    klass, cause = gate.DECLARED_CITATIONS["20261003"]
+    assert klass == "nocommit" and "fecha" in cause

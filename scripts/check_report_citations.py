@@ -5,19 +5,28 @@ número porque el método (regex sobre hex) no clasificaba, y lo que evitó
 publicar el defecto fue el juicio de un agente parándose antes del push.
 Ese ahorro de suerte era cronología, no diseño: aquí pasa a ser comprobación.
 
-Contrato (AST-35). Toda cita con forma de SHA en `reports/*.md` debe:
+Contrato (AST-35, **2 criterios**). Toda cita con forma de SHA en
+`reports/*.md` debe:
 
 1. **resolver** en el repo (`git cat-file --batch-check <token>^{commit}`), **o**
-2. llevar el sufijo de anotación justo después del token
-   (`@ws` / `@bundle` / `@nocommit`), **o**
-3. estar **declarada** en `DECLARED_CITATIONS` con clase y causa — la
-   convención para citas dentro de salida de git copiada literal, donde el
-   sufijo falsearía la cita que se está transcribiendo, **o**
-4. casar con un patrón de no-commit conocido (`pattern_non_commit`): id
-   decimal de MagicMock en una línea con `MagicMock`, o fragmento de UUID
-   (token pegado a un guion).
+2. estar **anotada explícitamente**: sufijo de anotación justo después del
+   token (`@ws` / `@bundle` / `@nocommit`), o entrada en `DECLARED_CITATIONS`
+   con clase y causa — la convención para citas dentro de salida de git
+   copiada literal, donde el sufijo falsearía la cita que se está
+   transcribiendo.
 
 Si no cumple ninguna → **FALLO**, con `fichero:línea` y token. Fail cerrado.
+
+**Por qué 2 y no 3 criterios** (nota de diseño de la terminal PI en AST-35;
+llamada del implementador): el criterio intermedio de "whitelist de
+no-commits por patrón" (id decimal junto a `MagicMock`, token pegado a un
+guion) clasifica **sin preguntarle a git**, y la forma no clasifica — es el
+mismo método roto que produjo el "32" de AST-34 (`5537803` es decimal y sí
+es un commit; `d284fe7c` tiene letras y no lo es). Un `revert-768d3ff` pegaría
+un commit real a un guion y saldría inventariado como "fragmento de UUID": la
+clase mentiría en silencio. Aquí toda clasificación es o bien **verificada
+por git** o bien **anotada a mano con causa registrada** — nada se infiere de
+la forma del token.
 
 Convención de anotación (definida en AST-35):
 
@@ -38,8 +47,17 @@ encontrados". El titular de este gate es el veredicto, no un número.
 
 Todo run de 7..40 hex es cita, **también si es puramente decimal**: `5537803`
 es un commit real y con un filtro de "decimales cortos" este gate lo habría
-ignorado en silencio en su primera corrida. Un fecha compacta tipo
-`20261003` cae igual — fail cerrado — y se resuelve con `20261003@nocommit`.
+ignorado en silencio en su primera corrida. Una fecha compacta tipo
+`20991231` cae igual — fail cerrado — y se anota (`20991231@nocommit` o, si
+es un literal citado donde el sufijo falsearía el texto —p.ej. la fecha
+dentro del nombre del bundle del rewrite—, registro en `DECLARED_CITATIONS`
+con causa).
+
+Corpus de diseño (AST-35): `reports/CTO-addendum-rewrite-20261003.md` — la
+tabla de 3 clases y las 19 traducciones patch-id del rewrite. Sobre él el
+gate distingue lo que resuelve (gemelos post-rewrite), lo anotado (12 ws +
+7 bundle + no-commits) y el residual (stamps de release pre-rewrite y la
+fecha del bundle, registrados con causa en `DECLARED_CITATIONS`): 0 FALLOS.
 
 Uso:
     python scripts/check_report_citations.py
@@ -72,9 +90,35 @@ CAUSE_BUNDLE = (
 # Declaraciones explícitas: token -> (clase, causa)
 # Las 12 + 8 de la tabla de 3 clases de AST-34, verificadas a mano contra el
 # repo: las de la clase "workspace" NO son ancestro de `main`; las de "bundle"
-# SÍ lo son en la historia pre-reescritura. El que añada una aquí añade su
-# causa — fail cerrado.
+# SÍ lo son en la historia pre-reescritura. Los no-commits que en la v1 de
+# este gate se clasificaban por patrón (ids de mock y fragmentos de UUID) se
+# declaran aquí con causa — la misma decisión, registrada en vez de inferida
+# de la forma (nota de la PI: 2 criterios). Y el residual del corpus
+# (addendum AST-34): stamps de release pre-rewrite y la fecha compacta del
+# nombre del bundle — literales citados donde el sufijo falsearía el texto.
+# Verificado con git cat-file en este clon: ninguno de los stamps resuelve ni
+# es ancestro de main. El que añada una aquí añade su causa.
 # --------------------------------------------------------------------------
+CAUSE_MOCK_ID = (
+    "id decimal de objeto MagicMock en tabla de salida de test (QA/DEVOPS) — "
+    "no es un commit"
+)
+CAUSE_UUID_FRAG = (
+    "fragmento del UUID de una pasada/run de DevOps "
+    "(reports/DEVOPS-devops-annex-de57bd59.md) — no es un commit"
+)
+CAUSE_STAMP = (
+    "stamp de release pre-rewrite (≤ v0.8.6): solo visible vía refs del "
+    "servidor, gemelo con el mismo mensaje/fecha en la historia nueva "
+    "(7ee7b88↔0417e76, addendum AST-34 §Nota API/PyPI) — sin resolución en "
+    "clón (git cat-file verificado, AST-35)"
+)
+CAUSE_DATE_BUNDLE = (
+    "fecha compacta AAAAMMDD (2026-10-03, día del rewrite) embebida en el "
+    "nombre literal del bundle pre-rewrite — el literal citado no es un "
+    "commit (addendum AST-34)"
+)
+
 DECLARED_CITATIONS: dict[str, tuple[str, str]] = {
     **{t: ("ws", CAUSE_WS) for t in (
         "2341a78", "28d89e6", "3505b7b", "38f2053", "5537803", "594098d",
@@ -92,18 +136,23 @@ DECLARED_CITATIONS: dict[str, tuple[str, str]] = {
                  "annex-de57bd59.md) — no es un commit"),
     "41962dab": ("nocommit",
                  "fragmento del UUID de run de AST-8 — no es un commit"),
+    "36f9356fee36": ("nocommit", CAUSE_UUID_FRAG),
+    "6666f530b1eb": ("nocommit", CAUSE_UUID_FRAG),
+    **{t: ("nocommit", CAUSE_MOCK_ID) for t in (
+        "126287905920672", "126287906441936", "126287907513280",
+        "128888842159840", "128888842172944", "128888860609904",
+        "129919280584016", "138477721213584", "138477721214256",
+        "138477722887104",
+    )},
+    # Residual del corpus de diseño (addendum AST-34, §Nota API/PyPI): stamps
+    # de release pre-rewrite y la fecha en el nombre del bundle — literales
+    # citados, pre-registrados para que el gate pase cuando el addendum entre
+    # en reports/ sin falsear el documento con sufijos.
+    **{t: ("bundle", CAUSE_STAMP) for t in (
+        "2521890", "91fb426", "64ce5c9", "7ee7b88",
+    )},
+    "20261003": ("nocommit", CAUSE_DATE_BUNDLE),
 }
-
-def pattern_non_commit(token: str, line: str, start: int) -> str | None:
-    """Causa si el token casa con un patrón de no-commit conocido, si no None."""
-    if token.isdecimal() and "MagicMock" in line:
-        return "patrón: id decimal de MagicMock en línea con MagicMock"
-    before = line[start - 1] if start else ""
-    after_idx = start + len(token)
-    after = line[after_idx] if after_idx < len(line) else ""
-    if before == "-" or after == "-":
-        return "patrón: fragmento de UUID (token pegado a un guion)"
-    return None
 
 
 def label_for(klass: str) -> str:
@@ -222,11 +271,11 @@ def main(argv: list[str] | None = None) -> int:
 
     report = Report()
     inventory: dict[str, dict[str, set[str]]] = {
-        "resuelve": {}, "@ws": {}, "@bundle": {}, "@nocommit": {}, "patrón": {},
+        "resuelve": {}, "@ws": {}, "@bundle": {}, "@nocommit": {},
     }
-    # Causa por token dentro de las clases cuya causa no la da la clase misma
-    # (@nocommit y patrón mezclan orígenes distintos).
-    causes: dict[str, dict[str, str]] = {"@nocommit": {}, "patrón": {}}
+    # Causa por token dentro de la clase cuya causa no la da la clase misma
+    # (@nocommit mezcla orígenes distintos).
+    causes: dict[str, dict[str, str]] = {"@nocommit": {}}
     pending: dict[str, set[str]] = {}  # token sin declarar -> dónde se cita
 
     for fname, lineno, token, start, line in hits:
@@ -246,13 +295,6 @@ def main(argv: list[str] | None = None) -> int:
             report.declare(f"{where} `{token}` → {label}: {cause}")
             inventory[label].setdefault(token, set()).add(where)
             causes.setdefault(label, {}).setdefault(token, cause)
-            continue
-
-        cause = pattern_non_commit(token, line, start)
-        if cause is not None:
-            report.declare(f"{where} `{token}` → no-commit · {cause}")
-            inventory["patrón"].setdefault(token, set()).add(where)
-            causes["patrón"].setdefault(token, cause)
             continue
 
         pending.setdefault(token, set()).add(where)
@@ -280,24 +322,22 @@ def main(argv: list[str] | None = None) -> int:
             report.fail(
                 f"{where} `{token}` — no resuelve en el repo y sin anotar "
                 f"(sufija {token}@ws / {token}@bundle / {token}@nocommit, o "
-                f"déclaralo en DECLARED_CITATIONS con causa){note}"
+                f"decláralo en DECLARED_CITATIONS con causa){note}"
             )
 
     print()
     print("[INVENTARIO POR CLASE — tokens, dónde se citan y por qué (nunca un conteo de hex)]")
-    marks = {"resuelve": "✔", "@ws": "✋", "@bundle": "✋", "@nocommit": "✋",
-             "patrón": "✋"}
-    # La causa de cada clase se imprime una vez; sólo @nocommit y patrón
-    # mezclan orígenes, y ahí la causa va además junto al token.
+    marks = {"resuelve": "✔", "@ws": "✋", "@bundle": "✋", "@nocommit": "✋"}
+    # La causa de cada clase se imprime una vez; cuando un token tiene una
+    # causa propia (distinta de la clase) va además junto al token.
     class_note = {
         "resuelve": "commit real en este repo (git cat-file)",
         "@ws": CAUSE_WS,
         "@bundle": CAUSE_BUNDLE,
         "@nocommit": "el token no identifica ningún commit",
-        "patrón": "no-commit detectable por patrón",
     }
     distinct = 0
-    for label in ("resuelve", "@ws", "@bundle", "@nocommit", "patrón"):
+    for label in ("resuelve", "@ws", "@bundle", "@nocommit"):
         entries = inventory[label]
         distinct += len(entries)
         note = f" — {class_note[label]}" if entries else ""
@@ -305,7 +345,10 @@ def main(argv: list[str] | None = None) -> int:
         per_token = causes.get(label, {})
         for token in sorted(entries):
             cause = per_token.get(token)
-            extra = f"  · {cause}" if cause and label in {"@nocommit", "patrón"} else ""
+            # Causa junto al token cuando NO es la de la clase (orígenes
+            # distintos dentro de @nocommit, o un @bundle excepcional como
+            # los stamps de release); la causa de la clase ya está arriba.
+            extra = f"  · {cause}" if cause and cause != class_note[label] else ""
             print(f"      {token}  →  {', '.join(sorted(entries[token]))}{extra}")
     if not distinct:
         print("  (sin citas con forma de SHA en reports/)")
@@ -321,8 +364,8 @@ def main(argv: list[str] | None = None) -> int:
         print("GATE EN ROJO: hay citas SHA que no resuelven y no están anotadas "
               "como workspace/bundle ni declaradas con causa.")
         return 1
-    print("GATE EN VERDE: toda cita SHA de reports/ resuelve en el repo, está "
-          "anotada (@ws/@bundle/@nocommit) o es un no-commit de patrón conocido.")
+    print("GATE EN VERDE: toda cita SHA de reports/ resuelve en el repo o está "
+          "anotada (@ws/@bundle/@nocommit, sufijo o DECLARED_CITATIONS con causa).")
     return 0
 
 
