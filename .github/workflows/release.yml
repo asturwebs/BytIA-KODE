@@ -35,8 +35,8 @@ jobs:
     name: Gates + build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: '3.11'
           enable-cache: true
@@ -55,7 +55,7 @@ jobs:
         run: uv build
       - name: Check distributions
         run: uvx twine check dist/*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -71,7 +71,7 @@ jobs:
       # no hay ningún secreto persistente en el repo ni en GitHub Settings.
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
@@ -88,7 +88,7 @@ jobs:
       # workflow ni `publish` ganan scopes de más.
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Extract release notes from CHANGELOG
         # El tag manda: si CHANGELOG no tiene la entrada de ESA versión, el
         # job falla antes de crear una Release vacía o desincronizada.
@@ -114,6 +114,6 @@ jobs:
           echo "--- release-notes.md ---"
           cat release-notes.md
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: release-notes.md
