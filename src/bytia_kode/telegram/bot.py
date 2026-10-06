@@ -1,11 +1,13 @@
 """Telegram bot interface for BytIA KODE."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import signal
 from pathlib import Path
 
 from telegram import Update
+from telegram.constants import ChatAction
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from bytia_kode import version_label
@@ -194,6 +196,22 @@ class TelegramBot:
         path.write_text(content, encoding="utf-8")
         await update.message.reply_text(f"Context regenerated: {path.name}")
 
+    _TYPING_INTERVAL = 4.0  # el status «escribiendo…» de Telegram expira a los ~5 s
+
+    async def _typing_loop(self, context: ContextTypes.DEFAULT_TYPE, chat_id: str) -> None:
+        """Mantiene el indicador «escribiendo…» mientras el agente procesa.
+
+        En modo agéntico la respuesta puede tardar minutos y el status de
+        typing de Telegram expira a los ~5 s: se renueva en cada tick hasta
+        que el caller cancela el task. Si la API falla en un tick, se
+        reintenta en el siguiente — el typing nunca tumba el chat."""
+        while True:
+            try:
+                await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+            except Exception as exc:
+                logger.debug("typing no renovado (se reintenta): %s", exc)
+            await asyncio.sleep(self._TYPING_INTERVAL)
+
     async def _chat(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not update.message or not update.message.text or not update.effective_user:
             return
@@ -210,6 +228,7 @@ class TelegramBot:
             return
 
         self._processing.add(chat_id)
+        typing_task = asyncio.create_task(self._typing_loop(context, chat_id))
         try:
             response_text = ""
             agent = self._get_agent(chat_id)
@@ -233,6 +252,7 @@ class TelegramBot:
             logger.error("Chat error: %s", exc)
             await update.message.reply_text("Error interno en el procesamiento")
         finally:
+            typing_task.cancel()
             self._processing.discard(chat_id)
 
     def run(self):
