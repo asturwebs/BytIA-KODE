@@ -75,6 +75,18 @@ Kill-switch: `BYTIA_KODE_HERDR=0`. Detalles y gotcha del parser CLI 0.8.2
 - Dependabot: ✅ **36 vulns cerradas (2026-09-15, `uv lock` quirúrgico de 12
   paquetes; `mcp` pineado `>=1.28.1,<2` para evitar major 2.x sin tests)** —
   verificar que GitHub cierra las alerts tras el re-escaneo
+- **Registro de deuda de dependencias (AST-37, 2026-10-06)** — evaluación formal de
+  los mayores abiertos, sin tocar deps; informe completo con fuentes en
+  `reports/AST-37-majors-deps-20261006.md`. Recomendaciones: **twine 7.0.0 SUBIR**
+  (6.2.0 rompe `twine check` contra Metadata 2.5 — verificado sobre la wheel 0.8.4;
+  CI ya usa 7 vía `uvx`), **sentence-transformers 6.1.0 SUBIR** en el mismo re-lock
+  (floors ya satisfechos por el lock: transformers 5.17/hub 1.8/torch 2.14; extra
+  sin uso hoy — cap 5.x interino por línea sin smoke del extra `memory`),
+  **faiss-cpu 1.15.1 SUBIR** (wheels cp310-abi3, sin knock-on),
+  **llama-cpp-python 0.3.36 APLAZAR** (sdist-only, compila cada install; renombres
+  C API del vendor ggml-org; re-evaluar al abrir la feature de inferencia embebida
+  o 2027-01-06). `mcp<2` cap deliberado intacto (motivo en el bloque Dependabot de
+  arriba). Ejecución, si procede: issue única de re-lock decidida por el Socio.
 - Emisor de estado `blocked` cuando exista flujo de aprobación de tools
 - Upstream herdr: que exponga/persista sesiones self-reported (hoy las traga)
 
