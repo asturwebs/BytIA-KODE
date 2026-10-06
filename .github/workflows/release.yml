@@ -50,6 +50,10 @@ jobs:
       - name: Validate metadata
         # Fail si README/CHANGELOG/pyproject divergen (doctrina de fuente única)
         run: uv run python scripts/validate_metadata.py
+      - name: .env.example hygiene gate
+        # AST-36: mismo gate que ci.yml — el tag que se publica no puede
+        # reabrir el incidente de los placeholders vacíos. Sin red.
+        run: uv run python scripts/check_env_example.py
       - name: README claims gate
         # AST-33: mismo gate que ci.yml — el tag que se publica lleva el
         # README verdad. Sin credenciales; única red: pypi.org.

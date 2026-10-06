@@ -41,3 +41,28 @@ def test_global_env_fills_keys_the_project_does_not_set(tmp_path, monkeypatch, e
     assert os.environ.get(_KEY) == "project-wins"
     assert os.environ.get("BYTIA_T4_GLOBAL_ONLY") == "present"
     os.environ.pop("BYTIA_T4_GLOBAL_ONLY", None)
+
+
+def test_project_empty_declaration_blocks_global_fill(tmp_path, monkeypatch):
+    """AST-36: `KEY=` (vacío) en el .env del proyecto cuenta como DECLARADA —
+    el global no puede rellenarla. Es el mecanismo exacto del incidente de los
+    6.253 restarts del bot: plantilla copiada con `TELEGRAM_BOT_TOKEN=` en
+    blanco mientras el global tenía el token real. Este test fija la
+    semántica para que .env.example siga trayendo los placeholders comentados
+    (gate scripts/check_env_example.py)."""
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / ".env").write_text(f"{_KEY}=\n")  # declarada VACÍA
+    global_dir = tmp_path / "home" / ".bytia-kode"
+    global_dir.mkdir(parents=True)
+    (global_dir / ".env").write_text(f"{_KEY}=global-real-token\n")
+    monkeypatch.chdir(project)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.delenv(_KEY, raising=False)
+
+    importlib.reload(config_module)
+
+    # La declaración vacía del proyecto GANA al valor real del global: por eso
+    # la plantilla no debe declarar nada vacío, y la precedencia NO se toca
+    # (es la misma protección T4 del test de arriba, vista desde el otro lado).
+    assert os.environ.get(_KEY) == ""

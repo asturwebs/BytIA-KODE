@@ -30,6 +30,11 @@ jobs:
         run: python scripts/check_secrets.py --all
       - name: Validate metadata
         run: python scripts/validate_metadata.py
+      - name: .env.example hygiene gate
+        # AST-36: la plantilla no puede declarar variables VACÍAS descomentadas
+        # — con override=False una declarada vacía pisa el .env global
+        # (incidente: 6.253 restarts del bot). Placeholders: comentados.
+        run: python scripts/check_env_example.py
       - name: README claims gate
         # AST-33: verdad ejecutable del README — fail cerrado. Sin credenciales;
         # única red permitida: pypi.org (API JSON).

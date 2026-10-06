@@ -63,6 +63,8 @@ COMMAND_RULES: list[tuple[str, str, str]] = [
      "ok", "este mismo gate corriendo"),
     (r"^uv run python scripts/validate_metadata\.py$",
      "ok", "ejecutada por este gate (metadata validation OK)"),
+    (r"^uv run python scripts/check_env_example\.py$",
+     "ok", "ejecutada por este gate (subproceso — gate de plantilla .env, AST-36)"),
     (r"^uv run python scripts/check_report_citations\.py$",
      "ok", "ejecutada por este gate (subproceso — gate de citas SHA de reports, AST-35)"),
     (r"^bytia-kode$",
@@ -158,7 +160,7 @@ DOCUMENTED_FILES = [
     ".github/workflows/ci.yml", ".github/workflows/release.yml",
     ".githooks/pre-commit",
     "scripts/validate_metadata.py", "scripts/check_readme_claims.py",
-    "scripts/check_report_citations.py",
+    "scripts/check_report_citations.py", "scripts/check_env_example.py",
     "src/bytia_kode/guardrail.py",
     "src/bytia_kode/prompts/kernel.default.yaml",
     "src/bytia_kode/prompts/runtime.default.yaml",
@@ -404,6 +406,17 @@ def check_cli(report: Report, version: str) -> None:
     else:
         tail = ((proc.stdout or "") + (proc.stderr or "")).strip()[-600:]
         report.fail("cli", f"check_report_citations falló (rc={proc.returncode}): {tail}")
+
+    # AST-36: gate de plantilla .env — sin placeholders vacíos descomentados.
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "check_env_example.py")],
+        capture_output=True, text=True, timeout=120, cwd=ROOT,
+    )
+    if proc.returncode == 0 and "GATE EN VERDE" in (proc.stdout or ""):
+        report.ok("cli", "scripts/check_env_example.py → GATE EN VERDE")
+    else:
+        tail = ((proc.stdout or "") + (proc.stderr or "")).strip()[-600:]
+        report.fail("cli", f"check_env_example falló (rc={proc.returncode}): {tail}")
 
 
 def check_paths(report: Report) -> None:
@@ -664,8 +677,13 @@ def check_config_defaults(report: Report, text: str) -> None:
             actual = probe.get(var)
             if actual != expected:
                 mismatches.append(f"{var}: README={expected!r} código={actual!r}")
-        # ambas tablas: cobertura en .env.example ("todas las variables")
-        if not re.search(rf"^{var}=", env_example, re.M):
+        # ambas tablas: cobertura en .env.example ("todas las variables").
+        # AST-36: los placeholders de la plantilla van COMENTADOS (`# VAR=`)
+        # — una línea vacía descomentada pisa el .env global — así que la
+        # cobertura acepta la forma activa o la comentada; que no haya NINGUNA
+        # de las dos sigue siendo fallo, y la forma vacía activa la caza el
+        # gate propio scripts/check_env_example.py.
+        if not re.search(rf"^(?:#[ \t]*)?{var}=", env_example, re.M):
             missing_example.append(var)
 
     if uncovered:
@@ -678,7 +696,7 @@ def check_config_defaults(report: Report, text: str) -> None:
         for v in missing_example:
             report.fail("cfg", f"variable del README ausente de .env.example (el README dice 'todas las variables'): {v}")
     if not (uncovered or mismatches or missing_example):
-        report.ok("cfg", f"{checked} variables de configuración del README = defaults reales de AppConfig (env limpio) y presentes en .env.example")
+        report.ok("cfg", f"{checked} variables de configuración del README = defaults reales de AppConfig (env limpio) y documentadas en .env.example (activas o comentadas, AST-36)")
 
 
 def check_themes(report: Report, text: str) -> None:

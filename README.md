@@ -44,7 +44,9 @@ EOF
 # editar con tu provider y API key — todas las variables: .env.example del repo
 ```
 
-> Un `.env` en el directorio de trabajo (proyecto) tiene precedencia sobre el global `~/.bytia-kode/.env`. Las skills vendor se siembran solas en `~/.bytia-kode/skills/vendor/` en el primer arranque — y se actualizan solas cuando la versión instalada cambia.
+> Un `.env` en el directorio de trabajo (proyecto) tiene precedencia sobre el global `~/.bytia-kode/.env`, y la cadena carga con `override=False`: una variable declarada en el `.env` del proyecto —**aunque sea en blanco**— bloquea el valor del global y el default del código (incidente AST-36: 6.253 reinicios del bot con un `TELEGRAM_BOT_TOKEN=` vacío copiado de la plantilla, pese a tener el token bien puesto en el global). Por eso `.env.example` trae los placeholders comentados: descomenta solo lo que rellenes de verdad.
+>
+> Las skills vendor se siembran solas en `~/.bytia-kode/skills/vendor/` en el primer arranque — y se actualizan solas cuando la versión instalada cambia.
 
 ## Quickstart
 
@@ -354,6 +356,7 @@ uv run bytia-kode
 
 ```bash
 uv run python scripts/validate_metadata.py
+uv run python scripts/check_env_example.py
 uv run python scripts/check_readme_claims.py
 uv run python scripts/check_report_citations.py
 uv run pytest -q
