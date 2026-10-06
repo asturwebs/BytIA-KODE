@@ -4,8 +4,8 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.7.x   | Yes       |
-| < 0.7   | No        |
+| 0.8.x   | Yes       |
+| < 0.8   | No        |
 
 BytIA KODE is in Alpha (`Development Status :: 3 - Alpha`). Security updates are applied to the latest release only.
 
@@ -13,7 +13,9 @@ BytIA KODE is in Alpha (`Development Status :: 3 - Alpha`). Security updates are
 
 **Do not report security vulnerabilities through public GitHub issues.**
 
-Email: **pedro@asturwebs.es** with subject `B-KODE Security: <brief description>`.
+Preferred channel: **GitHub Private Vulnerability Reporting** (Security tab → "Report a vulnerability") — private by default, no email exposure.
+
+Alternatively, email **pedro@asturwebs.es** with subject `B-KODE Security: <brief description>`.
 
 ### What to include
 
@@ -35,9 +37,9 @@ BytIA KODE implements defense-in-depth:
 - **BashTool:** allowlist of 26 binaries, `shell=False`, `shlex.split()`, shell operators blocked
 - **File tools:** sandbox to CWD + trusted paths (`~/.bytia-kode/`)
 - **Telegram:** fail-secure by default (denies all without `TELEGRAM_ALLOWED_USERS`)
-- **Pre-commit:** `check_secrets.py` scans for leaked credentials before every commit
+- **Secrets gate:** `scripts/check_secrets.py` runs in CI on every push (`ci.yml` + `release.yml`); an opt-in local pre-commit hook (`.githooks/`, activation documented in `CONTRIBUTING.md`) additionally runs metadata validation, secrets scan, README claims and report-citation checks plus the test suite before each local commit
 
-See `CLAUDE.md` and `docs/ARCHITECTURE.md` for full security architecture details.
+See `docs/ARCHITECTURE.md` for full security architecture details.
 
 ## Known Security Considerations
 
