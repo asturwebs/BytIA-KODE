@@ -36,6 +36,12 @@ def repo(tmp_path):
     (root / "tests" / "test_app.py").write_text(
         "def test_x():\n    assert True\n", encoding="utf-8"
     )
+    (root / "conftest.py").write_text("# base\n", encoding="utf-8")
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "x"\nversion = "0.0.0"\n\n'
+        '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n',
+        encoding="utf-8",
+    )
     git("add", "-A", cwd=root)
     git("commit", "-qm", "base", cwd=root)
     return root, git("rev-parse", "HEAD", cwd=root)
@@ -98,7 +104,7 @@ class TestTestPaths:
         assert is_test_path("src/app.py") is False
 
     def test_lists_tracked_test_files(self, scratch):
-        assert scratch.test_paths() == ["tests/test_app.py"]
+        assert set(scratch.test_paths()) == {"tests/test_app.py", "conftest.py"}
 
 
 class TestRestoreTests:
@@ -116,7 +122,9 @@ class TestRestoreTests:
         scratch.restore_tests()
 
         assert not (scratch.path / "tests" / "test_new.py").exists()
-        assert not (scratch.path / "conftest.py").exists()
+        assert (
+            scratch.path / "conftest.py"
+        ).read_text(encoding="utf-8") == "# base\n"
         assert (
             scratch.path / "tests" / "test_app.py"
         ).read_text(encoding="utf-8") == base_content
@@ -137,3 +145,130 @@ class TestRestoreTests:
         assert (
             git("status", "--porcelain", "--", "tests", cwd=scratch.path) == ""
         )
+
+
+class TestReviewFixes:
+    def test_restore_after_checkpoint_with_modified_test(self, scratch, repo):
+        root, _ = repo
+        base_content = (root / "tests" / "test_app.py").read_text(encoding="utf-8")
+        (scratch.path / "tests" / "test_app.py").write_text(
+            "def test_hack():\n    pass\n", encoding="utf-8"
+        )
+        scratch.checkpoint("checkpoint")
+
+        scratch.restore_tests()
+
+        assert (
+            scratch.path / "tests" / "test_app.py"
+        ).read_text(encoding="utf-8") == base_content
+
+    def test_restore_after_checkpoint_with_new_test(self, scratch):
+        (scratch.path / "tests" / "test_new.py").write_text(
+            "def test_nueva():\n    pass\n", encoding="utf-8"
+        )
+        scratch.checkpoint("checkpoint")
+
+        scratch.restore_tests()
+
+        assert not (scratch.path / "tests" / "test_new.py").exists()
+
+    def test_untracked_test_outside_tests_dir_is_removed(self, scratch):
+        (scratch.path / "test_regression.py").write_text(
+            "def test_x():\n    pass\n", encoding="utf-8"
+        )
+        (scratch.path / "src" / "tests").mkdir()
+        (scratch.path / "src" / "tests" / "test_new.py").write_text(
+            "def test_y():\n    pass\n", encoding="utf-8"
+        )
+
+        scratch.restore_tests()
+
+        assert not (scratch.path / "test_regression.py").exists()
+        assert not (scratch.path / "src" / "tests" / "test_new.py").exists()
+
+    def test_pyproject_pytest_section_is_restored(self, scratch, repo):
+        root, _ = repo
+        base_pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
+        target = scratch.path / "pyproject.toml"
+        target.write_text(
+            target.read_text(encoding="utf-8").replace(
+                'testpaths = ["tests"]',
+                'testpaths = ["tests"]\naddopts = "--deselect tests/test_app.py::test_x"',
+            ),
+            encoding="utf-8",
+        )
+
+        scratch.restore_tests()
+
+        restored = target.read_text(encoding="utf-8")
+        assert "addopts" not in restored
+        assert '[project]\nname = "x"' in restored
+        assert restored == base_pyproject
+
+    def test_rename_from_test_is_cleaned(self, scratch, repo):
+        root, _ = repo
+        base_conftest = (root / "conftest.py").read_text(encoding="utf-8")
+        git("mv", "conftest.py", "helpers.py", cwd=scratch.path)
+
+        scratch.restore_tests()
+
+        assert not (scratch.path / "helpers.py").exists()
+        assert (
+            scratch.path / "conftest.py"
+        ).read_text(encoding="utf-8") == base_conftest
+
+    def test_rename_from_test_with_rewrite_is_fail_closed(self, scratch, repo):
+        root, _ = repo
+        base_conftest = (root / "conftest.py").read_text(encoding="utf-8")
+        git("mv", "conftest.py", "helpers.py", cwd=scratch.path)
+        (scratch.path / "helpers.py").write_text(
+            "# conftest TAMPERADO\n", encoding="utf-8"
+        )
+        git("add", "-A", cwd=scratch.path)
+
+        with pytest.raises(Exception):
+            scratch.restore_tests()
+
+        assert (
+            scratch.path / "conftest.py"
+        ).read_text(encoding="utf-8") == base_conftest
+
+    def test_file_named_test_is_not_deleted(self, scratch):
+        (scratch.path / "test").write_text("legitimo\n", encoding="utf-8")
+
+        scratch.restore_tests()
+
+        assert (scratch.path / "test").exists()
+
+    def test_context_manager_tears_down(self, tmp_path, repo):
+        root, sha = repo
+        with Scratch(repo=root, base_sha=sha, root=tmp_path / "ws2") as scratch:
+            path = scratch.path
+            assert path.is_dir()
+        assert not path.exists()
+
+    def test_create_rejects_stale_dir(self, tmp_path, repo):
+        root, sha = repo
+        stale = tmp_path / "ws3"
+        (stale / "scratch").mkdir(parents=True)
+        instance = Scratch(repo=root, base_sha=sha, root=stale)
+
+        with pytest.raises(Exception):
+            instance.create()
+
+    def test_teardown_removes_stale_dir(self, tmp_path, repo):
+        root, sha = repo
+        stale = tmp_path / "ws4"
+        (stale / "scratch").mkdir(parents=True)
+        instance = Scratch(repo=root, base_sha=sha, root=stale)
+
+        instance.teardown()
+
+        assert not (stale / "scratch").exists()
+
+    def test_diff_binary_includes_content(self, scratch):
+        (scratch.path / "src" / "fixture.bin").write_bytes(b"\x00\x01\x02")
+
+        patch = scratch.diff()
+
+        assert "GIT binary patch" in patch

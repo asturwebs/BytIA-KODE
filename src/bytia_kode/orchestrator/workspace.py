@@ -1,18 +1,24 @@
 """Scratch git-worktree del orquestador (F2/T6).
 
-El worker edita un ``git worktree`` desechable; el repo del usuario nunca se
-toca. R3: sin worktree no hay elegibilidad. R4: teardown también en error.
+El worker edita un ``git worktree`` desechable. R3: sin worktree no hay
+elegibilidad. R4: el context manager garantiza teardown también en error.
 R6: ``git add -A`` antes de checkpoint y diff. R2: el restore de tests deja
-status limpio, incluidos los tests NUEVOS.
+status limpio **contra el SHA base** (no contra HEAD), cubre tests nuevos en
+cualquier ruta y renames, y restaura la sección pytest del ``pyproject.toml``.
 """
 
 from __future__ import annotations
 
+import re
+import shutil
 import subprocess
 from pathlib import Path, PurePosixPath
 
 TEST_DIR_NAMES = {"tests", "test"}
 TEST_FILES = {"conftest.py", "pytest.ini", "tox.ini", "noxfile.py"}
+_PYTEST_SECTION = re.compile(
+    r"(?ms)^\[tool\.pytest\.ini_options\].*?(?=^\[[^\]]+\]|\Z)"
+)
 
 
 class ScratchError(RuntimeError):
@@ -36,6 +42,15 @@ class Scratch:
         self.root = Path(root)
         self.path = self.root / "scratch"
 
+    # -- context manager (R4 estructural) ---------------------------------
+    def __enter__(self) -> "Scratch":
+        self.create()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        self.teardown()
+        return False
+
     # -- git ---------------------------------------------------------------
     def _git(self, *args: str, cwd: Path | None = None, check: bool = True):
         result = subprocess.run(
@@ -48,10 +63,22 @@ class Scratch:
             raise ScratchError(result.stderr.strip() or result.stdout.strip())
         return result
 
+    def _is_worktree(self) -> bool:
+        if not self.path.exists():
+            return False
+        result = self._git(
+            "rev-parse", "--show-toplevel", cwd=self.path, check=False
+        )
+        return result.returncode == 0
+
     # -- ciclo de vida -----------------------------------------------------
     def create(self) -> Path:
         self.root.mkdir(parents=True, exist_ok=True)
         if self.path.exists():
+            if not self._is_worktree():
+                raise ScratchError(
+                    f"directorio rancio no-worktree en {self.path}"
+                )
             return self.path
         self._git(
             "worktree", "add", "--detach", str(self.path), self.base_sha, cwd=self.repo
@@ -59,11 +86,13 @@ class Scratch:
         return self.path
 
     def teardown(self) -> None:
-        if self.path.exists():
+        if self._is_worktree():
             self._git(
                 "worktree", "remove", "--force", str(self.path), cwd=self.repo, check=False
             )
         self._git("worktree", "prune", cwd=self.repo, check=False)
+        if self.path.exists():
+            shutil.rmtree(self.path)
 
     # -- estado ------------------------------------------------------------
     def head(self) -> str:
@@ -85,35 +114,109 @@ class Scratch:
 
     def diff(self) -> str:
         self._git("add", "-A")
-        return self._git("diff", self.base_sha).stdout
+        return self._git("diff", "--binary", self.base_sha).stdout
 
     # -- tests -------------------------------------------------------------
+    def _status_entries(self) -> list[tuple[str, str, str | None]]:
+        """(código, path, origen) de `status --porcelain -z`, renames incluidos."""
+        raw = self._git("status", "--porcelain", "-z").stdout
+        parts = raw.split("\0")
+        entries: list[tuple[str, str, str | None]] = []
+        index = 0
+        while index < len(parts):
+            entry = parts[index]
+            if not entry:
+                index += 1
+                continue
+            code = entry[:2]
+            path = entry[3:]
+            if code.strip().startswith(("R", "C")):
+                source = parts[index + 1] if index + 1 < len(parts) else ""
+                entries.append((code, path, source))
+                index += 2
+            else:
+                entries.append((code, path, None))
+                index += 1
+        return entries
+
+    def _has_test_rename_evasion(self) -> bool:
+        """Test borrado + fichero nuevo no-test = posible rename evasivo (fail-closed)."""
+        entries = self._status_entries()
+        deleted_test = any(
+            "D" in code and is_test_path(path) for code, path, _ in entries
+        )
+        added_other = any(
+            ("A" in code or "?" in code) and not is_test_path(path)
+            for code, path, _ in entries
+        )
+        return deleted_test and added_other
+
+    def _test_specs(self) -> list[str]:
+        specs: set[str] = set()
+        for path in self._git("ls-files").stdout.splitlines():
+            if is_test_path(path):
+                specs.add(path)
+        for path in self.path.rglob("*"):
+            if path.is_file() and ".git" not in path.parts:
+                relative = path.relative_to(self.path).as_posix()
+                if is_test_path(relative):
+                    specs.add(relative)
+        for _code, path, source in self._status_entries():
+            if is_test_path(path) or (source and is_test_path(source)):
+                specs.add(path)
+                if source:
+                    specs.add(source)
+        return sorted(specs)
+
     def test_paths(self) -> list[str]:
         files = self._git("ls-files").stdout.splitlines()
         return [path for path in files if is_test_path(path)]
 
-    def _pathspecs(self) -> list[str]:
-        candidates = ["tests", "test", *sorted(TEST_FILES), *self.test_paths()]
-        specs: list[str] = []
-        for spec in dict.fromkeys(candidates):
-            in_base = bool(
-                self._git(
-                    "ls-tree", "-r", "--name-only", self.base_sha, "--", spec
-                ).stdout.strip()
-            )
-            if in_base or (self.path / spec).exists():
-                specs.append(spec)
-        return specs
-
     def restore_tests(self) -> None:
         """Restaura tests desde el SHA base y deja status limpio (R2)."""
-        specs = self._pathspecs()
-        if not specs:
-            return
+        evasion = self._has_test_rename_evasion()
+        specs = self._test_specs()
         for spec in specs:
             self._git("reset", "-q", self.base_sha, "--", spec, check=False)
             self._git("checkout", "--", spec, check=False)
             self._git("clean", "-fdq", "--", spec, check=False)
-        remaining = self._git("status", "--porcelain", "--", *specs).stdout.strip()
-        if remaining:
-            raise ScratchError(f"status no limpio tras restore: {remaining}")
+        self._restore_pyproject_pytest()
+        if specs:
+            remaining = self._git(
+                "diff", "--name-only", self.base_sha, "--", *specs
+            ).stdout.strip()
+            if remaining:
+                raise ScratchError(f"status no limpio tras restore: {remaining}")
+        if evasion:
+            raise ScratchError(
+                "posible rename de test a fichero no-test con contenido reescrito"
+            )
+
+    def _restore_pyproject_pytest(self) -> None:
+        """Restaura SOLO la sección [tool.pytest.ini_options] (R2.5/H3)."""
+        target = self.path / "pyproject.toml"
+        base = self._git("show", f"{self.base_sha}:pyproject.toml", check=False)
+        if base.returncode != 0:
+            return
+        base_text = base.stdout
+        current_text = target.read_text(encoding="utf-8") if target.exists() else ""
+        base_section = _PYTEST_SECTION.search(base_text)
+        current_section = _PYTEST_SECTION.search(current_text)
+        if base_section:
+            replacement = base_section.group(0)
+            if current_section:
+                new_text = (
+                    current_text[: current_section.start()]
+                    + replacement
+                    + current_text[current_section.end() :]
+                )
+            else:
+                new_text = current_text.rstrip() + "\n\n" + replacement
+        elif current_section:
+            new_text = (
+                current_text[: current_section.start()]
+                + current_text[current_section.end() :]
+            )
+        else:
+            return
+        target.write_text(new_text, encoding="utf-8")
