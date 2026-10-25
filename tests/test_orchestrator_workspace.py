@@ -272,3 +272,22 @@ class TestReviewFixes:
         patch = scratch.diff()
 
         assert "GIT binary patch" in patch
+
+    def test_pycache_is_not_a_test_path(self):
+        assert is_test_path("tests/__pycache__/test_x.cpython-313.pyc") is False
+
+    def test_diff_excludes_pycache(self, scratch):
+        cache = scratch.path / "tests" / "__pycache__"
+        cache.mkdir()
+        (cache / "test_x.cpython-313.pyc").write_bytes(b"\x00\x01")
+
+        patch = scratch.diff()
+
+        assert "__pycache__" not in patch
+
+    def test_touched_test_paths_ignores_pycache(self, scratch):
+        cache = scratch.path / "tests" / "__pycache__"
+        cache.mkdir()
+        (cache / "test_x.cpython-313.pyc").write_bytes(b"\x00\x01")
+
+        assert scratch.touched_test_paths() == []

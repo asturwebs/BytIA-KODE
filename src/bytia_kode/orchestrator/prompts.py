@@ -22,7 +22,7 @@ ROLE_PROMPTS: dict[str, str] = {
     ),
     "ideation": (
         "Eres un ingeniero senior explorando el problema. NO escribas código ni parches: "
-        "solo análisis.\n\n"
+        "solo análisis. No devuelvas un PLAN ni TASKS: eso ya lo hizo el manager.\n\n"
         "Responde EXCLUSIVAMENTE con:\n"
         "### NOTES\n"
         "Dificultad central y 2-3 enfoques genuinamente distintos. No headings dentro de NOTES.\n"

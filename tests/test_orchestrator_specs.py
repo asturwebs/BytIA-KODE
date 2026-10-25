@@ -50,6 +50,10 @@ class TestRolePrompts:
     def test_worker_prompt_forbids_nested_headings(self):
         assert "no headings" in ROLE_PROMPTS["worker"].lower()
 
+    def test_ideation_prompt_forbids_plan(self):
+        # E2E real: qwen38 devolvió un PLAN en la fase de ideación.
+        assert "no devuelvas un plan" in ROLE_PROMPTS["ideation"].lower()
+
     def test_worker_prompt_does_not_ask_for_code_in_text(self):
         prompt = ROLE_PROMPTS["worker"].lower()
         assert "no devuelvas el código" in prompt

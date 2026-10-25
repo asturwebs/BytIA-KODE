@@ -19,6 +19,14 @@ TEST_FILES = {"conftest.py", "pytest.ini", "tox.ini", "noxfile.py"}
 _PYTEST_SECTION = re.compile(
     r"(?ms)^\[tool\.pytest\.ini_options\].*?(?=^\[[^\]]+\]|\Z)"
 )
+# Artefactos que genera pytest/git y NO deben entrar en el patch ni contar
+# como toque de tests (el verify corre pytest dentro del scratch).
+_ARTIFACT_EXCLUDES = (
+    ":(exclude)**/__pycache__/**",
+    ":(exclude)**/*.pyc",
+    ":(exclude)**/*.pyo",
+    ":(exclude).pytest_cache/**",
+)
 
 
 class ScratchError(RuntimeError):
@@ -28,6 +36,8 @@ class ScratchError(RuntimeError):
 def is_test_path(path: str) -> bool:
     """Predicado ÚNICO compartido por detección y restore (R2.4)."""
     parsed = PurePosixPath(path)
+    if "__pycache__" in parsed.parts or parsed.suffix in {".pyc", ".pyo"}:
+        return False
     if parsed.name in TEST_FILES:
         return True
     if parsed.name.startswith("test_") and parsed.suffix == ".py":
@@ -99,7 +109,7 @@ class Scratch:
         return self._git("rev-parse", "HEAD").stdout.strip()
 
     def checkpoint(self, message: str) -> str:
-        self._git("add", "-A")
+        self._git("add", "-A", "--", ".", *_ARTIFACT_EXCLUDES)
         if self._git("status", "--porcelain").stdout.strip():
             self._git(
                 "-c",
@@ -113,8 +123,10 @@ class Scratch:
         return self.head()
 
     def diff(self) -> str:
-        self._git("add", "-A")
-        return self._git("diff", "--binary", self.base_sha).stdout
+        self._git("add", "-A", "--", ".", *_ARTIFACT_EXCLUDES)
+        return self._git(
+            "diff", "--binary", self.base_sha, "--", ".", *_ARTIFACT_EXCLUDES
+        ).stdout
 
     # -- tests -------------------------------------------------------------
     def _status_entries(self) -> list[tuple[str, str, str | None]]:
@@ -173,9 +185,11 @@ class Scratch:
         return [path for path in files if is_test_path(path)]
 
     def touched_test_paths(self) -> list[str]:
-        """Rutas de test presentes en el diff contra el SHA base (R2/C1)."""
-        self._git("add", "-A")
-        changed = self._git("diff", "--name-only", self.base_sha).stdout.splitlines()
+        """Rutas de test en el diff contra el SHA base (R2/C1), sin artefactos."""
+        self._git("add", "-A", "--", ".", *_ARTIFACT_EXCLUDES)
+        changed = self._git(
+            "diff", "--name-only", self.base_sha, "--", ".", *_ARTIFACT_EXCLUDES
+        ).stdout.splitlines()
         return [path for path in changed if is_test_path(path)]
 
     def restore_tests(self) -> None:
