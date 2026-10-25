@@ -143,8 +143,9 @@ Corte limpio en cualquier punto: todo el estado ya está en el ledger; una sesi�
 
 ```
 KODE_ESCALATION_ENABLED=false        # kill-switch global
-KODE_ESCALATION_MANAGER_PROVIDER=primary
+KODE_ESCALATION_MANAGER_PROVIDER=local   # default local; cloud solo opt-in (C2)
 KODE_ESCALATION_WORKER_PROVIDER=local
+KODE_ESCALATION_WORKER_MAX_ITER=12   # techo por worker agéntico (C7)
 KODE_ESCALATION_MAX_ROUNDS=4         # rondas worker→verify→manage
 KODE_ESCALATION_MAX_TASKS=8
 KODE_ESCALATION_MAX_WALLCLOCK_MIN=20
