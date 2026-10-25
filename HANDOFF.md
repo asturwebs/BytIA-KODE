@@ -44,10 +44,10 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 
 ### F2 — integración real (rama `f2-integration`)
 
-- Rama **`f2-integration`** (worktree `~/Projects/lab/kode-f2`), base `5ea530d`. HEAD **`db3e38b`**, **636/636 tests**. **NO en main.**
-- T6 scratch git-worktree (R3/R4/R6/R2, fixes H1-H7 del Engineer) · T7 `verify.py` (baseline, timeout) · T8 worker agéntico + **jail save/restore (R5)** · T9 providers + circuit → infra · T10 `/escalate` en TUI y Telegram · T11 `patch.diff` · T12 M1-M4 del CTO.
-- **E2E real en curso** (router `qwen38-160k`, repo con bug): pendiente de resultado.
-- Pendiente: revisión del Engineer/CTO del bloque F2, resultado e2e, **merge a main = decisión del Socio**. Sin release hasta F2 cerrado.
+- Rama **`f2-integration`** (worktree `~/Projects/lab/kode-f2`), base `5ea530d`. HEAD **`0233c39`**, **641/641 tests**. **NO en main.**
+- T6 scratch git-worktree (R3/R4/R6/R2, fixes H1-H7 del Engineer) · T7 `verify.py` (baseline, timeout) · T8 worker agéntico + **jail save/restore (R5)** · T9 providers + circuit → infra · T10 `/escalate` en TUI y Telegram · T11 `patch.diff` · T12 M1-M4 del CTO · T13 script e2e.
+- **E2E real ✅**: repo con bug (`add` restaba) → **`done`**, 3 rondas, 17.352 tokens, 298,5 s, **patch limpio** (solo `src/calc.py`). Tres fixes salieron del e2e: artefactos `__pycache__`, `PLAN` en ideation y backups del worker (`*.backup-*`).
+- Pendiente: **revisión del Engineer** (AST-43, emitida sobre `db3e38b`; avisado del HEAD `0233c39`), **merge a main = decisión del Socio**. Sin release hasta F2 cerrado.
 
 ## Arquitectura en 30 segundos
 
