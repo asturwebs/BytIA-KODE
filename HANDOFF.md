@@ -38,7 +38,7 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 
 - Rama **`f1-escalation-core`** (worktree `~/Projects/lab/kode-f1`), HEAD **`755e09b`**, **585/585 tests**. `main` intacto en `6937990`.
 - Módulos: `src/bytia_kode/orchestrator/{protocol,ledger,specs,prompts,runner}.py` + `EscalationConfig` en `config.py`.
-- Revisiones: revisor independiente (1 Critical + 10 Important, corregidos) y **Engineer** (`AST-40`: 4 Important + 4 Minor; 3 Important y los 4 Minor en `89c0556`, el retry/fallback en `755e09b`). **CTO pendiente** sobre el código.
+- Revisiones: revisor independiente (1 Critical + 10 Important, corregidos), **Engineer** (`AST-40`: 4 Important + 8 Minor, corregidos) y **CTO APROBADO** (`AST-41`, `f9adb32`, 594/594 en venv virgen, 2026-10-25). Merge autorizado por el Socio.
 - **NO hay comando `/escalate`** (es F2) y el CLI de la máquina corre el venv editable de `main` → F1 no cambia el runtime actual.
 - Secuencia acordada: Engineer → fixes → **CTO** → **tag `pre-f1-merge` en `6937990` + merge `--no-ff`** → F2 (verify real, worktree, Agent async, TUI/Telegram, jail, `patch.diff`). Sin merge ni tag hasta cerrar revisiones. Sin release en PyPI hasta F2.
 

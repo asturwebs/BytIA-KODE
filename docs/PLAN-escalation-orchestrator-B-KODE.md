@@ -351,7 +351,14 @@ Run del 2026-10-25 sobre `qwen38-160k` (Qwen3.8-27B IQ4_XS, ctx 163840), 3 tarea
 ### Gate F1 — estado
 - (a) Números de F0 contra C5: **✅** (tabla arriba).
 - (b) R1-R9 incorporados al doc: **✅** (este anexo + cuerpo sincronizado).
-F1 queda **abierto** a decisión del Socio.
+- **F1 implementado y mergeado** (2026-10-25, rama `f1-escalation-core` @ `f9adb32`, 594 tests; CTO APROBADO en AST-41).
+
+### Requisitos F2 (M1-M4 del CTO, 2026-10-25)
+
+- **M1**: `required_when_continuing` se declara pero no se aplica; un manager `continue` sin NEXT pasa la validación y esquiva el retry correctivo. Aplicar la condición o renombrar el campo.
+- **M2**: el NEXT de `ideation` se exige, se parsea y se descarta. Sembrar `next_task` de la ronda 1 con él o quitarlo de la spec.
+- **M3**: la convención `(done)` no está pactada con el modelo (el prompt dice "marca done" sin formato). Fijar `(done)` en el prompt.
+- **M4**: el catch-all clasifica bugs del propio runner como `infra`; prefijar `bug:` en el detail o clave propia en `record.jsonl` (F5).
 
 ---
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added — escalation-orchestrator core (F1, inerte hasta F2)
+
+Núcleo del modo de orquestación por escalamiento: parser de secciones
+(`orchestrator/protocol.py`), ledger atómico con `record.jsonl`
+(`ledger.py`), specs/prompts por rol (`specs.py`, `prompts.py`), runner con
+presupuestos duros, estados `done|budget|protocol|infra|ineligible` y R7
+(`runner.py`), y claves `KODE_ESCALATION_*` (`EscalationConfig`).
+
+**No hay comando `/escalate`**: F1 es código inerte (nada fuera del paquete
+importa `orchestrator`; kill-switch `KODE_ESCALATION_ENABLED=false` por
+defecto). La integración (verify real, worktree, Agent async, TUI/Telegram,
+jail, `patch.diff`) es F2. 594 tests.
+
 ## [0.8.6] - 2026-10-03
 
 ### Security — 17 alertas Dependabot cerradas (2 críticas, 7 altas, 8 moderadas)
