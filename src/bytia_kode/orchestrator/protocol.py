@@ -11,31 +11,52 @@ from __future__ import annotations
 
 import re
 
-_HEADING_PATTERNS = (
-    re.compile(r"^\s{0,3}#{1,6}\s*([A-Za-z][A-Za-z0-9_]*)\s*$"),
-    re.compile(r"^\s{0,3}\*\*([A-Za-z][A-Za-z0-9_]*)\*\*\s*$"),
-    re.compile(r"^\s{0,3}([A-Za-z][A-Za-z0-9_]*):\s*$"),
+# Solo estas secciones son headings. Cualquier otra línea con forma de
+# heading (un `# comentario` en un fence, `**Importante**`, `Ejemplo:`) es
+# texto de la sección abierta: el worker agéntico escribe prosa y comandos,
+# y tratarlos como secciones abortaba la tarea (revisión F1, C1).
+KNOWN_SECTIONS = frozenset({"PLAN", "TASKS", "NOTES", "NEXT", "STATUS", "CODE"})
+
+_HASH_HEADING = re.compile(
+    r"^\s{0,3}#{1,6}\s*([A-Za-z][A-Za-z0-9_]*)\s*(?::\s*(.*))?$"
 )
+_BOLD_HEADING = re.compile(r"^\s{0,3}\*\*([A-Za-z][A-Za-z0-9_]*)\*\*\s*$")
+_COLON_HEADING = re.compile(r"^\s{0,3}([A-Za-z][A-Za-z0-9_]*):\s*$")
 
 
-def _heading_name(line: str) -> str | None:
-    for pattern in _HEADING_PATTERNS:
-        match = pattern.match(line)
-        if match:
-            return match.group(1).upper()
+def _heading(line: str) -> tuple[str, str] | None:
+    """(SECCIÓN, contenido_inline) si la línea abre una sección conocida."""
+    match = _HASH_HEADING.match(line)
+    if match and match.group(1).upper() in KNOWN_SECTIONS:
+        return match.group(1).upper(), (match.group(2) or "").strip()
+    match = _BOLD_HEADING.match(line)
+    if match and match.group(1).upper() in KNOWN_SECTIONS:
+        return match.group(1).upper(), ""
+    match = _COLON_HEADING.match(line)
+    if match and match.group(1).upper() in KNOWN_SECTIONS:
+        return match.group(1).upper(), ""
     return None
 
 
 def parse_sections(text: str) -> dict[str, str]:
-    """Devuelve {SECCIÓN: contenido} para todas las secciones del texto."""
+    """Devuelve {SECCIÓN: contenido} para las secciones conocidas del texto."""
     collected: dict[str, list[str]] = {}
     current: str | None = None
+    in_fence = False
     for line in text.splitlines():
-        name = _heading_name(line)
-        if name is not None:
-            current = name
-            collected.setdefault(current, [])
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            if current is not None:
+                collected[current].append(line)
             continue
+        if not in_fence:
+            heading = _heading(line)
+            if heading is not None:
+                current, inline = heading
+                collected.setdefault(current, [])
+                if inline:
+                    collected[current].append(inline)
+                continue
         if current is not None:
             collected[current].append(line)
     return {name: "\n".join(lines).strip() for name, lines in collected.items()}

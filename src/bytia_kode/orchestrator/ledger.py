@@ -8,8 +8,10 @@ un fallo a mitad no puede dejar el fichero corrupto ni a medias.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+import tempfile
 from pathlib import Path
 
 _META_FILE = "meta.json"
@@ -26,9 +28,17 @@ class Ledger:
     def write_text(self, name: str, content: str) -> None:
         target = self.root / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        tmp = target.with_name(target.name + ".tmp")
-        tmp.write_text(content, encoding="utf-8")
+        # Nombre temporal único por escritor: dos procesos que escriban el
+        # mismo fichero no comparten el tmp (revisión F1, hallazgo 11).
+        fd, tmp_name = tempfile.mkstemp(
+            dir=target.parent, prefix=target.name + ".", suffix=".tmp"
+        )
+        tmp = Path(tmp_name)
         try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
             os.replace(tmp, target)
         except BaseException:
             tmp.unlink(missing_ok=True)
@@ -44,9 +54,14 @@ class Ledger:
     def append_record(self, entry: dict) -> None:
         line = json.dumps(entry, ensure_ascii=False, sort_keys=True)
         with (self.root / "record.jsonl").open("a", encoding="utf-8") as handle:
-            handle.write(line + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
+            # Lock entre escritores (TUI y Telegram comparten el workspace).
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                handle.write(line + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def record_entries(self) -> list[dict]:
         target = self.root / "record.jsonl"
@@ -55,8 +70,13 @@ class Ledger:
         entries: list[dict] = []
         for line in target.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
-            if stripped:
+            if not stripped:
+                continue
+            try:
                 entries.append(json.loads(stripped))
+            except json.JSONDecodeError:
+                # Línea truncada por un corte a mitad de append: se ignora.
+                continue
         return entries
 
     # -- lista de tareas ---------------------------------------------------
@@ -65,7 +85,13 @@ class Ledger:
 
     def read_tasks(self) -> list[dict]:
         raw = self.read_text("tasks.json")
-        return json.loads(raw) if raw.strip() else []
+        if not raw.strip():
+            return []
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        return data if isinstance(data, list) else []
 
     # -- SHA base ----------------------------------------------------------
     def set_base_sha(self, sha: str) -> None:
@@ -78,4 +104,10 @@ class Ledger:
 
     def _read_meta(self) -> dict:
         raw = self.read_text(_META_FILE)
-        return json.loads(raw) if raw.strip() else {}
+        if not raw.strip():
+            return {}
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return data if isinstance(data, dict) else {}

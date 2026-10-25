@@ -67,3 +67,19 @@ class TestEscalationEnvOverrides:
     def test_manager_override_is_explicit(self, isolated_config, monkeypatch):
         monkeypatch.setenv("KODE_ESCALATION_MANAGER_PROVIDER", "unsloth")
         assert isolated_config().escalation.manager_provider == "unsloth"
+
+
+def test_runner_config_bridges_escalation_config():
+    from bytia_kode.config import EscalationConfig
+    from bytia_kode.orchestrator.runner import RunnerConfig
+
+    escalation = EscalationConfig(
+        max_rounds=2, max_tasks=3, max_tokens=1000, max_wallclock_min=1
+    )
+
+    config = RunnerConfig.from_escalation(escalation)
+
+    assert config.max_rounds == 2
+    assert config.max_tasks == 3
+    assert config.max_tokens == 1000
+    assert config.max_wallclock_s == 60

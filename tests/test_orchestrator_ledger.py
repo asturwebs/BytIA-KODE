@@ -98,6 +98,56 @@ class TestTasks:
         assert make_ledger(tmp_path).read_tasks() == []
 
 
+class TestCorruptionTolerance:
+    def test_record_entries_skips_corrupt_line(self, tmp_path):
+        led = make_ledger(tmp_path)
+        led.append_record({"a": 1})
+        with (led.root / "record.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write('{"truncada": \n')
+        led.append_record({"b": 2})
+
+        entries = led.record_entries()
+
+        assert entries == [{"a": 1}, {"b": 2}]
+
+    def test_read_tasks_tolerates_invalid_json(self, tmp_path):
+        led = make_ledger(tmp_path)
+        (led.root / "tasks.json").write_text("{no json", encoding="utf-8")
+        assert led.read_tasks() == []
+
+    def test_read_tasks_rejects_non_list(self, tmp_path):
+        led = make_ledger(tmp_path)
+        (led.root / "tasks.json").write_text('{"a": 1}', encoding="utf-8")
+        assert led.read_tasks() == []
+
+    def test_get_base_sha_tolerates_invalid_meta(self, tmp_path):
+        led = make_ledger(tmp_path)
+        (led.root / "meta.json").write_text("{no json", encoding="utf-8")
+        assert led.get_base_sha() is None
+
+    def test_concurrent_writes_do_not_share_tmp(self, tmp_path):
+        led = make_ledger(tmp_path)
+        errors = []
+
+        def writer(name):
+            try:
+                for _ in range(20):
+                    led.write_text("notes.md", name)
+            except Exception as exc:  # noqa: BLE001 - el test reporta cualquier fallo
+                errors.append(exc)
+
+        import threading
+
+        threads = [threading.Thread(target=writer, args=(n,)) for n in ("a", "b")]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert errors == []
+        assert led.read_text("notes.md") in {"a", "b"}
+
+
 class TestBaseSha:
     def test_base_sha_roundtrip(self, tmp_path):
         led = make_ledger(tmp_path)

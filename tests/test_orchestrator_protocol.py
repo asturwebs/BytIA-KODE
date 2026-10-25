@@ -49,12 +49,50 @@ class TestParseSections:
     def test_text_without_sections_returns_empty(self):
         assert parse_sections("no hay secciones aqui") == {}
 
-    def test_unknown_section_is_kept_for_validation(self):
+    def test_unknown_hash_heading_is_treated_as_text(self):
         text = "### NOTES\na\n### RANDOM\nz\n### NEXT\nb\n### STATUS\ncontinue\n"
 
         parsed = parse_sections(text)
 
-        assert parsed["RANDOM"] == "z"
+        assert "RANDOM" not in parsed
+        assert "z" in parsed["NOTES"]
+
+    def test_hash_comment_inside_fence_is_not_a_heading(self):
+        text = (
+            "### NOTES\n"
+            "Verificado con:\n"
+            "```bash\n"
+            "# verificar\n"
+            "pytest -q\n"
+            "```\n"
+            "### NEXT\nb\n### STATUS\ncontinue\n"
+        )
+
+        parsed = parse_sections(text)
+
+        assert "VERIFICAR" not in parsed
+        assert "# verificar" in parsed["NOTES"]
+
+    def test_bold_text_is_not_a_heading(self):
+        text = "### NOTES\n**Importante**\ncontenido\n### NEXT\nb\n### STATUS\ncontinue\n"
+
+        parsed = parse_sections(text)
+
+        assert "IMPORTANTE" not in parsed
+        assert "**Importante**" in parsed["NOTES"]
+
+    def test_colon_line_is_not_a_heading(self):
+        text = "### NOTES\nEjemplo:\ncontenido\n### NEXT\nb\n### STATUS\ncontinue\n"
+
+        parsed = parse_sections(text)
+
+        assert "EJEMPLO" not in parsed
+        assert "Ejemplo:" in parsed["NOTES"]
+
+    def test_inline_status_value_is_parsed(self):
+        parsed = parse_sections("### NOTES\na\n### NEXT\nb\n### STATUS: solved\n")
+
+        assert parsed["STATUS"] == "solved"
 
 
 class TestValidateSections:
@@ -105,9 +143,8 @@ class TestValidateSections:
 
         assert "invalid STATUS: donee" in errors
 
-    def test_unexpected_section_reported(self):
-        text = "### NOTES\nalgo\n### Detalle\nmas\n### NEXT\nb\n### STATUS\ncontinue\n"
-        parsed = parse_sections(text)
+    def test_section_from_another_role_is_unexpected(self):
+        parsed = {"NOTES": "a", "NEXT": "b", "STATUS": "continue", "PLAN": "colado"}
 
         errors = validate_sections(
             parsed,
@@ -116,4 +153,4 @@ class TestValidateSections:
             allowed_status=("continue", "solved"),
         )
 
-        assert "unexpected section: DETALLE" in errors
+        assert "unexpected section: PLAN" in errors

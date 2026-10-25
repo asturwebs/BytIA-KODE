@@ -51,6 +51,9 @@ def make_runner(
     clock=None,
     reply_tokens=10,
     tamper_check=None,
+    restore_tests=None,
+    preflight=None,
+    base_sha=None,
 ):
     ledger = Ledger(tmp_path / "ws")
     provider = FakeProvider(texts, reply_tokens=reply_tokens)
@@ -62,6 +65,9 @@ def make_runner(
         config=config or RunnerConfig(),
         clock=clock or (lambda: 0.0),
         tamper_check=tamper_check,
+        restore_tests=restore_tests,
+        preflight=preflight,
+        base_sha=base_sha,
     )
     return runner, ledger, provider
 
@@ -91,8 +97,7 @@ class TestHappyPath:
         runner.run("problema")
 
         entries = ledger.record_entries()
-        assert [e["role"] for e in entries] == provider.roles
-        assert len(entries) == 4
+        assert [e["role"] for e in entries if e["role"] != "result"] == provider.roles
 
 
 class TestBudgets:
@@ -134,7 +139,7 @@ class TestBudgets:
         result = runner.run("problema")
 
         assert result.status == "budget"
-        assert result.rounds == 1
+        assert result.rounds == 0
 
 
 class TestTamperAndInvariants:
@@ -205,3 +210,179 @@ class TestTamperAndInvariants:
 
         assert result.status == "protocol"
         assert "missing: NOTES" in result.detail
+
+
+class TestReviewFixes:
+    def test_status_with_trailing_text_is_done(self, tmp_path):
+        manage = "### STATUS\ndone — suite verde\n### TASKS\n- implementar (done)\n"
+        runner, _, _ = make_runner(tmp_path, [PLAN, IDEATION, WORKER, manage])
+
+        result = runner.run("problema")
+
+        assert result.status == "done"
+
+    def test_budget_checked_before_every_call(self, tmp_path):
+        runner, _, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, WORKER, MANAGE_DONE],
+            config=RunnerConfig(max_tokens=25),
+            reply_tokens=10,
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "budget"
+        assert result.tokens <= 30
+
+    def test_max_tasks_truncates_plan(self, tmp_path):
+        plan = "### PLAN\nx\n### TASKS\n" + "\n".join(f"- t{i}" for i in range(10)) + "\n"
+        manage = (
+            "### STATUS\ndone\n### TASKS\n"
+            + "\n".join(f"- t{i}" for i in range(10))
+            + "\n"
+        )
+        runner, ledger, _ = make_runner(
+            tmp_path,
+            [plan, IDEATION, WORKER, manage],
+            config=RunnerConfig(max_tasks=3),
+        )
+
+        runner.run("problema")
+
+        assert len(ledger.read_tasks()) == 3
+
+    def test_provider_error_returns_infra(self, tmp_path):
+        def provider(role, prompt):
+            raise TimeoutError("boom")
+
+        runner = Runner(
+            ledger=Ledger(tmp_path / "ws"),
+            spec=CODE_REPO,
+            provider=provider,
+            verifier=lambda: Verdict(ok=True),
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "infra"
+        assert "boom" in result.detail
+
+    def test_preflight_ineligible_stops_before_plan(self, tmp_path):
+        runner, _, provider = make_runner(tmp_path, [], preflight=lambda: "test-targeted")
+
+        result = runner.run("problema")
+
+        assert result.status == "ineligible"
+        assert "test-targeted" in result.detail
+        assert provider.roles == []
+
+    def test_problem_md_and_base_sha_are_written(self, tmp_path):
+        runner, ledger, _ = make_runner(
+            tmp_path, [PLAN, IDEATION, WORKER, MANAGE_DONE], base_sha="abc123"
+        )
+
+        runner.run("problema")
+
+        assert "problema" in ledger.read_text("problem.md")
+        assert ledger.get_base_sha() == "abc123"
+
+    def test_result_is_recorded(self, tmp_path):
+        runner, ledger, _ = make_runner(tmp_path, [PLAN, IDEATION, WORKER, MANAGE_DONE])
+
+        runner.run("problema")
+
+        assert ledger.record_entries()[-1]["role"] == "result"
+
+    def test_tamper_check_none_counts_as_tamper(self, tmp_path):
+        tamper = iter([None, None])
+        runner, _, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, WORKER, WORKER],
+            tamper_check=lambda: next(tamper, False),
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "protocol"
+        assert "test-tamper" in result.detail
+
+    def test_missing_tamper_check_is_reported(self, tmp_path):
+        runner, _, _ = make_runner(tmp_path, [PLAN, IDEATION, WORKER, MANAGE_DONE])
+
+        result = runner.run("problema")
+
+        assert result.tamper_checked is False
+
+    def test_restore_tests_called_on_tamper(self, tmp_path):
+        calls = []
+        tamper = iter([True, False])
+        runner, _, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, WORKER, WORKER, MANAGE_DONE],
+            tamper_check=lambda: next(tamper, False),
+            restore_tests=lambda: calls.append(1),
+        )
+
+        runner.run("problema")
+
+        assert calls == [1]
+
+    def test_tampered_notes_are_not_persisted(self, tmp_path):
+        fake_notes = "### NOTES\nFALSO\n### NEXT\nnada\n### STATUS\nsolved\n"
+        tamper = iter([True, False])
+        runner, ledger, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, fake_notes, WORKER, MANAGE_DONE],
+            tamper_check=lambda: next(tamper, False),
+        )
+
+        runner.run("problema")
+
+        assert "FALSO" not in ledger.read_text("notes.md")
+
+    def test_manager_next_drives_the_next_worker(self, tmp_path):
+        manage_next = "### STATUS\ncontinue\n### NEXT\nB: tests\n### TASKS\n- A\n"
+        runner, _, provider = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, WORKER, manage_next, WORKER, MANAGE_DONE],
+            config=RunnerConfig(max_rounds=2),
+        )
+
+        runner.run("problema")
+
+        assert "B: tests" in provider.prompts[4]
+
+    def test_worker_status_reaches_manager_prompt(self, tmp_path):
+        runner, _, provider = make_runner(tmp_path, [PLAN, IDEATION, WORKER, MANAGE_DONE])
+
+        runner.run("problema")
+
+        assert "solved" in provider.prompts[3]
+
+    def test_plan_without_bullets_is_protocol_error(self, tmp_path):
+        plan = "### PLAN\nx\n### TASKS\nSin tareas concretas.\n"
+        runner, _, _ = make_runner(tmp_path, [plan, IDEATION, WORKER, MANAGE_DONE])
+
+        result = runner.run("problema")
+
+        assert result.status == "protocol"
+        assert "no tasks" in result.detail
+
+    def test_section_from_another_role_is_protocol_error(self, tmp_path):
+        worker = "### NOTES\na\n### NEXT\nb\n### STATUS\nsolved\n### PLAN\ncolado\n"
+        runner, _, _ = make_runner(tmp_path, [PLAN, IDEATION, worker, MANAGE_DONE])
+
+        result = runner.run("problema")
+
+        assert result.status == "protocol"
+        assert "unexpected section: PLAN" in result.detail
+
+    def test_numbered_task_lines_are_parsed(self):
+        from bytia_kode.orchestrator.runner import parse_task_lines
+
+        assert parse_task_lines("1. uno\n2. dos\n") == ["uno", "dos"]
+
+    def test_task_lines_inside_fence_are_ignored(self):
+        from bytia_kode.orchestrator.runner import parse_task_lines
+
+        assert parse_task_lines("```\n- ejemplo\n```\n- real\n") == ["real"]
