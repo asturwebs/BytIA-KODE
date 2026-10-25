@@ -31,7 +31,8 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 - **Plan**: `docs/PLAN-escalation-orchestrator-B-KODE.md` (commit `9850bc9`) — orquestación por escalamiento inspirada en GVS5H, adaptada a KODE. Incluye **Anexo C** (revisión adversarial: C1 integridad de tests, C2 privacidad manager cloud, C3 worker agéntico, C4 baseline+checkpoints, C5 F0/F5, C6 conformidad de protocolo), **C7** (orden detección→restore→verify→checkpoint, `WORKER_MAX_ITER=12`) y **C8** (tareas test-targeted no elegibles).
 - **Decisiones cerradas**: worker agéntico con tools (opción B, `### CODE` fuera); manager `local` por defecto, cloud solo opt-in; F5 pareado (McNemar/bootstrap) con coste ≤3×; verificación real con tests restaurados desde el SHA base.
 - **Seguridad (mismo día)**: `e6843cc` aiohttp 3.14.5 + certifi 2026.10.23 (9 alertas Dependabot resueltas por versión, pendiente re-escaneo de GitHub) + `.github/dependabot.yml`; `3e4a169` el escáner de secretos ya no marca nombres `KODE_*` de configuración (con control negativo en tests).
-- **Pendiente**: F0 spike (adaptar GVS5H al router :8080 con `qwen38-160k`: conformidad ≥90%, ciclo <15 min, <30k tokens/tarea) · re-escaneo Dependabot · decisión del Socio sobre cloud en repos de cliente · entrega del plan a Paperclip.
+- **F0 completado (2026-10-25)**: 3/3 tareas, **100% conformidad**, peor ciclo **8,20 min**, peor **16.505 tokens** → **Go**. VRAM 21,7/24,5 GB (workers secuenciales confirmados). Anexo D: R1-R9 del CTO incorporadas y cuerpo sincronizado. **Gate F1: (a) números F0 ✅, (b) R1-R9 ✅** — abierto a decisión del Socio.
+- **Pendiente**: re-escaneo Dependabot · Paperclip **AST-39** (`in_review`, CTO) · decisión F1.
 
 ## Arquitectura en 30 segundos
 
