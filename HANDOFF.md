@@ -42,6 +42,13 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 - **NO hay comando `/escalate`** (es F2) y el CLI de la máquina corre el venv editable de `main` → F1 no cambia el runtime actual.
 - Secuencia: Engineer → fixes → CTO → tag + merge **hechos**. Siguiente: **F2** (verify real, worktree, Agent async, TUI/Telegram, jail, `patch.diff`) con los requisitos **M1-M4** del CTO (Anexo D). Sin release en PyPI hasta F2.
 
+### F2 — integración real (rama `f2-integration`)
+
+- Rama **`f2-integration`** (worktree `~/Projects/lab/kode-f2`), base `5ea530d`. HEAD **`db3e38b`**, **636/636 tests**. **NO en main.**
+- T6 scratch git-worktree (R3/R4/R6/R2, fixes H1-H7 del Engineer) · T7 `verify.py` (baseline, timeout) · T8 worker agéntico + **jail save/restore (R5)** · T9 providers + circuit → infra · T10 `/escalate` en TUI y Telegram · T11 `patch.diff` · T12 M1-M4 del CTO.
+- **E2E real en curso** (router `qwen38-160k`, repo con bug): pendiente de resultado.
+- Pendiente: revisión del Engineer/CTO del bloque F2, resultado e2e, **merge a main = decisión del Socio**. Sin release hasta F2 cerrado.
+
 ## Arquitectura en 30 segundos
 
 ```
