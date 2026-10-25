@@ -215,6 +215,9 @@ class EscalationConfig:
     auto_after_iter: int = field(
         default_factory=lambda: int(_env("KODE_ESCALATION_AUTO_AFTER_ITER", "6"))
     )
+    protocol_retries: int = field(
+        default_factory=lambda: int(_env("KODE_ESCALATION_PROTOCOL_RETRIES", "1"))
+    )
 
 
 @dataclass

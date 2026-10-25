@@ -434,3 +434,126 @@ class TestReviewFixes:
         from bytia_kode.orchestrator.runner import parse_task_lines
 
         assert parse_task_lines("```\n- ejemplo\n```\n- real\n") == ["real"]
+
+
+class TestRound2Fixes:
+    def test_verifier_exception_returns_infra(self, tmp_path):
+        def verifier():
+            raise TimeoutError("pytest timeout")
+
+        runner, _, _ = make_runner(
+            tmp_path, [PLAN, IDEATION, WORKER, MANAGE_DONE], verifier=verifier
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "infra"
+        assert "pytest timeout" in result.detail
+
+    def test_preflight_exception_returns_infra(self, tmp_path):
+        def preflight():
+            raise OSError("sin repo")
+
+        runner, _, _ = make_runner(tmp_path, [], preflight=preflight)
+
+        result = runner.run("problema")
+
+        assert result.status == "infra"
+        assert "sin repo" in result.detail
+
+    def test_restore_exception_returns_infra(self, tmp_path):
+        tamper = iter([True, False])
+
+        def restore():
+            raise OSError("git roto")
+
+        runner, _, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, WORKER, WORKER, MANAGE_DONE],
+            tamper_check=lambda: next(tamper, False),
+            restore_tests=restore,
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "infra"
+        assert "git roto" in result.detail
+
+    def test_result_tokens_include_aborted_calls(self, tmp_path):
+        runner, _, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, "malo uno", "malo dos"],
+            config=RunnerConfig(protocol_retries=1),
+            reply_tokens=10,
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "protocol"
+        assert result.tokens == 40
+
+    def test_protocol_retries_from_config(self, monkeypatch):
+        from bytia_kode.config import EscalationConfig
+        from bytia_kode.orchestrator.runner import RunnerConfig
+
+        monkeypatch.setenv("KODE_ESCALATION_PROTOCOL_RETRIES", "3")
+
+        escalation = EscalationConfig()
+
+        assert escalation.protocol_retries == 3
+        assert RunnerConfig.from_escalation(escalation).protocol_retries == 3
+
+    def test_tamper_check_error_is_recorded(self, tmp_path):
+        def tamper_check():
+            raise OSError("diff roto")
+
+        runner, ledger, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, WORKER, WORKER],
+            tamper_check=tamper_check,
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "protocol"
+        tamper_entries = [e for e in ledger.record_entries() if e["role"] == "tamper"]
+        assert tamper_entries and "diff roto" in tamper_entries[0]["error"]
+
+    def test_done_tasks_are_skipped_without_next(self, tmp_path):
+        manage = "### STATUS\ncontinue\n### TASKS\n- A (done)\n- B\n"
+        runner, _, provider = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, WORKER, manage, WORKER, MANAGE_DONE],
+            config=RunnerConfig(max_rounds=2),
+        )
+
+        runner.run("problema")
+
+        assert "B" in provider.prompts[4]
+        assert "A (done)" not in provider.prompts[4]
+
+    def test_next_multiline_uses_first_line(self, tmp_path):
+        manage = "### STATUS\ncontinue\n### NEXT\nB: tests\nmas detalle\n### TASKS\n- A\n"
+        runner, _, provider = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, WORKER, manage, WORKER, MANAGE_DONE],
+            config=RunnerConfig(max_rounds=2),
+        )
+
+        runner.run("problema")
+
+        assert "B: tests" in provider.prompts[4]
+        assert "mas detalle" not in provider.prompts[4]
+
+    def test_max_tasks_truncation_is_recorded(self, tmp_path):
+        plan = "### PLAN\nx\n### TASKS\n" + "\n".join(f"- t{i}" for i in range(10)) + "\n"
+        runner, ledger, _ = make_runner(
+            tmp_path,
+            [plan, IDEATION, WORKER, MANAGE_DONE],
+            config=RunnerConfig(max_tasks=3),
+        )
+
+        runner.run("problema")
+
+        entries = [e for e in ledger.record_entries() if e["role"] == "config"]
+        assert entries and entries[0]["truncated_tasks"] == 7

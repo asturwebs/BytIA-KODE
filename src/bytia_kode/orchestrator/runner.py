@@ -45,6 +45,7 @@ class RunnerConfig:
             max_tasks=escalation.max_tasks,
             max_tokens=escalation.max_tokens,
             max_wallclock_s=escalation.max_wallclock_min * 60,
+            protocol_retries=escalation.protocol_retries,
         )
 
 
@@ -62,11 +63,15 @@ class _BudgetExceeded(Exception):
 
 
 class _ProviderError(Exception):
-    pass
+    def __init__(self, detail: str, tokens: int):
+        super().__init__(detail)
+        self.tokens = tokens
 
 
 class _ProtocolError(Exception):
-    pass
+    def __init__(self, detail: str, tokens: int):
+        super().__init__(detail)
+        self.tokens = tokens
 
 
 def parse_task_lines(text: str) -> list[str]:
@@ -139,7 +144,7 @@ class Runner:
             self.ledger.append_record(
                 {"role": role, "round": round_no, "error": str(exc)}
             )
-            raise _ProviderError(str(exc)) from exc
+            raise _ProviderError(str(exc), tokens) from exc
         self.ledger.append_record(
             {"role": role, "round": round_no, "tokens": reply.tokens}
         )
@@ -168,12 +173,37 @@ class Runner:
             if not errors:
                 return parsed, tokens
             if attempt >= self.config.protocol_retries:
-                raise _ProtocolError("; ".join(errors))
+                raise _ProtocolError("; ".join(errors), tokens)
             attempt += 1
             current_prompt = (
                 f"{prompt}\n\nTu respuesta anterior no cumplió el protocolo "
                 f"({'; '.join(errors)}). Responde de nuevo SOLO con las secciones requeridas."
             )
+
+    @staticmethod
+    def _first_pending(tasks: list[str]) -> str | None:
+        for task in tasks:
+            if "(done)" not in task.lower():
+                return task
+        return tasks[0] if tasks else None
+
+    @staticmethod
+    def _next_line(parsed: dict[str, str]) -> str | None:
+        for line in parsed.get("NEXT", "").splitlines():
+            if line.strip():
+                return line.strip()
+        return None
+
+    def _truncate(self, tasks: list[str], round_no: int = 0) -> list[str]:
+        if len(tasks) > self.config.max_tasks:
+            self.ledger.append_record(
+                {
+                    "role": "config",
+                    "round": round_no,
+                    "truncated_tasks": len(tasks) - self.config.max_tasks,
+                }
+            )
+        return tasks[: self.config.max_tasks]
 
     # -- prompts -----------------------------------------------------------
     def _plan_prompt(self, task_text: str) -> str:
@@ -223,22 +253,22 @@ class Runner:
             result.tamper_checked = self.tamper_check is not None
             return result
 
-        if self.preflight is not None:
-            reason = self.preflight()
-            if reason:
-                return finish(RunResult("ineligible", detail=str(reason)))
-
-        self.ledger.write_text("problem.md", task_text)
-        if self.base_sha:
-            self.ledger.set_base_sha(self.base_sha)
-
         try:
+            if self.preflight is not None:
+                reason = self.preflight()
+                if reason:
+                    return finish(RunResult("ineligible", detail=str(reason)))
+
+            self.ledger.write_text("problem.md", task_text)
+            if self.base_sha:
+                self.ledger.set_base_sha(self.base_sha)
+
             parsed, tokens = self._request(
                 "primary_plan", self._plan_prompt(task_text), tokens, start
             )
             plan = parsed["PLAN"]
             self.ledger.write_text("plan.md", plan)
-            tasks = parse_task_lines(parsed["TASKS"])[: self.config.max_tasks]
+            tasks = self._truncate(parse_task_lines(parsed["TASKS"]))
             if not tasks:
                 return finish(
                     RunResult("protocol", tokens=tokens, detail="no tasks")
@@ -260,7 +290,7 @@ class Runner:
                             "budget", rounds=rounds, tokens=tokens, detail="no tasks"
                         )
                     )
-                task = next_task or tasks[0]
+                task = next_task or self._first_pending(tasks)
                 next_task = None
 
                 parsed, tokens = self._request(
@@ -275,7 +305,10 @@ class Runner:
                 if self.tamper_check is not None:
                     try:
                         verdict_tamper = self.tamper_check()
-                    except Exception:  # noqa: BLE001 - no determinable => fail-closed
+                    except Exception as exc:  # noqa: BLE001 - fail-closed
+                        self.ledger.append_record(
+                            {"role": "tamper", "round": round_no, "error": str(exc)}
+                        )
                         verdict_tamper = None
                     tampered = verdict_tamper is not False
                 if tampered:
@@ -309,9 +342,9 @@ class Runner:
                     round_no,
                 )
                 tasks = (
-                    parse_task_lines(parsed_manage.get("TASKS", ""))[
-                        : self.config.max_tasks
-                    ]
+                    self._truncate(
+                        parse_task_lines(parsed_manage.get("TASKS", "")), round_no
+                    )
                     or tasks
                 )
                 self.ledger.write_tasks(tasks)
@@ -320,16 +353,25 @@ class Runner:
                     status = "continue"
                 if status == "done":
                     return finish(RunResult("done", rounds=rounds, tokens=tokens))
-                next_task = parsed_manage.get("NEXT", "").strip() or None
+                next_task = self._next_line(parsed_manage)
 
             return finish(RunResult("budget", rounds=rounds, tokens=tokens))
         except _BudgetExceeded:
             return finish(RunResult("budget", rounds=rounds, tokens=tokens))
         except _ProtocolError as exc:
             return finish(
-                RunResult("protocol", rounds=rounds, tokens=tokens, detail=str(exc))
+                RunResult("protocol", rounds=rounds, tokens=exc.tokens, detail=str(exc))
             )
         except _ProviderError as exc:
             return finish(
-                RunResult("infra", rounds=rounds, tokens=tokens, detail=str(exc))
+                RunResult("infra", rounds=rounds, tokens=exc.tokens, detail=str(exc))
+            )
+        except Exception as exc:  # noqa: BLE001 - seams y bugs nunca desnudos
+            return finish(
+                RunResult(
+                    "infra",
+                    rounds=rounds,
+                    tokens=tokens,
+                    detail=f"{type(exc).__name__}: {exc}",
+                )
             )
