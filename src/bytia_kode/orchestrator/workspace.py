@@ -172,6 +172,12 @@ class Scratch:
         files = self._git("ls-files").stdout.splitlines()
         return [path for path in files if is_test_path(path)]
 
+    def touched_test_paths(self) -> list[str]:
+        """Rutas de test presentes en el diff contra el SHA base (R2/C1)."""
+        self._git("add", "-A")
+        changed = self._git("diff", "--name-only", self.base_sha).stdout.splitlines()
+        return [path for path in changed if is_test_path(path)]
+
     def restore_tests(self) -> None:
         """Restaura tests desde el SHA base y deja status limpio (R2)."""
         evasion = self._has_test_rename_evasion()
