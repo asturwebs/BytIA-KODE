@@ -53,13 +53,16 @@ def parse_task_lines(text: str) -> list[str]:
 
 
 class Runner:
-    def __init__(self, *, ledger, spec, provider, verifier, config=None, clock=None):
+    def __init__(
+        self, *, ledger, spec, provider, verifier, config=None, clock=None, tamper_check=None
+    ):
         self.ledger = ledger
         self.spec = spec
         self.provider = provider
         self.verifier = verifier
         self.config = config or RunnerConfig()
         self.clock = clock or time.monotonic
+        self.tamper_check = tamper_check or (lambda: False)
 
     # -- llamadas ----------------------------------------------------------
     def _call(self, role: str, prompt: str, tokens: int) -> tuple[Reply, int]:
@@ -70,9 +73,6 @@ class Runner:
     def _validate(self, role: str, parsed: dict[str, str]) -> list[str]:
         role_spec = self.spec.roles[role]
         required = list(role_spec.required)
-        status = parsed.get("STATUS", "").strip().lower()
-        if status and status != "done":
-            required += role_spec.required_when_continuing
         allowed: set[str] = set()
         for spec in self.spec.roles.values():
             allowed.update(spec.required)
@@ -129,6 +129,7 @@ class Runner:
         notes = parsed["NOTES"]
         self.ledger.write_text("notes.md", notes)
 
+        invalid_streak = 0
         for round_no in range(1, self.config.max_rounds + 1):
             rounds = round_no
             if tokens >= self.config.max_tokens:
@@ -151,6 +152,16 @@ class Runner:
             notes = parsed["NOTES"]
             self.ledger.write_text("notes.md", notes)
 
+            if self.tamper_check():
+                invalid_streak += 1
+                self.ledger.append_record({"role": "tamper", "round": round_no})
+                if invalid_streak >= 2:
+                    return RunResult(
+                        "protocol", rounds=rounds, tokens=tokens, detail="test-tamper"
+                    )
+                continue
+            invalid_streak = 0
+
             verdict = self.verifier()
             reply, tokens = self._call(
                 "primary_manage", self._manage_prompt(notes, tasks, verdict), tokens
@@ -163,7 +174,10 @@ class Runner:
                 )
             tasks = parse_task_lines(parsed.get("TASKS", "")) or tasks
             self.ledger.write_tasks(tasks)
-            if parsed["STATUS"].strip().lower() == "done":
+            status = parsed["STATUS"].strip().lower()
+            if status == "done" and not verdict.ok:
+                status = "continue"
+            if status == "done":
                 return RunResult("done", rounds=rounds, tokens=tokens)
 
         return RunResult("budget", rounds=rounds, tokens=tokens)
