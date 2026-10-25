@@ -291,3 +291,11 @@ class TestReviewFixes:
         (cache / "test_x.cpython-313.pyc").write_bytes(b"\x00\x01")
 
         assert scratch.touched_test_paths() == []
+
+    def test_diff_excludes_worker_backups(self, scratch):
+        # E2E real: el worker (Agent de KODE) creó calc.py.backup-*.
+        (scratch.path / "src" / "calc.py.backup-20261025").write_text(
+            "viejo\n", encoding="utf-8"
+        )
+
+        assert ".backup-" not in scratch.diff()

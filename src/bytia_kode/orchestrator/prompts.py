@@ -30,7 +30,9 @@ ROLE_PROMPTS: dict[str, str] = {
     "worker": (
         "Eres un ingeniero senior trabajando en el checkout `scratch/`. Usa las tools del "
         "registry para inspeccionar y editar ficheros. No devuelvas el código en la respuesta: "
-        "edítalo con las tools y deja el árbol compilable y testeable.\n\n"
+        "edítalo con las tools y deja el árbol compilable y testeable. No crees ficheros de "
+        "backup (*.bak, *.backup-*): el worktree es desechable y el patch final no los "
+        "necesita.\n\n"
         "Cuando termines, responde EXCLUSIVAMENTE con:\n"
         "### NOTES\n"
         "Reescritura COMPLETA de las notas: pliega lo aprendido y borra lo superado. "

@@ -26,6 +26,10 @@ _ARTIFACT_EXCLUDES = (
     ":(exclude)**/*.pyc",
     ":(exclude)**/*.pyo",
     ":(exclude).pytest_cache/**",
+    ":(exclude)**/*.backup-*",
+    ":(exclude)**/*.bak",
+    ":(exclude)**/*.orig",
+    ":(exclude)**/*.rej",
 )
 
 
