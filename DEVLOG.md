@@ -26,6 +26,7 @@ Registro diario de sesiones de desarrollo. Cada día tiene su propio archivo en 
 | 2026-04-30 | S38: Session Metadata Persistence + v0.7.7 Closure | [`2026-04-30.md`](docs/devlog/2026-04-30.md) |
 | 2026-05-24 | S39: MCP Client Support (v0.8.0a1 WIP) | [`Session-39-MCP-Client.md`](docs/devlog/Session-39-MCP-Client.md) |
 | 2026-09-16 | Hotfix providers: failover vivo (2 HIGH de OpenCodeReview + re-review) | [`2026-09-16.md`](docs/devlog/2026-09-16.md) |
+| 2026-10-25 | S40: PLAN escalation-orchestrator (GVS5H) | [`2026-10-25.md`](docs/devlog/2026-10-25.md) |
 
 > **Nota:** las sesiones del **2026-09-21** (guardarraíl JEVAL, modo shadow, TTS local `bytia-tts`, botón de audio) y las de la **revisión AST (2026-09-25 → 2026-09-27)** no tienen entrada propia en `docs/devlog/`: quedan documentadas en los informes de `reports/` de esta revisión.
 
