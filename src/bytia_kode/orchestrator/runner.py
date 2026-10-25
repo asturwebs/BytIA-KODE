@@ -35,6 +35,7 @@ class RunnerConfig:
     max_tasks: int = 8
     max_tokens: int = 200_000
     max_wallclock_s: float = 20 * 60
+    protocol_retries: int = 1
 
     @classmethod
     def from_escalation(cls, escalation) -> "RunnerConfig":
@@ -61,6 +62,10 @@ class _BudgetExceeded(Exception):
 
 
 class _ProviderError(Exception):
+    pass
+
+
+class _ProtocolError(Exception):
     pass
 
 
@@ -150,6 +155,26 @@ class Runner:
             allowed_status=role_spec.allowed_status,
         )
 
+    def _request(
+        self, role: str, prompt: str, tokens: int, start: float, round_no: int = 0
+    ) -> tuple[dict[str, str], int]:
+        """Llamada con validación y reintento correctivo (C6: parser tolerante)."""
+        attempt = 0
+        current_prompt = prompt
+        while True:
+            reply, tokens = self._call(role, current_prompt, tokens, start, round_no)
+            parsed = parse_sections(reply.text)
+            errors = self._validate(role, parsed)
+            if not errors:
+                return parsed, tokens
+            if attempt >= self.config.protocol_retries:
+                raise _ProtocolError("; ".join(errors))
+            attempt += 1
+            current_prompt = (
+                f"{prompt}\n\nTu respuesta anterior no cumplió el protocolo "
+                f"({'; '.join(errors)}). Responde de nuevo SOLO con las secciones requeridas."
+            )
+
     # -- prompts -----------------------------------------------------------
     def _plan_prompt(self, task_text: str) -> str:
         return f"{ROLE_PROMPTS['primary_plan']}\n\nPROBLEMA:\n{task_text}\n"
@@ -208,15 +233,9 @@ class Runner:
             self.ledger.set_base_sha(self.base_sha)
 
         try:
-            reply, tokens = self._call(
+            parsed, tokens = self._request(
                 "primary_plan", self._plan_prompt(task_text), tokens, start
             )
-            parsed = parse_sections(reply.text)
-            errors = self._validate("primary_plan", parsed)
-            if errors:
-                return finish(
-                    RunResult("protocol", tokens=tokens, detail="; ".join(errors))
-                )
             plan = parsed["PLAN"]
             self.ledger.write_text("plan.md", plan)
             tasks = parse_task_lines(parsed["TASKS"])[: self.config.max_tasks]
@@ -226,15 +245,9 @@ class Runner:
                 )
             self.ledger.write_tasks(tasks)
 
-            reply, tokens = self._call(
+            parsed, tokens = self._request(
                 "ideation", self._ideation_prompt(task_text, plan), tokens, start
             )
-            parsed = parse_sections(reply.text)
-            errors = self._validate("ideation", parsed)
-            if errors:
-                return finish(
-                    RunResult("protocol", tokens=tokens, detail="; ".join(errors))
-                )
             notes = parsed["NOTES"]
             self.ledger.write_text("notes.md", notes)
 
@@ -250,24 +263,13 @@ class Runner:
                 task = next_task or tasks[0]
                 next_task = None
 
-                reply, tokens = self._call(
+                parsed, tokens = self._request(
                     "worker",
                     self._worker_prompt(task_text, task, notes),
                     tokens,
                     start,
                     round_no,
                 )
-                parsed = parse_sections(reply.text)
-                errors = self._validate("worker", parsed)
-                if errors:
-                    return finish(
-                        RunResult(
-                            "protocol",
-                            rounds=rounds,
-                            tokens=tokens,
-                            detail="; ".join(errors),
-                        )
-                    )
 
                 tampered = False
                 if self.tamper_check is not None:
@@ -297,7 +299,7 @@ class Runner:
                 self.ledger.write_text("notes.md", notes)
 
                 verdict = self.verifier()
-                reply, tokens = self._call(
+                parsed_manage, tokens = self._request(
                     "primary_manage",
                     self._manage_prompt(
                         notes, tasks, verdict, self._status(parsed), parsed.get("NEXT", "")
@@ -306,17 +308,6 @@ class Runner:
                     start,
                     round_no,
                 )
-                parsed_manage = parse_sections(reply.text)
-                errors = self._validate("primary_manage", parsed_manage)
-                if errors:
-                    return finish(
-                        RunResult(
-                            "protocol",
-                            rounds=rounds,
-                            tokens=tokens,
-                            detail="; ".join(errors),
-                        )
-                    )
                 tasks = (
                     parse_task_lines(parsed_manage.get("TASKS", ""))[
                         : self.config.max_tasks
@@ -334,6 +325,10 @@ class Runner:
             return finish(RunResult("budget", rounds=rounds, tokens=tokens))
         except _BudgetExceeded:
             return finish(RunResult("budget", rounds=rounds, tokens=tokens))
+        except _ProtocolError as exc:
+            return finish(
+                RunResult("protocol", rounds=rounds, tokens=tokens, detail=str(exc))
+            )
         except _ProviderError as exc:
             return finish(
                 RunResult("infra", rounds=rounds, tokens=tokens, detail=str(exc))

@@ -80,7 +80,8 @@ class Ledger:
         return entries
 
     # -- lista de tareas ---------------------------------------------------
-    def write_tasks(self, tasks: list[dict]) -> None:
+    def write_tasks(self, tasks: list) -> None:
+        """Lista de tareas tal cual la produce el runner (strings en F1)."""
         self.write_text("tasks.json", json.dumps(tasks, ensure_ascii=False, indent=2))
 
     def read_tasks(self) -> list[dict]:

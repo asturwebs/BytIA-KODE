@@ -204,6 +204,7 @@ class TestTamperAndInvariants:
         runner, _, _ = make_runner(
             tmp_path,
             [PLAN, IDEATION, "texto sin secciones"],
+            config=RunnerConfig(protocol_retries=0),
         )
 
         result = runner.run("problema")
@@ -370,12 +371,59 @@ class TestReviewFixes:
 
     def test_section_from_another_role_is_protocol_error(self, tmp_path):
         worker = "### NOTES\na\n### NEXT\nb\n### STATUS\nsolved\n### PLAN\ncolado\n"
-        runner, _, _ = make_runner(tmp_path, [PLAN, IDEATION, worker, MANAGE_DONE])
+        runner, _, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, worker, MANAGE_DONE],
+            config=RunnerConfig(protocol_retries=0),
+        )
 
         result = runner.run("problema")
 
         assert result.status == "protocol"
         assert "unexpected section: PLAN" in result.detail
+
+    def test_protocol_error_is_retried_once(self, tmp_path):
+        runner, _, provider = make_runner(
+            tmp_path, [PLAN, IDEATION, "texto sin secciones", WORKER, MANAGE_DONE]
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "done"
+        assert provider.roles.count("worker") == 2
+
+    def test_protocol_retry_exhausted_aborts(self, tmp_path):
+        runner, _, _ = make_runner(
+            tmp_path,
+            [PLAN, IDEATION, "malo uno", "malo dos"],
+            config=RunnerConfig(protocol_retries=1),
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "protocol"
+
+    def test_non_consecutive_tampers_do_not_abort(self, tmp_path):
+        tamper = iter([True, False, True, False])
+        runner, _, _ = make_runner(
+            tmp_path,
+            [
+                PLAN,
+                IDEATION,
+                WORKER,
+                WORKER,
+                MANAGE_CONTINUE,
+                WORKER,
+                WORKER,
+                MANAGE_DONE,
+            ],
+            config=RunnerConfig(max_rounds=4),
+            tamper_check=lambda: next(tamper, False),
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "done"
 
     def test_numbered_task_lines_are_parsed(self):
         from bytia_kode.orchestrator.runner import parse_task_lines
