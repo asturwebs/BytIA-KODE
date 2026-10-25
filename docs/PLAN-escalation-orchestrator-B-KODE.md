@@ -327,16 +327,26 @@ F0 mide el protocolo **textual de 4 secciones de GVS5H** (con `### CODE`), no el
 
 ### Números de F0 (cierre de la condición (a))
 
-Run del 2026-10-25 sobre `qwen38-160k` (Qwen3.8-27B IQ4_XS, ctx 163840), 3 tareas de juguete, protocolo textual de GVS5H:
+Run del 2026-10-25 sobre `qwen38-160k` (Qwen3.8-27B IQ4_XS, ctx 163840), 3 tareas de juguete × **2 pasadas idénticas = 30 llamadas**, protocolo textual de GVS5H:
 
-| Tarea | Tests | Llamadas | Tokens | Minutos | Protocolo |
-|---|---|---|---|---|---|
-| fizzbuzz | 5/5 | 5 | 9.337 | 3,30 | 5/5 |
-| two_sum | 5/5 | 5 | 12.496 | 5,35 | 5/5 |
-| csv_to_dicts | 5/5 | 5 | 16.505 | 8,20 | 5/5 |
+| Pasada | Tarea | Tests | Llamadas | Tokens | Minutos | Protocolo |
+|---|---|---|---|---|---|---|
+| pass1 | fizzbuzz | 5/5 | 5 | 9.337 | 3,30 | 5/5 |
+| pass1 | two_sum | 5/5 | 5 | 12.496 | 5,35 | 5/5 |
+| pass1 | csv_to_dicts | 5/5 | 5 | 16.505 | 8,20 | 5/5 |
+| pass2 | fizzbuzz | 5/5 | 5 | 8.906 | 3,16 | 5/5 |
+| pass2 | two_sum | 5/5 | 5 | 11.609 | 5,01 | 5/5 |
+| pass2 | csv_to_dicts | 5/5 | 5 | 19.494 | 9,72 | 5/5 |
 
-Criterios C5: conformidad **100%** (≥90% ✅) · peor ciclo **8,20 min** (<15 ✅) · peor tokens **16.505** (<30k ✅). VRAM con el modelo cargado: **21,7/24,5 GB** → workers secuenciales confirmados.
-**Go en los tres criterios**, con la salvedad de R9 (proxy del modelo, no del protocolo final).
+- **Conformidad 30/30 = 100%**, pero el límite inferior de Wilson al 95% es **88,6%** (<90%): con cero fallos hacen falta **≥35 llamadas** para certificar ≥90% al 95%. C5 debe presupuestar ≥35, no 30.
+- Ciclo: máx **9,72 min** (<15 ✅), media 5,79. Tokens: máx **19.494** (<30k ✅), media 13.058. Total 34,7 min.
+- Funcional: **6/6 ejecuciones 5/5 tests** (30/30 casos). 0 errores, 0 reintentos, 0 truncamientos.
+- **79,8% de los caracteres de respuesta son traza `<think>`** y entran en `completion_tokens` (`--reasoning-format none`). F1 debe acotar thinking o el presupuesto se va ahí.
+- Con 2 rondas completas (~+4-8k tokens) el margen de 30k se estrecha; con prompts de repo real, recalibrar (no heredar el umbral).
+- No medido: critic, segunda ronda, arranque en frío, rutas de fallo, repo/tools, heterogeneidad, concurrencia.
+- VRAM con el modelo cargado: **21,7/24,5 GB** → workers secuenciales confirmados.
+
+**Go provisional** en los tres criterios de C5, con la salvedad de R9 (proxy del modelo) y la reserva estadística (Wilson 88,6% / n≥35).
 
 ### Gate F1 — estado
 - (a) Números de F0 contra C5: **✅** (tabla arriba).
