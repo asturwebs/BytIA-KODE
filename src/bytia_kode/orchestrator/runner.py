@@ -152,7 +152,11 @@ class Runner:
 
     def _validate(self, role: str, parsed: dict[str, str]) -> list[str]:
         role_spec = self.spec.roles[role]
-        allowed = set(role_spec.required) | set(role_spec.required_when_continuing)
+        allowed = (
+            set(role_spec.required)
+            | set(role_spec.recommended_when_continuing)
+            | set(role_spec.allowed_extra)
+        )
         return validate_sections(
             parsed,
             role_spec.required,
@@ -372,6 +376,6 @@ class Runner:
                     "infra",
                     rounds=rounds,
                     tokens=tokens,
-                    detail=f"{type(exc).__name__}: {exc}",
+                    detail=f"bug: {type(exc).__name__}: {exc}",
                 )
             )

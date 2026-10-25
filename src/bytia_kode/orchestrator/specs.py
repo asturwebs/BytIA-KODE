@@ -13,7 +13,12 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class RoleSpec:
     required: tuple[str, ...]
-    required_when_continuing: tuple[str, ...] = ()
+    # Recomendación del prompt, NO validación (M1): el runner tolera su
+    # ausencia y aplica el invariante «continue sin NEXT → primera tarea».
+    recommended_when_continuing: tuple[str, ...] = ()
+    # Secciones toleradas pero no requeridas (p. ej. NEXT en ideation, que el
+    # protocolo anterior pedía y el modelo puede seguir emitiendo).
+    allowed_extra: tuple[str, ...] = ()
     allowed_status: tuple[str, ...] | None = None
 
 
@@ -27,14 +32,14 @@ CODE_REPO = DomainSpec(
     name="code_repo",
     roles={
         "primary_plan": RoleSpec(required=("PLAN", "TASKS")),
-        "ideation": RoleSpec(required=("NOTES", "NEXT")),
+        "ideation": RoleSpec(required=("NOTES",), allowed_extra=("NEXT",)),
         "worker": RoleSpec(
             required=("NOTES", "NEXT", "STATUS"),
             allowed_status=("continue", "solved"),
         ),
         "primary_manage": RoleSpec(
             required=("STATUS", "TASKS"),
-            required_when_continuing=("NEXT",),
+            recommended_when_continuing=("NEXT",),
             allowed_status=("continue", "done"),
         ),
     },

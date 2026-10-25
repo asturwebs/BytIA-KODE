@@ -23,12 +23,18 @@ class TestCodeReproSpec:
         assert worker.required == ("NOTES", "NEXT", "STATUS")
         assert worker.allowed_status == ("continue", "solved")
 
-    def test_manage_requires_next_only_when_continuing(self):
+    def test_manage_recommends_next_when_continuing(self):
         manage = CODE_REPO.roles["primary_manage"]
 
         assert manage.required == ("STATUS", "TASKS")
-        assert manage.required_when_continuing == ("NEXT",)
+        assert manage.recommended_when_continuing == ("NEXT",)
         assert manage.allowed_status == ("continue", "done")
+
+    def test_ideation_requires_only_notes(self):
+        # M2: el NEXT de ideation se pedía, se parseaba y se descartaba.
+        ideation = CODE_REPO.roles["ideation"]
+        assert ideation.required == ("NOTES",)
+        assert ideation.allowed_extra == ("NEXT",)
 
 
 class TestRolePrompts:

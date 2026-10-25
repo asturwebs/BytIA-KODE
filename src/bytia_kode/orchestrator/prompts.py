@@ -26,8 +26,6 @@ ROLE_PROMPTS: dict[str, str] = {
         "Responde EXCLUSIVAMENTE con:\n"
         "### NOTES\n"
         "Dificultad central y 2-3 enfoques genuinamente distintos. No headings dentro de NOTES.\n"
-        "### NEXT\n"
-        "El siguiente paso más prometedor.\n"
     ),
     "worker": (
         "Eres un ingeniero senior trabajando en el checkout `scratch/`. Usa las tools del "
@@ -51,6 +49,7 @@ ROLE_PROMPTS: dict[str, str] = {
         "### NEXT\n"
         "UNA tarea exacta. Omite esta sección si STATUS es done.\n"
         "### TASKS\n"
-        "Lista curada de tareas: fusiona duplicados, marca done, pliega propuestas.\n"
+        "Lista curada de tareas: fusiona duplicados, pliega propuestas y marca "
+        "las completadas exactamente con `(done)` al final de la línea.\n"
     ),
 }

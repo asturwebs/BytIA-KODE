@@ -492,6 +492,19 @@ class TestRound2Fixes:
         assert result.status == "protocol"
         assert result.tokens == 40
 
+    def test_internal_bug_is_marked(self, tmp_path):
+        def verifier():
+            raise TypeError("bug interno")
+
+        runner, _, _ = make_runner(
+            tmp_path, [PLAN, IDEATION, WORKER, MANAGE_DONE], verifier=verifier
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "infra"
+        assert result.detail.startswith("bug:")
+
     def test_protocol_retries_from_config(self, monkeypatch):
         from bytia_kode.config import EscalationConfig
         from bytia_kode.orchestrator.runner import RunnerConfig
