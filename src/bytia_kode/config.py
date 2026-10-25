@@ -30,6 +30,11 @@ def _env(key: str, default: str = "") -> str:
     return os.getenv(key, default).strip()
 
 
+def _env_bool(key: str, default: bool = False) -> bool:
+    raw = _env(key, "1" if default else "0").lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def _get_vendor_skills_path() -> Path | None:
     """Get the path to vendored skills in the package."""
     package_dir = Path(__file__).parent
@@ -174,6 +179,48 @@ class WorkspaceConfig:
 
 
 @dataclass
+class EscalationConfig:
+    """Orquestador por escalamiento (F1, §4.6).
+
+    Defaults: kill-switch apagado, manager y worker locales (C2: cloud
+    prohibido en repos de cliente), techo por worker 12 (C7) y presupuestos
+    duros de rondas, tareas, tokens y wall-clock.
+    """
+
+    enabled: bool = field(default_factory=lambda: _env_bool("KODE_ESCALATION_ENABLED"))
+    manager_provider: str = field(
+        default_factory=lambda: _env("KODE_ESCALATION_MANAGER_PROVIDER", "local")
+    )
+    worker_provider: str = field(
+        default_factory=lambda: _env("KODE_ESCALATION_WORKER_PROVIDER", "local")
+    )
+    worker_max_iter: int = field(
+        default_factory=lambda: int(_env("KODE_ESCALATION_WORKER_MAX_ITER", "12"))
+    )
+    max_rounds: int = field(
+        default_factory=lambda: int(_env("KODE_ESCALATION_MAX_ROUNDS", "4"))
+    )
+    max_tasks: int = field(
+        default_factory=lambda: int(_env("KODE_ESCALATION_MAX_TASKS", "8"))
+    )
+    max_wallclock_min: int = field(
+        default_factory=lambda: int(_env("KODE_ESCALATION_MAX_WALLCLOCK_MIN", "20"))
+    )
+    max_tokens: int = field(
+        default_factory=lambda: int(_env("KODE_ESCALATION_MAX_TOKENS", "200000"))
+    )
+    auto_trigger: bool = field(
+        default_factory=lambda: _env_bool("KODE_ESCALATION_AUTO_TRIGGER")
+    )
+    auto_after_iter: int = field(
+        default_factory=lambda: int(_env("KODE_ESCALATION_AUTO_AFTER_ITER", "6"))
+    )
+    protocol_retries: int = field(
+        default_factory=lambda: int(_env("KODE_ESCALATION_PROTOCOL_RETRIES", "1"))
+    )
+
+
+@dataclass
 class AppConfig:
     provider: ProviderConfig = field(default_factory=ProviderConfig)
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
@@ -205,6 +252,7 @@ class AppConfig:
     workspace: WorkspaceConfig = field(
         default_factory=lambda: _workspace_from_config(_load_yaml_config())
     )
+    escalation: EscalationConfig = field(default_factory=EscalationConfig)
 
     def __post_init__(self):
         self.data_dir.mkdir(parents=True, exist_ok=True)
