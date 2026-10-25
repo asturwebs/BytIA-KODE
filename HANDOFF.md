@@ -34,6 +34,14 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 - **F0 completado (2026-10-25)**: 2 pasadas × 3 tareas = 30 llamadas, **30/30 conformidad** (Wilson 95% inferior **88,6%** → hacen falta **≥35** para certificar ≥90%), peor ciclo **9,72 min**, peor **19.494 tokens**, 6/6 ejecuciones 5/5 tests → **Go provisional**. **79,8% del output son `<think>`** (coste real). VRAM 21,7/24,5 GB (workers secuenciales). Informe: `~/Projects/lab/gvs5h-spike/REPORT.md`. Anexo D: R1-R9 del CTO incorporadas y cuerpo sincronizado. **Gate F1: (a) números F0 ✅, (b) R1-R9 ✅** — abierto a decisión del Socio.
 - **Pendiente**: re-escaneo Dependabot · Paperclip **AST-39** (`in_review`, CTO) · decisión F1.
 
+### F1 — escalation core (rama, NO en main)
+
+- Rama **`f1-escalation-core`** (worktree `~/Projects/lab/kode-f1`), HEAD **`755e09b`**, **585/585 tests**. `main` intacto en `6937990`.
+- Módulos: `src/bytia_kode/orchestrator/{protocol,ledger,specs,prompts,runner}.py` + `EscalationConfig` en `config.py`.
+- Revisiones: revisor independiente (1 Critical + 10 Important, corregidos) y **Engineer** (`AST-40`: 4 Important + 4 Minor; 3 Important y los 4 Minor en `89c0556`, el retry/fallback en `755e09b`). **CTO pendiente** sobre el código.
+- **NO hay comando `/escalate`** (es F2) y el CLI de la máquina corre el venv editable de `main` → F1 no cambia el runtime actual.
+- Secuencia acordada: Engineer → fixes → **CTO** → **tag `pre-f1-merge` en `6937990` + merge `--no-ff`** → F2 (verify real, worktree, Agent async, TUI/Telegram, jail, `patch.diff`). Sin merge ni tag hasta cerrar revisiones. Sin release en PyPI hasta F2.
+
 ## Arquitectura en 30 segundos
 
 ```
