@@ -32,7 +32,9 @@ CODE_REPO = DomainSpec(
     name="code_repo",
     roles={
         "primary_plan": RoleSpec(required=("PLAN", "TASKS")),
-        "ideation": RoleSpec(required=("NOTES",), allowed_extra=("NEXT",)),
+        "ideation": RoleSpec(
+            required=("NOTES",), allowed_extra=("NEXT", "PLAN", "TASKS")
+        ),
         "worker": RoleSpec(
             required=("NOTES", "NEXT", "STATUS"),
             allowed_status=("continue", "solved"),

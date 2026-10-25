@@ -32,9 +32,10 @@ class TestCodeReproSpec:
 
     def test_ideation_requires_only_notes(self):
         # M2: el NEXT de ideation se pedía, se parseaba y se descartaba.
+        # E2E real: qwen38 devolvía PLAN/TASKS; se toleran y se ignoran.
         ideation = CODE_REPO.roles["ideation"]
         assert ideation.required == ("NOTES",)
-        assert ideation.allowed_extra == ("NEXT",)
+        assert set(ideation.allowed_extra) == {"NEXT", "PLAN", "TASKS"}
 
 
 class TestRolePrompts:

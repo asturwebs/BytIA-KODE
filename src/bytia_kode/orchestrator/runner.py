@@ -213,8 +213,10 @@ class Runner:
     def _plan_prompt(self, task_text: str) -> str:
         return f"{ROLE_PROMPTS['primary_plan']}\n\nPROBLEMA:\n{task_text}\n"
 
-    def _ideation_prompt(self, task_text: str, plan: str) -> str:
-        return f"{ROLE_PROMPTS['ideation']}\n\nPROBLEMA:\n{task_text}\n\nPLAN:\n{plan}\n"
+    def _ideation_prompt(self, task_text: str) -> str:
+        # Sin el PLAN en el contexto: el modelo local lo repetía como sección
+        # en su respuesta (verificado en el e2e real con qwen38-160k).
+        return f"{ROLE_PROMPTS['ideation']}\n\nPROBLEMA:\n{task_text}\n"
 
     def _worker_prompt(self, task_text: str, task: str, notes: str) -> str:
         return (
@@ -280,7 +282,7 @@ class Runner:
             self.ledger.write_tasks(tasks)
 
             parsed, tokens = self._request(
-                "ideation", self._ideation_prompt(task_text, plan), tokens, start
+                "ideation", self._ideation_prompt(task_text), tokens, start
             )
             notes = parsed["NOTES"]
             self.ledger.write_text("notes.md", notes)
