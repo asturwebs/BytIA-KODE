@@ -252,7 +252,7 @@ Y marcar la ronda como `invalid` (registrada en `record.jsonl`) si el diff del w
 
 ### C2 — BLOQUEANTE de privacidad: manager cloud por defecto
 `KODE_ESCALATION_MANAGER_PROVIDER=primary` y `PROVIDER_*` es un endpoint cloud con API key. El manager recibe plan, notas, solución y fragmentos del repo. Con repos de clientes eso es código propietario saliendo a un tercero por defecto, sin aviso. Contradice el valor 3 del Kernel y la regla local-first.
-**Decisión cerrada:** default `local`. El modo cloud exige (a) opt-in explícito, (b) aviso visible de que el contenido del repo se envía al proveedor, (c) bloqueo en workspaces marcados como cliente. Queda al Socio si el cloud se permite alguna vez en repos de cliente (recomendación: NO).
+**Decisión cerrada:** default `local`. El modo cloud exige (a) opt-in explícito, (b) aviso visible de que el contenido del repo se envía al proveedor, (c) bloqueo en workspaces marcados como cliente. **Decisión del Socio (2026-10-25): NO.** El modo cloud queda prohibido en repos de cliente; solo `local`/`unsloth`.
 
 ### C3 — BLOQUEANTE de diseño: worker textual vs. worker agéntico
 §2.2/§4.4 portan el protocolo de GVS5H (`### CODE` = programa completo autocontenido); §4.8 dice que los workers usan tools del registry sobre scratch. En repos reales no existe "el programa completo". Sin decidirlo, F1 no se puede escribir.
