@@ -73,6 +73,31 @@ class TestNonSecretsNotFlagged:
         )
 
 
+class TestConfigVarNamesNotFlagged:
+    """Nombres de config del proyecto (KODE_*) no son secretos.
+
+    Regresión 2026-10-25: el plan de escalation quedó trackeado con líneas
+    `KODE_ESCALATION_*=valor` y el escaneo full-tree las marcó por longitud.
+    """
+
+    def test_project_config_assignment_not_flagged(self):
+        assert not check_secrets.is_suspicious_line(
+            "KODE_ESCALATION_MANAGER_PROVIDER=primary"
+        )
+
+    def test_project_config_numeric_not_flagged(self):
+        assert not check_secrets.is_suspicious_line(
+            "KODE_ESCALATION_MAX_TOKENS=200000"
+        )
+
+    def test_config_name_with_real_secret_value_still_flagged(self):
+        # Control negativo: el nombre KODE_ no blanquea un valor con pinta
+        # de secreto (32 chars de entropía alta).
+        assert check_secrets.is_suspicious_line(
+            "KODE_ESCALATION_FAKE_KEY=" + _ENTROPY
+        )
+
+
 class TestCiInvocations:
     def test_full_tree_scan_passes_on_current_repo(self, capsys):
         # Anti-verde-vacuo: `git ls-files` no ve ficheros untracked, así que un

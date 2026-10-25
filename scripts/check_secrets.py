@@ -8,6 +8,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SK_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]{10,}")
 HIGH_ENTROPY_PATTERN = re.compile(r"\b[A-Za-z0-9_\-=/+]{30,}\b")
+# Nombre de variable de configuración del proyecto, con valor corto y simple
+# (KODE_ESCALATION_MAX_TOKENS=200000). El nombre por sí solo supera los 30
+# chars del patrón de entropía; el valor acotado impide que un secreto real
+# pase por ir precedido de un nombre KODE_.
+CONFIG_VAR_PATTERN = re.compile(r"KODE_[A-Z0-9_]+(?:=[a-z0-9_.-]{0,24})?")
 SKIP_FILES = {'.env.example', 'uv.lock', 'ROADMAP.md', 'CHANGELOG.md'}
 SKIP_DIRS = {'docs/devlog/', 'src/bytia_kode/vendor/skills/'}
 SKIP_PATTERNS = [
@@ -73,6 +78,8 @@ def is_suspicious_line(line: str) -> bool:
         if '/' in token or ':' in token:
             continue
         if all(char in '0123456789abcdef' for char in token.lower()):
+            continue
+        if CONFIG_VAR_PATTERN.fullmatch(token):
             continue
         return True
     return False
