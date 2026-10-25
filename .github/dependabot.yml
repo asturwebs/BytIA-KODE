@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Dependencias Python (pyproject.toml / uv.lock).
+  # Nota: se usa el ecosistema "pip" (estable y documentado por GitHub);
+  # si el soporte nativo de "uv" se consolida, migrar esta entrada.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+
+  # GitHub Actions de .github/workflows/.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
