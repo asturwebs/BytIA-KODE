@@ -56,7 +56,8 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 
 - **PyPI 0.9.0 verificado** en venv limpio: `bytia-kode --version` → `0.9.0+0892714`. La ficha de PyPI aún muestra el README anterior; los arreglos de abajo se reflejarán en el próximo release (0.9.1).
 - **README corregido** (`bd8a9ad`): cadena real (Unsloth → Ollama → nube; router bajo demanda), pin F1/F3/F4-F8, árbol `orchestrator/` y enlaces absolutos para PyPI.
-- **GitHub**: `SECURITY.md` añadido; topics + homepage; ruleset `protect-main` con **required check `validate`** (solo afecta a PRs); PR #8 (aiohttp) cerrado por obsoleto; #9 (setup-python v7) y #10 (setup-uv v7) mergeados; **#11 (mcp `<3`) abierto** — el cap `<2` es deliberado, no mergear sin tests del extra.
+- **GitHub**: `SECURITY.md` añadido; topics + homepage; PR #8 (aiohttp) cerrado por obsoleto; #9 (setup-python v7) y #10 (setup-uv v7) mergeados; **#11 (mcp `<3`) abierto** — el cap `<2` es deliberado, no mergear sin tests del extra.
+- **Lección (ruleset)**: `required_status_checks` en un ruleset bloquea **también los pushes directos** a main (el check solo existe después del push: huevo y gallina). Añadido y **revertido**; `protect-main` queda en `deletion` + `non_fast_forward`.
 - **Secret scanning**: `non-provider patterns` y `validity checks` **no configurables por API en este repo** (el PATCH los ignora); push protection ya activo. Si se quieren, se activan desde Settings → Code security (requiere GHAS).
 - Suite: **688/688**. Gates del release: verdes.
 
