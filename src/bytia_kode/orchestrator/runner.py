@@ -338,10 +338,11 @@ class Runner:
                 self.ledger.write_text("notes.md", notes)
 
                 verdict = self.verifier()
+                worker_status = self._status(parsed)
                 parsed_manage, tokens = self._request(
                     "primary_manage",
                     self._manage_prompt(
-                        notes, tasks, verdict, self._status(parsed), parsed.get("NEXT", "")
+                        notes, tasks, verdict, worker_status, parsed.get("NEXT", "")
                     ),
                     tokens,
                     start,
@@ -357,6 +358,11 @@ class Runner:
                 status = self._status(parsed_manage)
                 if status == "done" and not verdict.ok:
                     status = "continue"
+                # Ground truth: tests verdes + worker declara solved = hecho.
+                # El manager no puede bloquear indefinidamente una tarea resuelta
+                # (e2e real: 4 rondas budget con el patch ya correcto).
+                if verdict.ok and worker_status == "solved":
+                    status = "done"
                 if status == "done":
                     return finish(RunResult("done", rounds=rounds, tokens=tokens))
                 next_task = self._next_line(parsed_manage)
