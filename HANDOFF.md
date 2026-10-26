@@ -46,6 +46,7 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 
 - Rama **`f2-integration`** mergeada en `main` con **`--no-ff`** → merge commit **`2f68fed`** (2026-10-26), **647/647 tests**, CI verde. Tag de retorno **`pre-f2-merge`** en `578d300`.
 - **`/escalate` ya disponible en el CLI** (TUI y Telegram). Requiere `KODE_ESCALATION_ENABLED=true` y, para usar el router, `LOCAL_BASE_URL=http://localhost:8080/v1` + `LOCAL_MODEL=qwen38-160k` (el default `local` apunta a Ollama/gemma4).
+- **Guía de la feature**: `docs/ESCALATION.md` (requisitos, uso, estados, seguridad, config, límites, troubleshooting). README y CHANGELOG actualizados; gate de claims verde.
 - T6 scratch git-worktree (R3/R4/R6/R2, fixes H1-H7 + H1 de AST-43) · T7 `verify.py` (baseline, timeout, exit 2/3/4/5 = no-ok) · T8 worker agéntico + **jail save/restore (R5)** · T9 providers + circuit → infra · T10 `/escalate` en TUI y Telegram · T11 `patch.diff` · T12 M1-M4 del CTO · T13 e2e.
 - **E2E real ✅ FINAL**: repo con bug (`add` restaba) → **`done` en 1 ronda**, 5.870 tokens, 163,6 s, **patch limpio** (solo `src/calc.py`). Cierre por ground truth (tests verdes + worker solved) tras detectar 4 rondas `budget` con el patch ya correcto.
 - Revisiones del Engineer (AST-43): 2 rondas, NO APROBADO → **H1-H4 + R2-1 + R2-M1 cerrados** (`f4fc6a8`, `dde5947`). Pendiente su re-revisión del HEAD.
