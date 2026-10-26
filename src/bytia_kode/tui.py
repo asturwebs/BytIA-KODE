@@ -908,8 +908,48 @@ class BytIAKODEApp(App):
         elif cmd.lower().startswith("/use "):
             model_name = cmd_raw[5:].strip()
             self._use_model(model_name)
+        elif cmd.startswith("/escalate"):
+            task = cmd_raw[len("/escalate") :].strip()
+            if not task:
+                self._add_system_message("Usage: /escalate <tarea>")
+            else:
+                self.run_worker(
+                    self._run_escalation(task), exclusive=True, group="escalate"
+                )
         else:
             self._add_system_message(f"Unknown command: {cmd_raw}  |  /help for list")
+
+    async def _run_escalation(self, task: str):
+        """F2: ciclo multi-agente sobre el repo del cwd (worktree desechable)."""
+        import asyncio
+        from pathlib import Path
+
+        from bytia_kode.orchestrator.service import EscalationService
+
+        self._add_system_message(f"Escalating: {task}")
+
+        def progress(message: str) -> None:
+            self.call_from_thread(self._add_system_message, f"[escalate] {message}")
+
+        service = EscalationService(
+            config=self.agent.config,
+            repo=Path.cwd(),
+            task=task,
+            progress=progress,
+        )
+        try:
+            outcome = await asyncio.to_thread(service.run)
+        except Exception as exc:  # noqa: BLE001 - la TUI reporta, no tumba
+            self._add_message("error", f"Escalation failed: {exc}")
+            return
+        self._add_system_message(
+            f"Escalation {outcome.result.status} · rondas "
+            f"{outcome.result.rounds} · tokens {outcome.result.tokens}"
+        )
+        if outcome.result.detail:
+            self._add_system_message(f"Detalle: {outcome.result.detail}")
+        if outcome.patch:
+            self._add_system_message(outcome.patch[:6000])
 
     def _show_workspace(self):
         """AST-26: /workspace — muestra la política de jail activa."""
@@ -1005,6 +1045,7 @@ class BytIAKODEApp(App):
             ("/sessions", "List saved sessions", ""),
             ("/session", "Show current session info", ""),
             ("/load <id>", "Load session", ""),
+            ("/escalate", "Multi-agent orchestration on the repo (F2)", ""),
             ("/clear", "Clear screen", "Ctrl+L"),
             ("/model", "Show model info", "Ctrl+M"),
             ("/tools", "List tools", "Ctrl+T"),

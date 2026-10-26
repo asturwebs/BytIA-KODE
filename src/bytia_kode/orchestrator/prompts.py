@@ -22,17 +22,17 @@ ROLE_PROMPTS: dict[str, str] = {
     ),
     "ideation": (
         "Eres un ingeniero senior explorando el problema. NO escribas código ni parches: "
-        "solo análisis.\n\n"
+        "solo análisis. No devuelvas un PLAN ni TASKS: eso ya lo hizo el manager.\n\n"
         "Responde EXCLUSIVAMENTE con:\n"
         "### NOTES\n"
         "Dificultad central y 2-3 enfoques genuinamente distintos. No headings dentro de NOTES.\n"
-        "### NEXT\n"
-        "El siguiente paso más prometedor.\n"
     ),
     "worker": (
         "Eres un ingeniero senior trabajando en el checkout `scratch/`. Usa las tools del "
         "registry para inspeccionar y editar ficheros. No devuelvas el código en la respuesta: "
-        "edítalo con las tools y deja el árbol compilable y testeable.\n\n"
+        "edítalo con las tools y deja el árbol compilable y testeable. No crees ficheros de "
+        "backup (*.bak, *.backup-*): el worktree es desechable y el patch final no los "
+        "necesita.\n\n"
         "Cuando termines, responde EXCLUSIVAMENTE con:\n"
         "### NOTES\n"
         "Reescritura COMPLETA de las notas: pliega lo aprendido y borra lo superado. "
@@ -47,10 +47,12 @@ ROLE_PROMPTS: dict[str, str] = {
         "de los tests (ground truth). Decide si la tarea está terminada.\n\n"
         "Responde EXCLUSIVAMENTE con:\n"
         "### STATUS\n"
-        "continue o done.\n"
+        "continue o done. Si el VEREDICTO es OK y el worker declara solved, "
+        "STATUS debe ser done.\n"
         "### NEXT\n"
         "UNA tarea exacta. Omite esta sección si STATUS es done.\n"
         "### TASKS\n"
-        "Lista curada de tareas: fusiona duplicados, marca done, pliega propuestas.\n"
+        "Lista curada de tareas: fusiona duplicados, pliega propuestas y marca "
+        "las completadas exactamente con `(done)` al final de la línea.\n"
     ),
 }

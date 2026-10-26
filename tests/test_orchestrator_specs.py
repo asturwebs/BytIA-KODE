@@ -23,12 +23,19 @@ class TestCodeReproSpec:
         assert worker.required == ("NOTES", "NEXT", "STATUS")
         assert worker.allowed_status == ("continue", "solved")
 
-    def test_manage_requires_next_only_when_continuing(self):
+    def test_manage_recommends_next_when_continuing(self):
         manage = CODE_REPO.roles["primary_manage"]
 
         assert manage.required == ("STATUS", "TASKS")
-        assert manage.required_when_continuing == ("NEXT",)
+        assert manage.recommended_when_continuing == ("NEXT",)
         assert manage.allowed_status == ("continue", "done")
+
+    def test_ideation_requires_only_notes(self):
+        # M2: el NEXT de ideation se pedía, se parseaba y se descartaba.
+        # E2E real: qwen38 devolvía PLAN/TASKS; se toleran y se ignoran.
+        ideation = CODE_REPO.roles["ideation"]
+        assert ideation.required == ("NOTES",)
+        assert set(ideation.allowed_extra) == {"NEXT", "PLAN", "TASKS"}
 
 
 class TestRolePrompts:
@@ -43,6 +50,10 @@ class TestRolePrompts:
 
     def test_worker_prompt_forbids_nested_headings(self):
         assert "no headings" in ROLE_PROMPTS["worker"].lower()
+
+    def test_ideation_prompt_forbids_plan(self):
+        # E2E real: qwen38 devolvió un PLAN en la fase de ideación.
+        assert "no devuelvas un plan" in ROLE_PROMPTS["ideation"].lower()
 
     def test_worker_prompt_does_not_ask_for_code_in_text(self):
         prompt = ROLE_PROMPTS["worker"].lower()

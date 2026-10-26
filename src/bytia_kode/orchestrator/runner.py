@@ -152,7 +152,11 @@ class Runner:
 
     def _validate(self, role: str, parsed: dict[str, str]) -> list[str]:
         role_spec = self.spec.roles[role]
-        allowed = set(role_spec.required) | set(role_spec.required_when_continuing)
+        allowed = (
+            set(role_spec.required)
+            | set(role_spec.recommended_when_continuing)
+            | set(role_spec.allowed_extra)
+        )
         return validate_sections(
             parsed,
             role_spec.required,
@@ -209,8 +213,10 @@ class Runner:
     def _plan_prompt(self, task_text: str) -> str:
         return f"{ROLE_PROMPTS['primary_plan']}\n\nPROBLEMA:\n{task_text}\n"
 
-    def _ideation_prompt(self, task_text: str, plan: str) -> str:
-        return f"{ROLE_PROMPTS['ideation']}\n\nPROBLEMA:\n{task_text}\n\nPLAN:\n{plan}\n"
+    def _ideation_prompt(self, task_text: str) -> str:
+        # Sin el PLAN en el contexto: el modelo local lo repetía como sección
+        # en su respuesta (verificado en el e2e real con qwen38-160k).
+        return f"{ROLE_PROMPTS['ideation']}\n\nPROBLEMA:\n{task_text}\n"
 
     def _worker_prompt(self, task_text: str, task: str, notes: str) -> str:
         return (
@@ -276,7 +282,7 @@ class Runner:
             self.ledger.write_tasks(tasks)
 
             parsed, tokens = self._request(
-                "ideation", self._ideation_prompt(task_text, plan), tokens, start
+                "ideation", self._ideation_prompt(task_text), tokens, start
             )
             notes = parsed["NOTES"]
             self.ledger.write_text("notes.md", notes)
@@ -332,10 +338,11 @@ class Runner:
                 self.ledger.write_text("notes.md", notes)
 
                 verdict = self.verifier()
+                worker_status = self._status(parsed)
                 parsed_manage, tokens = self._request(
                     "primary_manage",
                     self._manage_prompt(
-                        notes, tasks, verdict, self._status(parsed), parsed.get("NEXT", "")
+                        notes, tasks, verdict, worker_status, parsed.get("NEXT", "")
                     ),
                     tokens,
                     start,
@@ -351,6 +358,11 @@ class Runner:
                 status = self._status(parsed_manage)
                 if status == "done" and not verdict.ok:
                     status = "continue"
+                # Ground truth: tests verdes + worker declara solved = hecho.
+                # El manager no puede bloquear indefinidamente una tarea resuelta
+                # (e2e real: 4 rondas budget con el patch ya correcto).
+                if verdict.ok and worker_status == "solved":
+                    status = "done"
                 if status == "done":
                     return finish(RunResult("done", rounds=rounds, tokens=tokens))
                 next_task = self._next_line(parsed_manage)
@@ -372,6 +384,6 @@ class Runner:
                     "infra",
                     rounds=rounds,
                     tokens=tokens,
-                    detail=f"{type(exc).__name__}: {exc}",
+                    detail=f"bug: {type(exc).__name__}: {exc}",
                 )
             )

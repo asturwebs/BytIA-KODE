@@ -37,6 +37,7 @@ class FakeProvider:
 PLAN = "### PLAN\nResolver el problema\n### TASKS\n- implementar\n"
 IDEATION = "### NOTES\nEnfoque directo\n### NEXT\nimplementar\n"
 WORKER = "### NOTES\nImplementado\n### NEXT\nverificar\n### STATUS\nsolved\n"
+WORKER_CONTINUE = "### NOTES\nparcial\n### NEXT\nseguir\n### STATUS\ncontinue\n"
 MANAGE_DONE = "### STATUS\ndone\n### TASKS\n- implementar (done)\n"
 MANAGE_CONTINUE = "### STATUS\ncontinue\n### NEXT\nseguir\n### TASKS\n- implementar\n"
 MANAGE_CONTINUE_NO_NEXT = "### STATUS\ncontinue\n### TASKS\n- seguir\n"
@@ -104,7 +105,14 @@ class TestBudgets:
     def test_round_budget_stops_when_never_done(self, tmp_path):
         runner, _, _ = make_runner(
             tmp_path,
-            [PLAN, IDEATION, WORKER, MANAGE_CONTINUE, WORKER, MANAGE_CONTINUE],
+            [
+                PLAN,
+                IDEATION,
+                WORKER_CONTINUE,
+                MANAGE_CONTINUE,
+                WORKER_CONTINUE,
+                MANAGE_CONTINUE,
+            ],
             config=RunnerConfig(max_rounds=2),
         )
 
@@ -165,7 +173,7 @@ class TestTamperAndInvariants:
 
         runner, _, provider = make_runner(
             tmp_path,
-            [PLAN, IDEATION, WORKER, WORKER, MANAGE_CONTINUE],
+            [PLAN, IDEATION, WORKER_CONTINUE, WORKER_CONTINUE, MANAGE_CONTINUE],
             config=RunnerConfig(max_rounds=2),
             tamper_check=lambda: next(tamper, False),
         )
@@ -191,7 +199,14 @@ class TestTamperAndInvariants:
     def test_continue_without_next_uses_first_pending_task(self, tmp_path):
         runner, _, provider = make_runner(
             tmp_path,
-            [PLAN, IDEATION, WORKER, MANAGE_CONTINUE_NO_NEXT, WORKER, MANAGE_DONE],
+            [
+                PLAN,
+                IDEATION,
+                WORKER_CONTINUE,
+                MANAGE_CONTINUE_NO_NEXT,
+                WORKER_CONTINUE,
+                MANAGE_DONE,
+            ],
             config=RunnerConfig(max_rounds=2),
         )
 
@@ -345,13 +360,24 @@ class TestReviewFixes:
         manage_next = "### STATUS\ncontinue\n### NEXT\nB: tests\n### TASKS\n- A\n"
         runner, _, provider = make_runner(
             tmp_path,
-            [PLAN, IDEATION, WORKER, manage_next, WORKER, MANAGE_DONE],
+            [PLAN, IDEATION, WORKER_CONTINUE, manage_next, WORKER_CONTINUE, MANAGE_DONE],
             config=RunnerConfig(max_rounds=2),
         )
 
         runner.run("problema")
 
         assert "B: tests" in provider.prompts[4]
+
+    def test_verdict_ok_and_solved_closes_without_manager_done(self, tmp_path):
+        # E2E real: el manager no cerró con tests verdes; el ground truth manda.
+        runner, _, _ = make_runner(
+            tmp_path, [PLAN, IDEATION, WORKER, MANAGE_CONTINUE]
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "done"
+        assert result.rounds == 1
 
     def test_worker_status_reaches_manager_prompt(self, tmp_path):
         runner, _, provider = make_runner(tmp_path, [PLAN, IDEATION, WORKER, MANAGE_DONE])
@@ -492,6 +518,19 @@ class TestRound2Fixes:
         assert result.status == "protocol"
         assert result.tokens == 40
 
+    def test_internal_bug_is_marked(self, tmp_path):
+        def verifier():
+            raise TypeError("bug interno")
+
+        runner, _, _ = make_runner(
+            tmp_path, [PLAN, IDEATION, WORKER, MANAGE_DONE], verifier=verifier
+        )
+
+        result = runner.run("problema")
+
+        assert result.status == "infra"
+        assert result.detail.startswith("bug:")
+
     def test_protocol_retries_from_config(self, monkeypatch):
         from bytia_kode.config import EscalationConfig
         from bytia_kode.orchestrator.runner import RunnerConfig
@@ -523,7 +562,7 @@ class TestRound2Fixes:
         manage = "### STATUS\ncontinue\n### TASKS\n- A (done)\n- B\n"
         runner, _, provider = make_runner(
             tmp_path,
-            [PLAN, IDEATION, WORKER, manage, WORKER, MANAGE_DONE],
+            [PLAN, IDEATION, WORKER_CONTINUE, manage, WORKER_CONTINUE, MANAGE_DONE],
             config=RunnerConfig(max_rounds=2),
         )
 
@@ -536,7 +575,7 @@ class TestRound2Fixes:
         manage = "### STATUS\ncontinue\n### NEXT\nB: tests\nmas detalle\n### TASKS\n- A\n"
         runner, _, provider = make_runner(
             tmp_path,
-            [PLAN, IDEATION, WORKER, manage, WORKER, MANAGE_DONE],
+            [PLAN, IDEATION, WORKER_CONTINUE, manage, WORKER_CONTINUE, MANAGE_DONE],
             config=RunnerConfig(max_rounds=2),
         )
 

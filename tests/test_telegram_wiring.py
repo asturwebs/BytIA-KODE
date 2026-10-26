@@ -26,6 +26,18 @@ def bot(tmp_path):
         return TelegramBot(cfg)
 
 
+def test_escalate_handler_registered(bot):
+    from telegram.ext import CommandHandler
+
+    commands = []
+    for group in bot.app.handlers.values():
+        for handler in group:
+            if isinstance(handler, CommandHandler):
+                commands.extend(handler.commands)
+
+    assert "escalate" in commands
+
+
 class TestTelegramSubprocessWiring:
     """H3 (parcial): the agent must register an on_subprocess callback
     (tui.py parity) so /kill can terminate the bash subprocess."""
