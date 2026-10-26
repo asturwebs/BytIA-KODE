@@ -2,18 +2,22 @@
 
 ## [Unreleased]
 
-### Added — escalation-orchestrator core (F1, inerte hasta F2)
+### Added — orquestación multi-agente (`/escalate`)
 
-Núcleo del modo de orquestación por escalamiento: parser de secciones
-(`orchestrator/protocol.py`), ledger atómico con `record.jsonl`
-(`ledger.py`), specs/prompts por rol (`specs.py`, `prompts.py`), runner con
-presupuestos duros, estados `done|budget|protocol|infra|ineligible` y R7
-(`runner.py`), y claves `KODE_ESCALATION_*` (`EscalationConfig`).
+Modo opt-in de escalación (F1+F2): núcleo (`orchestrator/protocol.py`,
+`ledger.py`, `specs.py`, `prompts.py`, `runner.py`), verificación real
+(`verify.py`), scratch git-worktree con anti-tamper (`workspace.py`), worker
+agéntico confinado (`agent_worker.py`, `jail.py`), providers (`providers.py`),
+servicio y comando `/escalate` en TUI y Telegram (`service.py`), `patch.diff`
+y claves `KODE_ESCALATION_*`.
 
-**No hay comando `/escalate`**: F1 es código inerte (nada fuera del paquete
-importa `orchestrator`; kill-switch `KODE_ESCALATION_ENABLED=false` por
-defecto). La integración (verify real, worktree, Agent async, TUI/Telegram,
-jail, `patch.diff`) es F2. 594 tests.
+Requiere `KODE_ESCALATION_ENABLED=true`. Guía: [docs/ESCALATION.md](docs/ESCALATION.md).
+E2E real: `done` en 1 ronda, 5.870 tokens, 163,6 s. 647 tests.
+
+### Security — dependencias y escáner
+
+- aiohttp 3.14.5, certifi 2026.10.23, filelock 4.2.4, setuptools 84.2.1 (9 alertas Dependabot cerradas).
+- El escáner de secretos ya no marca nombres de configuración `KODE_*` con valor corto (falso positivo del propio plan).
 
 ## [0.8.6] - 2026-10-03
 
