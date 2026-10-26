@@ -54,7 +54,8 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 
 ### Cierre de sesión — 2026-10-26
 
-- **PyPI 0.9.0 verificado** en venv limpio: `bytia-kode --version` → `0.9.0+0892714`. La ficha de PyPI aún muestra el README anterior; los arreglos de abajo se reflejarán en el próximo release (0.9.1).
+- **PyPI 0.9.0 y 0.9.1 publicados** (OIDC + aprobación del Socio). `0.9.1` verificado en venv limpio: `bytia-kode --version` → `0.9.1+394779c`. La ficha de PyPI 0.9.1 lleva el README corregido.
+- **Release 0.9.1** (`394779c`): README verdadero (cadena, pin, árbol, enlaces absolutos) + CI con `setup-python`/`setup-uv` v7 y `release.yml` arreglado. PR #11 (mcp `<3`) cerrado con motivo: cap deliberado.
 - **README corregido** (`bd8a9ad`): cadena real (Unsloth → Ollama → nube; router bajo demanda), pin F1/F3/F4-F8, árbol `orchestrator/` y enlaces absolutos para PyPI.
 - **GitHub**: `SECURITY.md` añadido; topics + homepage; PR #8 (aiohttp) cerrado por obsoleto; #9 (setup-python v7) y #10 (setup-uv v7) mergeados; **#11 (mcp `<3`) abierto** — el cap `<2` es deliberado, no mergear sin tests del extra.
 - **Lección (ruleset)**: `required_status_checks` en un ruleset bloquea **también los pushes directos** a main (el check solo existe después del push: huevo y gallina). Añadido y **revertido**; `protect-main` queda en `deletion` + `non_fast_forward`.
