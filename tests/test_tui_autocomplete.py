@@ -131,6 +131,17 @@ class TestCommandSource:
         init = next(command for command in TUI_COMMANDS if command.name == "/init")
         assert init.menu_action == "init_project"
 
+    def test_tui_commands_include_memory(self):
+        assert "/memory" in _names(TUI_COMMANDS)
+        assert "/memory" in _names(filter_commands("/mem"))
+
+    def test_init_prompts_have_best_practices(self):
+        from bytia_kode.tui import INIT_PROMPT, INIT_UPDATE_PROMPT
+
+        for prompt in (INIT_PROMPT, INIT_UPDATE_PROMPT):
+            assert "específico" in prompt
+            assert "200" in prompt
+
     def test_menu_is_derived_from_tui_commands(self):
         expected = [
             (command.menu_label, command.menu_action)

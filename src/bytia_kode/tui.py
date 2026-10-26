@@ -132,8 +132,10 @@ TUI_COMMANDS: tuple[TuiCommand, ...] = (
     TuiCommand("/verify", "/verify",
                "Verify the repo suite vs the HEAD baseline", "",
                "✅  Verify repo", "verify_repo"),
-    TuiCommand("/init", "/init", "Generate B-KODE.md for this repo", "",
+    TuiCommand("/init", "/init", "Create or update B-KODE.md for this repo", "",
                "📝  Init project (B-KODE.md)", "init_project"),
+    TuiCommand("/memory", "/memory", "Edit B-KODE.md in $EDITOR", "",
+               "✏️  Edit B-KODE.md", "edit_memory"),
     TuiCommand("/clear", "/clear", "Clear screen", "Ctrl+L",
                "\u2715  Clear screen", "clear_screen"),
     TuiCommand("/tools", "/tools", "List tools", "Ctrl+T",
@@ -172,19 +174,40 @@ TUI_COMMANDS: tuple[TuiCommand, ...] = (
 )
 
 
-INIT_PROMPT = (
-    "Crea el fichero B-KODE.md en la raíz de este repositorio (el cwd).\n\n"
-    "Antes de escribir, analiza el repositorio con las tools: árbol de "
-    "directorios, pyproject.toml/package.json, README, tests y CI.\n\n"
-    "El fichero debe incluir, en Markdown y en español:\n"
+_INIT_SECTIONS = (
     "1. Qué es el proyecto (2-3 frases).\n"
     "2. Stack y dependencias principales.\n"
     "3. Comandos: instalar, ejecutar, tests, lint/build.\n"
     "4. Estructura de directorios (solo lo relevante).\n"
-    "5. Convenciones de código y gotchas reales.\n\n"
-    "Reglas: no inventes datos que no puedas verificar en el repo; si algo no "
-    "está, omítelo. No modifiques ningún otro fichero. Al terminar, di qué has "
-    "escrito y dónde."
+    "5. Convenciones de código y gotchas reales.\n"
+)
+
+INIT_PROMPT = (
+    "Crea el fichero B-KODE.md en {path}.\n\n"
+    "Antes de escribir, analiza el repositorio con las tools: árbol de "
+    "directorios, pyproject.toml/package.json, README, tests y CI.\n\n"
+    "El fichero debe incluir, en Markdown y en español:\n"
+    + _INIT_SECTIONS
+    + "\nReglas: no inventes datos que no puedas verificar en el repo; si algo no "
+    "está, omítelo. Sé específico y accionable (comandos y rutas exactas, nada "
+    "de consejos genéricos); usa bullets bajo headings; no listes todos los "
+    "ficheros ni repitas el README; máximo ~200 líneas. No modifiques ningún "
+    "otro fichero. Al terminar, di qué has escrito y dónde."
+)
+
+INIT_UPDATE_PROMPT = (
+    "Actualiza el fichero B-KODE.md existente en {path} (backup en {backup}).\n\n"
+    "Analiza el repositorio con las tools (árbol, pyproject.toml/package.json, "
+    "README, tests, CI) y lee el B-KODE.md actual antes de escribir.\n\n"
+    "Conserva lo que siga siendo correcto —especialmente lo escrito a mano—, "
+    "corrige lo obsoleto y añade lo que falte. Mantén las secciones:\n"
+    + _INIT_SECTIONS
+    + "\nReglas: no inventes datos que no puedas verificar; si algo no está, "
+    "omítelo o márcalo como pendiente. Sé específico y accionable (comandos y "
+    "rutas exactas, nada de consejos genéricos); usa bullets bajo headings; no "
+    "listes todos los ficheros ni repitas el README; máximo ~200 líneas. No "
+    "modifiques ningún otro fichero. Al terminar, resume qué has conservado, "
+    "corregido y añadido."
 )
 
 
@@ -1189,23 +1212,37 @@ class BytIAKODEApp(App):
             self.action_verify_repo()
         elif cmd == "/init":
             self._run_init()
+        elif cmd == "/memory":
+            self.action_edit_memory()
         else:
             self._add_system_message(f"Unknown command: {cmd_raw}  |  /help for list")
 
-    def _run_init(self):
-        """Genera B-KODE.md si no existe; nunca sobrescribe."""
-        from bytia_kode.agent import find_bkode
+    def _run_init(self, target=None):
+        """Crea o actualiza B-KODE.md (si existe, backup + análisis + update)."""
+        from pathlib import Path
 
+        from bytia_kode.agent import backup_bkode_file, find_bkode
+
+        target = Path(target or (Path.cwd() / "B-KODE.md")).resolve()
         existing = find_bkode()
-        if existing is not None:
+        if existing is not None and existing.resolve() != target:
             self._add_system_message(
-                f"B-KODE.md ya existe en {existing}. Edítalo a mano; no lo sobrescribo."
+                f"B-KODE.md encontrado en {existing} (fuera del cwd). /init solo "
+                f"crea/actualiza {target}; edita aquel a mano si quieres."
             )
             return
-        self._add_system_message("Generating B-KODE.md (analizando el repo)…")
+        if target.exists():
+            backup = backup_bkode_file(target)
+            self._add_system_message(
+                f"B-KODE.md existente; backup en {backup}. Actualizando…"
+            )
+            prompt = INIT_UPDATE_PROMPT.format(path=target, backup=backup)
+        else:
+            self._add_system_message("Generating B-KODE.md (analizando el repo)…")
+            prompt = INIT_PROMPT.format(path=target)
         self.is_processing = True
         self._start_spinner()
-        self._process_message(INIT_PROMPT)
+        self._process_message(prompt)
 
     async def _run_verify(self):
         """Suite real del árbol de trabajo vs baseline del HEAD (worktree)."""
@@ -1626,6 +1663,32 @@ class BytIAKODEApp(App):
 
     def action_init_project(self):
         self._run_init()
+
+    def action_edit_memory(self):
+        self._edit_memory()
+
+    def _run_editor(self, cmd: list[str]) -> None:
+        import subprocess
+
+        subprocess.run(cmd, check=False)
+
+    def _edit_memory(self):
+        """Abre B-KODE.md en $EDITOR y recarga el contexto al volver."""
+        import os
+        from pathlib import Path
+
+        from bytia_kode.agent import find_bkode
+
+        target = find_bkode() or (Path.cwd() / "B-KODE.md")
+        editor = os.environ.get("EDITOR") or os.environ.get("VISUAL") or "nano"
+        try:
+            with self.suspend():
+                self._run_editor([editor, str(target)])
+        except Exception as exc:  # noqa: BLE001 - la TUI reporta, no tumba
+            self._add_message("error", f"No se pudo abrir el editor: {exc}")
+            return
+        self.agent.reload_bkode()
+        self._add_system_message(f"Editado {target}; contexto recargado.")
 
     def action_show_models(self):
         self._show_models()

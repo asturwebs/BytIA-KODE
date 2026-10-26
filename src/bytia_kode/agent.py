@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import threading
 from importlib import resources
 from pathlib import Path
@@ -176,6 +177,65 @@ def find_bkode(start: Path | None = None) -> Path | None:
     return None
 
 
+_BKODE_IMPORT = re.compile(r"^\s*@(\S+)\s*$")
+_BKODE_IMPORT_MAX_DEPTH = 5
+
+
+def resolve_bkode_imports(
+    content: str, base_dir: Path, depth: int = 0, seen: set[Path] | None = None
+) -> str:
+    """Resuelve líneas `@ruta` de B-KODE.md (como los imports de CLAUDE.md).
+
+    Las rutas relativas se resuelven contra el directorio del B-KODE.md; las
+    líneas dentro de fences no se evalúan; profundidad máxima 5; los ciclos se
+    dejan tal cual (no se expanden).
+    """
+    if depth >= _BKODE_IMPORT_MAX_DEPTH:
+        return content
+    seen = seen if seen is not None else set()
+    out: list[str] = []
+    in_fence = False
+    for line in content.splitlines():
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        match = None if in_fence else _BKODE_IMPORT.match(line)
+        if not match:
+            out.append(line)
+            continue
+        path = Path(match.group(1)).expanduser()
+        if not path.is_absolute():
+            path = base_dir / path
+        path = path.resolve()
+        if path in seen or not path.is_file():
+            out.append(line)
+            continue
+        seen.add(path)
+        try:
+            imported = path.read_text(encoding="utf-8")
+        except OSError:
+            out.append(line)
+            continue
+        out.append(
+            resolve_bkode_imports(imported, path.parent, depth + 1, seen).strip()
+        )
+    return "\n".join(out)
+
+
+def backup_bkode_file(path: Path, backups_dir: Path | None = None) -> Path:
+    """Copia B-KODE.md a ~/.bytia-kode/backups/ antes de que /init lo actualice."""
+    import shutil
+    import time as _time
+
+    backups = backups_dir or (Path.home() / ".bytia-kode" / "backups")
+    backups.mkdir(parents=True, exist_ok=True)
+    stamp = _time.strftime("%Y%m%d-%H%M%S")
+    target = backups / f"B-KODE-{path.parent.name}-{stamp}.md"
+    shutil.copy2(path, target)
+    return target
+
+
 def _sanitize_user_message(user_message: str) -> str:
     filtered = "".join(ch for ch in user_message if ch.isprintable() or ch in "\n\t")
     lines = [line.rstrip() for line in filtered.splitlines()]
@@ -302,11 +362,18 @@ class Agent:
         try:
             content = bk.read_text(encoding="utf-8").strip()
             if content:
+                content = resolve_bkode_imports(content, bk.parent)
                 logger.info("B-KODE.md loaded from %s", bk)
                 return bk, content
         except OSError as exc:
             logger.warning("Failed to read B-KODE.md at %s: %s", bk, exc)
         return None, ""
+
+    def reload_bkode(self) -> None:
+        """Recarga B-KODE.md tras editarlo (p. ej. /memory) e invalida el SP."""
+        self._bkode_path, self._bkode_content = self._load_bkode()
+        self._identity_dirty = True
+        self._sp_cache = None
 
     def _apply_template_vars(self, payload: dict) -> dict:
         """Resolve {{var}} placeholders in kernel/runtime YAML with runtime values."""

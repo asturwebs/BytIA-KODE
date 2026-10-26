@@ -21,11 +21,14 @@ y claves `KODE_ESCALATION_*`.
 Requiere `KODE_ESCALATION_ENABLED=true`. Guía: [docs/ESCALATION.md](docs/ESCALATION.md).
 E2E real: `done` en 1 ronda, 5.870 tokens, 163,6 s. 647 tests.
 
-### Added — contexto de proyecto (`/init`)
+### Added — contexto de proyecto (`/init`, `/memory`)
 
-Genera `B-KODE.md` en la raíz del repo a partir del análisis real (stack,
-comandos de setup/test/build, estructura, convenciones y gotchas). No
-sobrescribe si ya existe. Disponible en TUI (`/init`, también en Ctrl+P).
+`/init` crea **o actualiza** `B-KODE.md` a partir del análisis real (stack,
+comandos de setup/test/build, estructura, convenciones y gotchas). Si ya
+existe, deja backup en `~/.bytia-kode/backups/`, conserva lo válido y corrige
+lo obsoleto. Admite **imports `@ruta`** (profundidad 5, como CLAUDE.md).
+`/memory` abre el fichero en tu `$EDITOR` y recarga el contexto al volver.
+Disponibles en TUI (y Ctrl+P).
 
 ### Added — verificación real (`/verify`)
 
