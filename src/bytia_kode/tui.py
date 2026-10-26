@@ -435,6 +435,9 @@ class ActivityIndicator(Static):
 
     def on_mount(self) -> None:
         self._refresh()
+        # Presentarse en el panel de herdr al arrancar: sin esto, un TUI
+        # abierto e idle no aparecía hasta su primer cambio de estado.
+        self._herdr.notify_state(self._status)
         self.watch(self.app, "theme", lambda *_: self._refresh())
 
     def set_status(self, status: str, detail: str = ""):

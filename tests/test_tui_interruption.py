@@ -74,6 +74,30 @@ def _messages(app, role):
     return [m.msg_content for m in app.query(ChatMessage) if m.role == role]
 
 
+class TestHerdrAnnounce:
+    """Un TUI recién abierto debe aparecer en el panel de herdr sin un turno."""
+
+    @pytest.mark.asyncio
+    async def test_initial_state_is_reported_on_mount(self, monkeypatch):
+        from bytia_kode import tui as tui_module
+
+        calls: list[str] = []
+
+        class FakeBridge:
+            def notify_state(self, status, detail=""):
+                calls.append(status)
+
+            def notify_session(self, session_id):
+                pass
+
+        monkeypatch.setattr(tui_module, "HerdrBridge", lambda **kwargs: FakeBridge())
+        app = BytIAKODEApp(agent=FakeAgent())
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert "ready" in calls
+
+
 class TestInterruptBinding:
     """Esc = interrupt: llama a agent.interrupt() y avisa al usuario."""
 
