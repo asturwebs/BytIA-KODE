@@ -44,10 +44,11 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 
 ### F2 — integración real (rama `f2-integration`)
 
-- Rama **`f2-integration`** (worktree `~/Projects/lab/kode-f2`), base `5ea530d`. HEAD **`0233c39`**, **641/641 tests**. **NO en main.**
-- T6 scratch git-worktree (R3/R4/R6/R2, fixes H1-H7 del Engineer) · T7 `verify.py` (baseline, timeout) · T8 worker agéntico + **jail save/restore (R5)** · T9 providers + circuit → infra · T10 `/escalate` en TUI y Telegram · T11 `patch.diff` · T12 M1-M4 del CTO · T13 script e2e.
-- **E2E real ✅**: repo con bug (`add` restaba) → **`done`**, 3 rondas, 17.352 tokens, 298,5 s, **patch limpio** (solo `src/calc.py`). Tres fixes salieron del e2e: artefactos `__pycache__`, `PLAN` en ideation y backups del worker (`*.backup-*`).
-- Pendiente: **revisión del Engineer** (AST-43, emitida sobre `db3e38b`; avisado del HEAD `0233c39`), **merge a main = decisión del Socio**. Sin release hasta F2 cerrado.
+- Rama **`f2-integration`** (worktree `~/Projects/lab/kode-f2`), base `5ea530d`. HEAD **`dde5947`**, **647/647 tests verificados sobre el commit**. **NO en main.**
+- T6 scratch git-worktree (R3/R4/R6/R2, fixes H1-H7 + H1 de AST-43) · T7 `verify.py` (baseline, timeout, exit 2/3/4/5 = no-ok) · T8 worker agéntico + **jail save/restore (R5)** · T9 providers + circuit → infra · T10 `/escalate` en TUI y Telegram · T11 `patch.diff` · T12 M1-M4 del CTO · T13 e2e.
+- **E2E real ✅ FINAL**: repo con bug (`add` restaba) → **`done` en 1 ronda**, 5.870 tokens, 163,6 s, **patch limpio** (solo `src/calc.py`). Cierre por ground truth (tests verdes + worker solved) tras detectar 4 rondas `budget` con el patch ya correcto.
+- Revisiones del Engineer (AST-43): 2 rondas, NO APROBADO → **H1-H4 + R2-1 + R2-M1 cerrados** (`f4fc6a8`, `dde5947`). Pendiente su re-revisión del HEAD.
+- **Pendiente final: merge a main = decisión del Socio** (tag `pre-f2-merge` + merge `--no-ff` + CI, igual que F1). Sin release hasta F2 cerrado.
 
 ## Arquitectura en 30 segundos
 
