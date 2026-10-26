@@ -25,6 +25,7 @@ def main() -> int:
     config.provider.base_url = ROUTER
     config.provider.model = MODEL
     config.provider.api_key = "dummy"
+    config.escalation.enabled = True
 
     def provider_factory(scratch: Path):
         text = TextProvider(
@@ -35,6 +36,7 @@ def main() -> int:
         )
         return RoleProvider(text=text, worker=worker)
 
+    factory = provider_factory
     service = EscalationService(
         config=config,
         repo=REPO,
@@ -43,7 +45,7 @@ def main() -> int:
             "la suma de a y b, no la resta. No modifiques los tests."
         ),
         workspace_root=WORKSPACE,
-        provider_factory=provider_factory,
+        provider_factory=factory,
         progress=lambda message: print(f"[progress] {message}", flush=True),
     )
 

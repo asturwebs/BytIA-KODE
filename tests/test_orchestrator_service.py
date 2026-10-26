@@ -52,7 +52,9 @@ def repo(tmp_path):
 
 def make_config(tmp_path):
     return SimpleNamespace(
-        escalation=EscalationConfig(max_rounds=2, max_tokens=100_000),
+        escalation=EscalationConfig(
+            enabled=True, max_rounds=2, max_tokens=100_000
+        ),
         data_dir=tmp_path / "data",
         provider=SimpleNamespace(),
     )
@@ -92,6 +94,19 @@ def test_happy_path_produces_patch_and_tears_down(tmp_path, repo):
     assert outcome.result.status == "done", outcome.result.detail
     assert "+x = 2" in outcome.patch
     assert not (tmp_path / "ws" / "scratch").exists()
+
+
+def test_disabled_returns_ineligible(tmp_path, repo):
+    cfg = make_config(tmp_path)
+    cfg.escalation = EscalationConfig(enabled=False)
+    service = EscalationService(
+        config=cfg, repo=repo, task="x", workspace_root=tmp_path / "ws3"
+    )
+
+    outcome = service.run()
+
+    assert outcome.result.status == "ineligible"
+    assert "disabled" in outcome.result.detail
 
 
 def test_tamper_is_invalidated_and_aborts(tmp_path, repo):

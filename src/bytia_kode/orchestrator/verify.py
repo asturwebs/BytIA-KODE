@@ -97,5 +97,9 @@ class Verifier:
         if baseline is not None:
             new_failures = [t for t in result.new_failures if t not in baseline]
             result.new_failures = new_failures
-            result.ok = result.exit_code == 0 or not new_failures
+            # Solo exit 1 es «tests rojos comparables»: 2 (interrupted),
+            # 3 (internal), 4 (usage/conftest) y 5 (no tests) NO son verdes.
+            result.ok = result.exit_code == 0 or (
+                result.exit_code == 1 and not new_failures
+            )
         return result

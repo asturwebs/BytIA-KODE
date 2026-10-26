@@ -299,3 +299,25 @@ class TestReviewFixes:
         )
 
         assert ".backup-" not in scratch.diff()
+
+    def test_restore_removes_ignored_new_test(self, scratch):
+        # H1: el worker añade el test al .gitignore para que clean -fd no lo borre.
+        (scratch.path / ".gitignore").write_text(
+            "tests/test_evil.py\n", encoding="utf-8"
+        )
+        (scratch.path / "tests" / "test_evil.py").write_text(
+            "def test_evil():\n    pass\n", encoding="utf-8"
+        )
+
+        assert "tests/test_evil.py" in scratch.touched_test_paths()
+        scratch.restore_tests()
+
+        assert not (scratch.path / "tests" / "test_evil.py").exists()
+
+    def test_checkpoint_with_only_artifacts_is_noop(self, scratch, repo):
+        _, sha = repo
+        cache = scratch.path / "tests" / "__pycache__"
+        cache.mkdir()
+        (cache / "x.pyc").write_bytes(b"\x00")
+
+        assert scratch.checkpoint("solo artefactos") == sha

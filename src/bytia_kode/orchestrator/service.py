@@ -90,6 +90,12 @@ class EscalationService:
 
     # -- ejecución ---------------------------------------------------------
     def run(self) -> EscalationOutcome:
+        if not self.config.escalation.enabled:
+            return EscalationOutcome(
+                result=RunResult("ineligible", detail="escalation disabled"),
+                patch="",
+                workspace=self.workspace_root,
+            )
         scratch = Scratch(
             repo=self.repo, base_sha=self.base_sha, root=self.workspace_root
         )

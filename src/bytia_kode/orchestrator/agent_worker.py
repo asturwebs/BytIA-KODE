@@ -50,8 +50,13 @@ class AgentWorker:
             async for chunk in agent.chat(prompt, provider=self.provider):
                 if isinstance(chunk, str):
                     chunks.append(chunk)
-                elif isinstance(chunk, tuple) and chunk and chunk[0] == "text":
-                    chunks.append(chunk[1])
+                elif isinstance(chunk, tuple) and chunk:
+                    if chunk[0] == "error":
+                        # El Agent emite errores de provider como tupla, sin
+                        # excepción: se convierten en infra (contrato T9).
+                        raise RuntimeError(str(chunk[1]))
+                    if chunk[0] == "text":
+                        chunks.append(chunk[1])
         finally:
             await agent.close()
         return "".join(chunks).strip()

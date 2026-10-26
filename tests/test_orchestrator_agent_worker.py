@@ -91,6 +91,11 @@ class TestWorkerJail:
         assert registry.get_workspace_mode() == "permissive"
 
 
+class FakeErrorAgent(FakeAgent):
+    async def chat(self, prompt, provider="primary"):
+        yield ("error", "network down")
+
+
 class TestAgentWorker:
     def test_runs_agent_with_cap_and_provider(self, tmp_path):
         set_outside_jail(tmp_path)
@@ -116,6 +121,18 @@ class TestAgentWorker:
         assert agent.seen_jail["mode"] == "confined"
         assert agent.seen_jail["workspace"] == scratch.resolve()
         assert reply.tokens > 0
+
+    def test_error_chunk_raises_for_infra(self, tmp_path):
+        scratch = tmp_path / "scratch"
+        scratch.mkdir()
+        worker = AgentWorker(
+            config=object(),
+            scratch=scratch,
+            agent_factory=FakeErrorAgent,
+        )
+
+        with pytest.raises(RuntimeError):
+            worker("worker", "hazlo")
 
     def test_jail_is_restored_after_worker(self, tmp_path):
         outside = set_outside_jail(tmp_path)

@@ -53,6 +53,18 @@ class TestBaseline:
         assert result.ok is True
         assert result.new_failures == []
 
+    def test_broken_conftest_is_not_ok(self, tmp_path):
+        (tmp_path / "conftest.py").write_text(
+            "import modulo_que_no_existe\n", encoding="utf-8"
+        )
+        verifier = Verifier()
+        baseline = verifier.capture_baseline(tmp_path)
+
+        result = verifier.run(tmp_path, baseline=baseline)
+
+        assert result.exit_code == 4
+        assert result.ok is False
+
     def test_new_failure_is_reported(self, tmp_path):
         write_test(tmp_path, "test_ok.py", "def test_ok():\n    assert True\n")
         verifier = Verifier()

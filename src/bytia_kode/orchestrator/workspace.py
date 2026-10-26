@@ -114,7 +114,9 @@ class Scratch:
 
     def checkpoint(self, message: str) -> str:
         self._git("add", "-A", "--", ".", *_ARTIFACT_EXCLUDES)
-        if self._git("status", "--porcelain").stdout.strip():
+        if self._git(
+            "status", "--porcelain", "--", ".", *_ARTIFACT_EXCLUDES
+        ).stdout.strip():
             self._git(
                 "-c",
                 "user.name=bytia-orchestrator",
@@ -189,12 +191,26 @@ class Scratch:
         return [path for path in files if is_test_path(path)]
 
     def touched_test_paths(self) -> list[str]:
-        """Rutas de test en el diff contra el SHA base (R2/C1), sin artefactos."""
+        """Rutas de test tocadas contra el SHA base (R2/C1), sin artefactos.
+
+        `git diff` es ciego a untracked/ignored: se completa con un walk del
+        worktree para tests que no existen en base (evasión `.gitignore`).
+        """
         self._git("add", "-A", "--", ".", *_ARTIFACT_EXCLUDES)
-        changed = self._git(
-            "diff", "--name-only", self.base_sha, "--", ".", *_ARTIFACT_EXCLUDES
-        ).stdout.splitlines()
-        return [path for path in changed if is_test_path(path)]
+        changed = set(
+            self._git(
+                "diff", "--name-only", self.base_sha, "--", ".", *_ARTIFACT_EXCLUDES
+            ).stdout.splitlines()
+        )
+        base_tests = set(
+            self._git("ls-tree", "-r", "--name-only", self.base_sha).stdout.splitlines()
+        )
+        for path in self.path.rglob("*"):
+            if path.is_file() and ".git" not in path.parts:
+                relative = path.relative_to(self.path).as_posix()
+                if is_test_path(relative) and relative not in base_tests:
+                    changed.add(relative)
+        return [path for path in sorted(changed) if is_test_path(path)]
 
     def restore_tests(self) -> None:
         """Restaura tests desde el SHA base y deja status limpio (R2)."""
@@ -203,7 +219,7 @@ class Scratch:
         for spec in specs:
             self._git("reset", "-q", self.base_sha, "--", spec, check=False)
             self._git("checkout", "--", spec, check=False)
-            self._git("clean", "-fdq", "--", spec, check=False)
+            self._git("clean", "-fdxq", "--", spec, check=False)
         self._restore_pyproject_pytest()
         if specs:
             remaining = self._git(
