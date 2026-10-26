@@ -100,6 +100,28 @@ def get_workspace_mode() -> str:
     return _workspace_mode
 
 
+def snapshot_workspace_policy() -> dict:
+    """Snapshot mutable del jail (mode, root y trusted) para save/restore."""
+    return {
+        "mode": _workspace_mode,
+        "workspace": _WORKSPACE_ROOT,
+        "trusted": list(_TRUSTED_PATHS),
+    }
+
+
+def restore_workspace_policy(state: dict) -> None:
+    """Restaura el snapshot; pensado para el save/restore del orquestador."""
+    global _WORKSPACE_ROOT, _workspace_mode
+    _TRUSTED_PATHS[:] = list(state["trusted"])
+    _WORKSPACE_ROOT = state["workspace"]
+    _workspace_mode = state["mode"]
+
+
+def replace_trusted_paths(paths: list[Path]) -> None:
+    """Reemplaza la lista de trusted paths (no aditivo, a diferencia de set_trusted_paths)."""
+    _TRUSTED_PATHS[:] = [p.expanduser().resolve() for p in paths]
+
+
 def workspace_policy_state() -> dict:
     """Snapshot of the live jail policy for the system prompt and the TUI."""
     return {

@@ -1,5 +1,54 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.9.0] - 2026-10-26
+
+### Added — autocompletado de comandos en la TUI
+
+Al teclear `/` como primer carácter del prompt aparece una lista filtrable
+de comandos (`/esc` → `/escalate`), con navegación ↑/↓, Enter/Tab para
+completar y Esc para cerrar. La fuente es única (`TUI_COMMANDS`): la usan
+el autocompletado, `/help` y el menú Ctrl+P.
+
+### Added — orquestación multi-agente (`/escalate`)
+
+Modo opt-in de escalación (F1+F2): núcleo (`orchestrator/protocol.py`,
+`ledger.py`, `specs.py`, `prompts.py`, `runner.py`), verificación real
+(`verify.py`), scratch git-worktree con anti-tamper (`workspace.py`), worker
+agéntico confinado (`agent_worker.py`, `jail.py`), providers (`providers.py`),
+servicio y comando `/escalate` en TUI y Telegram (`service.py`), `patch.diff`
+y claves `KODE_ESCALATION_*`.
+
+Requiere `KODE_ESCALATION_ENABLED=true`. Guía: [docs/ESCALATION.md](docs/ESCALATION.md).
+E2E real: `done` en 1 ronda, 5.870 tokens, 163,6 s. 647 tests.
+
+### Added — contexto de proyecto (`/init`, `/memory`)
+
+`/init` crea **o actualiza** `B-KODE.md` a partir del análisis real (stack,
+comandos de setup/test/build, estructura, convenciones y gotchas). Si ya
+existe, deja backup en `~/.bytia-kode/backups/`, conserva lo válido y corrige
+lo obsoleto. Admite **imports `@ruta`** (profundidad 5, como CLAUDE.md).
+`/memory` abre el fichero en tu `$EDITOR` y recarga el contexto al volver.
+Disponibles en TUI (y Ctrl+P).
+
+### Added — verificación real (`/verify`)
+
+Corre la suite del **árbol de trabajo** y la compara con un **baseline del
+HEAD** obtenido en un `git worktree` desechable: solo los fallos **nuevos**
+invalidan. Disponible en TUI (`/verify`, también en Ctrl+P) y Telegram.
+Es la pieza práctica de F2 sin orquestación.
+
+### Fixed — panel de agentes de herdr
+
+La TUI se presenta en el panel al arrancar (idle + sesión), sin esperar al
+primer cambio de estado. Antes, un TUI abierto e idle no aparecía.
+
+### Security — dependencias y escáner
+
+- aiohttp 3.14.5, certifi 2026.10.23, filelock 4.2.4, setuptools 84.2.1 (9 alertas Dependabot cerradas).
+- El escáner de secretos ya no marca nombres de configuración `KODE_*` con valor corto (falso positivo del propio plan).
+
 ## [0.8.6] - 2026-10-03
 
 ### Security — 17 alertas Dependabot cerradas (2 críticas, 7 altas, 8 moderadas)

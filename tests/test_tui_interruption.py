@@ -74,6 +74,113 @@ def _messages(app, role):
     return [m.msg_content for m in app.query(ChatMessage) if m.role == role]
 
 
+class TestHerdrAnnounce:
+    """Un TUI recién abierto debe aparecer en el panel de herdr sin un turno."""
+
+    @pytest.mark.asyncio
+    async def test_initial_state_is_reported_on_mount(self, monkeypatch):
+        from bytia_kode import tui as tui_module
+
+        calls: list[str] = []
+
+        class FakeBridge:
+            def notify_state(self, status, detail=""):
+                calls.append(status)
+
+            def notify_session(self, session_id):
+                pass
+
+        monkeypatch.setattr(tui_module, "HerdrBridge", lambda **kwargs: FakeBridge())
+        app = BytIAKODEApp(agent=FakeAgent())
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert "ready" in calls
+
+
+class TestInitCommand:
+    """`/init` crea B-KODE.md o lo actualiza (con backup), como Claude."""
+
+    @pytest.mark.asyncio
+    async def test_creates_when_missing(self, monkeypatch, tmp_path):
+        target = tmp_path / "B-KODE.md"
+        monkeypatch.setattr("bytia_kode.agent.find_bkode", lambda *a, **k: None)
+        app = BytIAKODEApp(agent=FakeAgent())
+        calls: list[str] = []
+        monkeypatch.setattr(app, "_process_message", lambda text: calls.append(text))
+        monkeypatch.setattr(app, "_start_spinner", lambda: None)
+
+        async with app.run_test() as pilot:
+            app._run_init(target=target)
+            await pilot.pause()
+            assert len(calls) == 1
+            assert "Crea el fichero B-KODE.md" in calls[0]
+
+    @pytest.mark.asyncio
+    async def test_updates_existing_with_backup(self, monkeypatch, tmp_path):
+        target = tmp_path / "B-KODE.md"
+        target.write_text("viejo", encoding="utf-8")
+        monkeypatch.setattr("bytia_kode.agent.find_bkode", lambda *a, **k: target)
+        monkeypatch.setattr(
+            "bytia_kode.agent.backup_bkode_file", lambda path: tmp_path / "bak.md"
+        )
+        app = BytIAKODEApp(agent=FakeAgent())
+        calls: list[str] = []
+        monkeypatch.setattr(app, "_process_message", lambda text: calls.append(text))
+        monkeypatch.setattr(app, "_start_spinner", lambda: None)
+
+        async with app.run_test() as pilot:
+            app._run_init(target=target)
+            await pilot.pause()
+            assert len(calls) == 1
+            assert "Actualiza el fichero B-KODE.md" in calls[0]
+            assert any("backup" in c for c in _messages(app, "system"))
+
+    @pytest.mark.asyncio
+    async def test_refuses_when_bkode_is_in_parent(self, monkeypatch, tmp_path):
+        parent = tmp_path / "B-KODE.md"
+        target = tmp_path / "sub" / "B-KODE.md"
+        target.parent.mkdir()
+        monkeypatch.setattr("bytia_kode.agent.find_bkode", lambda *a, **k: parent)
+        app = BytIAKODEApp(agent=FakeAgent())
+        calls: list[str] = []
+        monkeypatch.setattr(app, "_process_message", lambda text: calls.append(text))
+
+        async with app.run_test() as pilot:
+            app._run_init(target=target)
+            await pilot.pause()
+            assert calls == []
+            assert any("fuera del cwd" in c for c in _messages(app, "system"))
+
+
+class TestMemoryCommand:
+    """`/memory` abre B-KODE.md en $EDITOR y recarga el contexto."""
+
+    @pytest.mark.asyncio
+    async def test_opens_editor_and_reloads(self, monkeypatch, tmp_path):
+        import contextlib
+
+        target = tmp_path / "B-KODE.md"
+        target.write_text("x", encoding="utf-8")
+        monkeypatch.setattr("bytia_kode.agent.find_bkode", lambda *a, **k: target)
+        calls: list[list[str]] = []
+        app = BytIAKODEApp(agent=FakeAgent())
+        monkeypatch.setattr(
+            app, "_run_editor", lambda cmd: calls.append(list(cmd)), raising=False
+        )
+        monkeypatch.setattr(app, "suspend", lambda: contextlib.nullcontext())
+        reloaded: list[bool] = []
+        monkeypatch.setattr(
+            app.agent, "reload_bkode", lambda: reloaded.append(True), raising=False
+        )
+
+        async with app.run_test() as pilot:
+            app._edit_memory()
+            await pilot.pause()
+            assert calls and str(target) in calls[0]
+            assert reloaded == [True]
+
+
 class TestInterruptBinding:
     """Esc = interrupt: llama a agent.interrupt() y avisa al usuario."""
 

@@ -86,7 +86,7 @@ Lo que NO existe aún: orquestación multi-instancia, ledger persistente, verifi
 
 1. Opt-in explícito. Default path intocado; `KODE_ESCALATION_ENABLED=false` por defecto.
 2. El ledger vive bajo el jail del registry (`set_trusted_paths`).
-3. Orquestación **heterogénea**: manager = provider primario/deepseek; workers = `local` (:8080). Configurable por claves de entorno.
+3. Orquestación **heterogénea**: manager = `local` por defecto; workers = `local` (:8080). Cloud solo opt-in explícito y **prohibido en repos de cliente** (C2). Configurable por claves de entorno.
 4. Verificación real (pytest/build en un worktree desechable) como ground truth del manager.
 5. Presupuestos duros + kill-switch + estados `infra` vs `model_fail`.
 6. Instancias frescas por rol (contexto corto + ledger) — sin context bloat; el resumen de corte reutiliza el patrón de `_summarize_messages`.
@@ -109,10 +109,11 @@ Fase 1 puede ser un único `escalation.py`; el paquete es la forma final. Integr
 ```
 ~/.bytia-kode/workspaces/<session_id>/<task_slug>/
 ├── plan.md · notes.md · tasks.json · record.jsonl
-├── scratch/        # worktree o copia del repo objetivo (git worktree add / cp -r)
+├── scratch/        # worktree git OBLIGATORIO para elegibilidad; cp -r = modo degradado sin verify (R3)
 └── patch.diff      # artefacto final: git diff del scratch, aplicable a demanda
 ```
 - Los workers editan SOLO `scratch/` (registrado en trusted paths). El repo real del usuario **nunca** se toca durante la orquestación; `patch.diff` se propone al usuario al final (aplicar/revisar/descartar).
+- Teardown obligatorio del worktree (`git worktree remove` + `prune`, también en el camino de error) y declaración de la traza en el `.git` del usuario (R4).
 - `record.jsonl`: una línea por llamada (rol, provider, tokens, duración, verdict, status infra|model) — misma semántica de contabilidad que GVS5H.
 
 ### 4.4 Flujo (pseudocódigo del runner)
@@ -124,27 +125,31 @@ plan   = primary_plan(manager)                    # ### PLAN / ### TASKS
 notes  += ideation(worker local, sin código)      # enfoques distintos
 for round in 1..MAX_ROUNDS:
     task = elegir_siguiente(tasks)                # del manager o primera pending
-    out  = worker(local, task, notes, scratch)    # ### CODE/### NOTES/### NEXT/### STATUS
-    ledger.aplicar(out)                           # scratch + notes rewrite + tasks
+    out  = worker(local, task, notes, scratch)    # edita scratch con tools -> ### NOTES/### NEXT/### STATUS
+    tamper = detectar_toque_tests(scratch)        # ANTES de restaurar (R2/C7)
+    ledger.aplicar(out)                           # notes rewrite + tasks (+ invalid si tamper)
+    restaurar_tests(scratch)                      # checkout + git clean -fd acotado + assert status limpio
     verdict = verify.py(scratch)                  # pytest -x / build  (REAL)
+    checkpoint(scratch)                           # git add -A + commit (R6)
     status,next,tasks = primary_manage(manager, verdict, ...)   # done|continue
     if status == done or presupuesto agotado: break
-artefacto = git -C scratch diff > patch.diff
+artefacto = git -C scratch add -A && git -C scratch diff <base> > patch.diff   # R6
 reporte = resumen(record.jsonl) → usuario (aplicar / descartar)
 ```
 Corte limpio en cualquier punto: todo el estado ya está en el ledger; una sesión futura puede retomar (resolviendo el problema de las 50 iteraciones del loop actual).
 
 ### 4.5 Specs de dominio (`specs.py`)
 
-- `CODE_REPO`: `solver_system` adaptado a repos (no stdin/stdout): "eres un ingeniero senior trabajando en un checkout en scratch/; usa las tools del registry; patch completo y compilable".
+- `CODE_REPO`: `solver_system` adaptado a repos (no stdin/stdout): "eres un ingeniero senior trabajando en un checkout en `scratch/`; usa las tools del registry; deja el árbol compilable y testeable" (worker agéntico: edita ficheros, no devuelve `### CODE` — C3/R1).
 - `critic`: NO basado en APPROVED/REJECTED de un LLM como primera línea de defensa: `verify.py` ejecuta `pytest -x`/`build` y devuelve veredicto estructurado (pasos, fallos, salida recortada). El crítico LLM queda como segunda opinión opcional (reutilizando el protocolo APPROVED de GVS5H).
 
 ### 4.6 Config (config.py + `.env`)
 
 ```
 KODE_ESCALATION_ENABLED=false        # kill-switch global
-KODE_ESCALATION_MANAGER_PROVIDER=primary
+KODE_ESCALATION_MANAGER_PROVIDER=local   # default local; cloud solo opt-in (C2)
 KODE_ESCALATION_WORKER_PROVIDER=local
+KODE_ESCALATION_WORKER_MAX_ITER=12   # techo por worker agéntico (C7)
 KODE_ESCALATION_MAX_ROUNDS=4         # rondas worker→verify→manage
 KODE_ESCALATION_MAX_TASKS=8
 KODE_ESCALATION_MAX_WALLCLOCK_MIN=20
@@ -251,7 +256,7 @@ Y marcar la ronda como `invalid` (registrada en `record.jsonl`) si el diff del w
 
 ### C2 — BLOQUEANTE de privacidad: manager cloud por defecto
 `KODE_ESCALATION_MANAGER_PROVIDER=primary` y `PROVIDER_*` es un endpoint cloud con API key. El manager recibe plan, notas, solución y fragmentos del repo. Con repos de clientes eso es código propietario saliendo a un tercero por defecto, sin aviso. Contradice el valor 3 del Kernel y la regla local-first.
-**Decisión cerrada:** default `local`. El modo cloud exige (a) opt-in explícito, (b) aviso visible de que el contenido del repo se envía al proveedor, (c) bloqueo en workspaces marcados como cliente. Queda al Socio si el cloud se permite alguna vez en repos de cliente (recomendación: NO).
+**Decisión cerrada:** default `local`. El modo cloud exige (a) opt-in explícito, (b) aviso visible de que el contenido del repo se envía al proveedor, (c) bloqueo en workspaces marcados como cliente. **Decisión del Socio (2026-10-25): NO.** El modo cloud queda prohibido en repos de cliente; solo `local`/`unsloth`.
 
 ### C3 — BLOQUEANTE de diseño: worker textual vs. worker agéntico
 §2.2/§4.4 portan el protocolo de GVS5H (`### CODE` = programa completo autocontenido); §4.8 dice que los workers usan tools del registry sobre scratch. En repos reales no existe "el programa completo". Sin decidirlo, F1 no se puede escribir.
@@ -283,6 +288,77 @@ El protocolo de secciones funciona en GVS5H porque manager y workers son el MISM
 - La regla de C1 («diff que toca tests → invalid») excluye de `/escalate` las tareas cuyo objetivo legítimo ES modificar tests (refactor de suite, subida de cobertura, migración de framework). Limitación aceptada y declarada — mejor aquí que descubrirla en producción.
 - Mitigación barata en F2: el runner detecta pronto la no-elegibilidad — si el PLAN del manager o la tarea `NEXT` apuntan a modificar `tests/`, abortar con estado `ineligible: test-targeted` antes de gastar la primera ronda.
 - Escape hatch futuro (fuera de F1): `KODE_ESCALATION_ALLOW_TEST_EDITS=true` + whitelist explícita de rutas; con ella el diff de tests se permite, pero los ficheros siguen snapshot-ándose para reversión limpia.
+
+## Anexo D — Correcciones del CTO (R1-R9) y cierre del gate F1
+
+> Revisión del CTO de Paperclip (documento `4ce1bcdf`, aceptado por el Socio 2026-10-25). Veredicto: **APROBADO CONDICIONADO** — C1-C8 correctas en sustancia; F1 cerrado hasta (a) números de F0 y (b) R1-R9 al doc. Este anexo incorpora R1-R9 y registra los números de F0; **prevalece sobre el Anexo C donde haya conflicto**.
+
+### R1 — Cuerpo sincronizado con la opción B
+§4.1.3 (manager `local` por defecto), §4.4 (sin `### CODE`; el worker edita scratch con tools y devuelve `### NOTES/### NEXT/### STATUS`) y §4.5 (spec en términos de tools + patch) corregidos en este mismo commit.
+
+### R2 — C1: el restore debe dejar «status limpio»
+`git checkout <base> -- <rutas>` **no elimina tests NUEVOS**. Invariant obligatorio:
+1. Detectar el toque (diff contra checkpoint/base) y registrar `invalid`.
+2. `git checkout <SHA-base> -- <rutas>` + `git clean -fd -- <rutas>`.
+3. Assert `git status --porcelain -- <rutas>` vacío.
+4. Enumeración de rutas de test desde el índice git con **un predicado único** compartido por detección y restore (raíz y `src/tests/`, conftests anidados).
+5. `pyproject.toml` se restaura solo en sus secciones de test (`[tool.pytest…]`); revertir el fichero entero se declara como collateral de dep-bumps.
+
+### R3 — Elegibilidad = scratch git-worktree
+`cp -r` produce un scratch sin git: desactiva C1 (restore), C4b (checkpoints) y `patch.diff`. `cp -r` queda como modo degradado **sin verify**. Sin worktree no hay `/escalate`.
+
+### R4 — Teardown y traza en el `.git` del usuario
+`git worktree add` escribe metadatos en el `.git` del repo del usuario. Obligatorio `git worktree remove` + `git worktree prune` en el cierre (incluido el camino de error) y declararlo en el reporte.
+
+### R5 — Jail del worker: save/restore alrededor de cada worker
+El jail del registry es estado global de módulo (`registry.py:58-100`: `_TRUSTED_PATHS` aditivo sin reversión; `_WORKSPACE_ROOT`/`_workspace_mode` single-slot). Un worker `Agent` anidado pisaría la jail de la sesión del usuario. Los workers son secuenciales ⇒ **save/restore explícito** de las tres variables alrededor de cada worker (race-free). Jail del worker = root `scratch/` + modo `confined` + trusted ∅ (no heredar `~/.bytia-kode`, trusted por defecto y con las SQLite de sesión).
+
+### R6 — `git add -A` antes de checkpoint y de `patch.diff`
+`git diff <base>` no incluye ficheros nuevos sin `git add`. Sin esto, verify ve el fichero nuevo pero el entregable lo pierde. Regla: `git add -A` → checkpoint → `git diff <base>`.
+
+### R7 — Semántica de ronda inválida
+Una ronda `invalid` conserva el árbol ya saneado (tests restaurados) y se registra en `record.jsonl`; **cuenta contra `MAX_ROUNDS`**. Techo propio: 2 consecutivas ⇒ abort con estado `protocol: test-tamper`. Calibrar `MAX_ROUNDS`, `MAX_WALLCLOCK_MIN` y `WORKER_MAX_ITER` juntos con los minutos/iteración de F0.
+
+### R8 — C2 con enforcement real
+Marcador de workspace de cliente (agent-write-denied, como T4) + **error duro** si `MANAGER_PROVIDER ∉ {local, unsloth}` en un repo marcado como cliente. No un aviso.
+
+### R9 — F0: qué prueba y qué no
+F0 mide el protocolo **textual de 4 secciones de GVS5H** (con `### CODE`), no el agéntico de 3 secciones de F1. Es un **proxy del modelo** (router/latencia/tokens/conformidad textual), **no transferible** como conformidad del worker de F2. **Re-baseline de conformidad en F2** (1 tarea real) antes de F5. n≥30 llamadas asegurado (contar sobre la marcha; añadir tarea si quedan <30) y el informe debe desglosar por tipo de sección qué rompe.
+
+### Números de F0 (cierre de la condición (a))
+
+Run del 2026-10-25 sobre `qwen38-160k` (Qwen3.8-27B IQ4_XS, ctx 163840), 3 tareas de juguete × **2 pasadas idénticas = 30 llamadas**, protocolo textual de GVS5H:
+
+| Pasada | Tarea | Tests | Llamadas | Tokens | Minutos | Protocolo |
+|---|---|---|---|---|---|---|
+| pass1 | fizzbuzz | 5/5 | 5 | 9.337 | 3,30 | 5/5 |
+| pass1 | two_sum | 5/5 | 5 | 12.496 | 5,35 | 5/5 |
+| pass1 | csv_to_dicts | 5/5 | 5 | 16.505 | 8,20 | 5/5 |
+| pass2 | fizzbuzz | 5/5 | 5 | 8.906 | 3,16 | 5/5 |
+| pass2 | two_sum | 5/5 | 5 | 11.609 | 5,01 | 5/5 |
+| pass2 | csv_to_dicts | 5/5 | 5 | 19.494 | 9,72 | 5/5 |
+
+- **Conformidad 30/30 = 100%**, pero el límite inferior de Wilson al 95% es **88,6%** (<90%): con cero fallos hacen falta **≥35 llamadas** para certificar ≥90% al 95%. C5 debe presupuestar ≥35, no 30.
+- Ciclo: máx **9,72 min** (<15 ✅), media 5,79. Tokens: máx **19.494** (<30k ✅), media 13.058. Total 34,7 min.
+- Funcional: **6/6 ejecuciones 5/5 tests** (30/30 casos). 0 errores, 0 reintentos, 0 truncamientos.
+- **79,8% de los caracteres de respuesta son traza `<think>`** y entran en `completion_tokens` (`--reasoning-format none`). F1 debe acotar thinking o el presupuesto se va ahí.
+- Con 2 rondas completas (~+4-8k tokens) el margen de 30k se estrecha; con prompts de repo real, recalibrar (no heredar el umbral).
+- No medido: critic, segunda ronda, arranque en frío, rutas de fallo, repo/tools, heterogeneidad, concurrencia.
+- VRAM con el modelo cargado: **21,7/24,5 GB** → workers secuenciales confirmados.
+
+**Go provisional** en los tres criterios de C5, con la salvedad de R9 (proxy del modelo) y la reserva estadística (Wilson 88,6% / n≥35).
+
+### Gate F1 — estado
+- (a) Números de F0 contra C5: **✅** (tabla arriba).
+- (b) R1-R9 incorporados al doc: **✅** (este anexo + cuerpo sincronizado).
+- **F1 implementado y mergeado** (2026-10-25, rama `f1-escalation-core` @ `f9adb32`, 594 tests; CTO APROBADO en AST-41).
+
+### Requisitos F2 (M1-M4 del CTO, 2026-10-25)
+
+- **M1**: `required_when_continuing` se declara pero no se aplica; un manager `continue` sin NEXT pasa la validación y esquiva el retry correctivo. Aplicar la condición o renombrar el campo.
+- **M2**: el NEXT de `ideation` se exige, se parsea y se descarta. Sembrar `next_task` de la ronda 1 con él o quitarlo de la spec.
+- **M3**: la convención `(done)` no está pactada con el modelo (el prompt dice "marca done" sin formato). Fijar `(done)` en el prompt.
+- **M4**: el catch-all clasifica bugs del propio runner como `infra`; prefijar `bug:` en el detail o clave propia en `record.jsonl` (F5).
 
 ---
 

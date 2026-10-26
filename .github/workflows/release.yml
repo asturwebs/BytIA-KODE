@@ -36,7 +36,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
         with:
           # AST-35: el gate de citas SHA necesita historia completa para
           # resolver con git cat-file (mismo motivo que en ci.yml).

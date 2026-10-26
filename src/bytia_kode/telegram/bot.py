@@ -72,6 +72,8 @@ class TelegramBot:
         self.app.add_handler(CommandHandler("model", self._model))
         self.app.add_handler(CommandHandler("sessions", self._sessions))
         self.app.add_handler(CommandHandler("context", self._context))
+        self.app.add_handler(CommandHandler("escalate", self._escalate))
+        self.app.add_handler(CommandHandler("verify", self._verify))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._chat))
 
     def _is_allowed(self, user_id: int) -> bool:
@@ -147,9 +149,78 @@ class TelegramBot:
             "/model - Current model\n"
             "/help - This message\n"
             "/sessions - List available sessions\n"
-            "/context - Regenerate workspace context\n\n"
+            "/context - Regenerate workspace context\n"
+            "/escalate <tarea> - Multi-agent orchestration (repo = cwd del bot)\n"
+            "/verify - Run the repo suite vs the HEAD baseline\n\n"
             "Just send a message to chat!"
         )
+
+    async def _verify(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not update.message or not update.effective_user:
+            return
+        if not self._is_allowed(update.effective_user.id):
+            await self._deny(update)
+            return
+        import asyncio
+        from pathlib import Path
+
+        from bytia_kode.orchestrator.verify_service import VerifyService
+
+        await update.message.reply_text("Verifying repo…")
+        try:
+            outcome = await asyncio.to_thread(
+                VerifyService(repo=Path.cwd()).run
+            )
+        except Exception as exc:  # noqa: BLE001 - el bot reporta, no tumba
+            await update.message.reply_text(f"Verify failed: {exc}")
+            return
+        if outcome.ok:
+            text = (
+                f"VERIFY OK · baseline {outcome.baseline_failures} fallos "
+                f"preexistentes · {outcome.current.passed} passed"
+            )
+        else:
+            nuevos = (
+                ", ".join(outcome.current.new_failures)
+                or outcome.current.error
+                or "error"
+            )
+            text = f"VERIFY FALLO · nuevos: {nuevos}\n" + outcome.current.output_tail[:3000]
+        await update.message.reply_text(text[:4000])
+
+    async def _escalate(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not update.message or not update.effective_user:
+            return
+        if not self._is_allowed(update.effective_user.id):
+            await self._deny(update)
+            return
+        task = " ".join(context.args or []).strip()
+        if not task:
+            await update.message.reply_text(
+                "Usage: /escalate <tarea>  (repo = cwd del bot)"
+            )
+            return
+        import asyncio
+        from pathlib import Path
+
+        from bytia_kode.orchestrator.service import EscalationService
+
+        await update.message.reply_text(f"Escalating: {task}")
+        service = EscalationService(config=self.config, repo=Path.cwd(), task=task)
+        try:
+            outcome = await asyncio.to_thread(service.run)
+        except Exception as exc:  # noqa: BLE001 - el bot reporta, no tumba
+            await update.message.reply_text(f"Escalation failed: {exc}")
+            return
+        text = (
+            f"Escalation {outcome.result.status} · rondas "
+            f"{outcome.result.rounds} · tokens {outcome.result.tokens}"
+        )
+        if outcome.result.detail:
+            text += f"\n{outcome.result.detail}"
+        if outcome.patch:
+            text += "\n\n" + outcome.patch[:3500]
+        await update.message.reply_text(text[:4000])
 
     async def _model(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not update.message or not update.effective_user:
