@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added — autocompletado de comandos en la TUI
+
+Al teclear `/` como primer carácter del prompt aparece una lista filtrable
+de comandos (`/esc` → `/escalate`), con navegación ↑/↓, Enter/Tab para
+completar y Esc para cerrar. La fuente es única (`TUI_COMMANDS`): la usan
+el autocompletado, `/help` y el menú Ctrl+P.
+
 ### Added — orquestación multi-agente (`/escalate`)
 
 Modo opt-in de escalación (F1+F2): núcleo (`orchestrator/protocol.py`,
