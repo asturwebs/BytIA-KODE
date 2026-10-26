@@ -5,8 +5,8 @@
 [![PyPI](https://img.shields.io/pypi/v/bytia-kode.svg)](https://pypi.org/project/bytia-kode/)
 [![Tests](https://github.com/asturwebs/BytIA-KODE/actions/workflows/ci.yml/badge.svg)](https://github.com/asturwebs/BytIA-KODE/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/bytia-kode/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![SQLite WAL](https://img.shields.io/badge/SQLite%20WAL-enabled-orange.svg)](docs/ARCHITECTURE.md)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/asturwebs/BytIA-KODE/blob/main/LICENSE)
+[![SQLite WAL](https://img.shields.io/badge/SQLite%20WAL-enabled-orange.svg)](https://github.com/asturwebs/BytIA-KODE/blob/main/docs/ARCHITECTURE.md)
 [![Textual](https://img.shields.io/badge/Textual-8.2.1+-blueviolet.svg)](https://textual.textualize.io/)
 [![Telegram Bot](https://img.shields.io/badge/Telegram%20Bot-22.0+-26A5E4.svg)](https://docs.python-telegram-bot.org/)
 
@@ -60,9 +60,9 @@ La TUI pide lo mínimo: el `.env` con tu provider (ver [Instalación](#instalaci
 
 ## Características
 
-- **Multi-provider con failover automático** — cadena local-first (router → Ollama → nube) con circuit breaker (CLOSED → OPEN → HALF_OPEN): si el primario cae, el agente cambia solo y se recupera a los 60 s. Pin manual por teclas F1–F8.
+- **Multi-provider con failover automático** — cadena local-first (**Unsloth Studio → Ollama → nube (z.ai → DeepSeek)**; el router llama.cpp `:8080` es **bajo demanda**, fuera del walk) con circuit breaker (CLOSED → OPEN → HALF_OPEN): si el primario cae, el agente cambia solo y se recupera a los 60 s. Pin manual: F1 auto · F3 cicla · F4–F8 providers.
 - **Verificación real (`/verify`)** — corre la suite en tu árbol de trabajo y la compara con un baseline del HEAD en un worktree desechable: solo cuentan los fallos **nuevos**. La forma práctica de comprobar que un cambio no rompió nada.
-- **Orquestación multi-agente (`/escalate`, experimental)** — instancias frescas coordinadas por un ledger en disco, verificación real y entrega por `patch.diff` sobre un worktree desechable. Promoción congelada; ver [docs/ESCALATION.md](docs/ESCALATION.md).
+- **Orquestación multi-agente (`/escalate`, experimental)** — instancias frescas coordinadas por un ledger en disco, verificación real y entrega por `patch.diff` sobre un worktree desechable. Promoción congelada; ver [docs/ESCALATION.md](https://github.com/asturwebs/BytIA-KODE/blob/main/docs/ESCALATION.md).
 - **Sesiones persistentes** — todo se guarda en SQLite WAL (`~/.bytia-kode/sessions.db`), compartido entre TUI y Telegram: empieza un chat en una interfaz y résumelo en la otra. Auto-save O(1) por mensaje.
 - **Sistema de skills por capas** — procedimientos Markdown+YAML en `~/.bytia-kode/skills/` con prioridad bytia > user > vendor; las vendor se siembran y actualizan automáticamente con el paquete.
 - **Tools nativas con perímetro de seguridad** — 12 tools (bash, files, grep/glob/tree, web_fetch, sesiones) tras un modelo defense-in-depth: allowlist de binarios, jail de workspace configurable (confined/permissive/open, ver [Política de workspace](#política-de-workspace)), SSRF cerrada, redacción de secretos en logs.
@@ -224,6 +224,14 @@ agent.py
   └─ skills/loader.py
 
 audio.py                        ← TTS: bytia-tts + piper (local)
+
+orchestrator/                   ← multi-agente (experimental) y verificación real
+  ├─ orchestrator/verify.py / verify_service.py   ← /verify: suite vs baseline del HEAD
+  ├─ orchestrator/workspace.py                ← scratch git-worktree + anti-tamper
+  ├─ orchestrator/runner.py / protocol.py     ← bucle, presupuestos y protocolo de secciones
+  ├─ orchestrator/jail.py / agent_worker.py   ← worker Agent confinado (R5)
+  ├─ orchestrator/service.py / providers.py   ← /escalate y ruteo de providers
+  └─ orchestrator/ledger.py / specs.py / prompts.py
 ```
 
 ### Stack técnico
@@ -394,9 +402,9 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para los criterios de validación.
 
 ## Documentación
 
-- [Manual de la TUI](docs/TUI.md)
-- [Arquitectura técnica](docs/ARCHITECTURE.md)
-- [Guía de desarrollo](docs/DEVELOPMENT.md)
+- [Manual de la TUI](https://github.com/asturwebs/BytIA-KODE/blob/main/docs/TUI.md)
+- [Arquitectura técnica](https://github.com/asturwebs/BytIA-KODE/blob/main/docs/ARCHITECTURE.md)
+- [Guía de desarrollo](https://github.com/asturwebs/BytIA-KODE/blob/main/docs/DEVELOPMENT.md)
 - [Proceso de release](RELEASING.md)
 - [Guía de contribución](CONTRIBUTING.md)
 - [Código de conducta](CODE_OF_CONDUCT.md)
@@ -410,4 +418,4 @@ Historial completo de versiones: [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 
-Licencia MIT. Consulta [LICENSE](LICENSE).
+Licencia MIT. Consulta [LICENSE](https://github.com/asturwebs/BytIA-KODE/blob/main/LICENSE).
