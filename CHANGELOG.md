@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-26
+
+### Fixed — README y CI
+
+- README: cadena real de providers (Unsloth → Ollama → nube; el router `:8080` es bajo demanda), pin F1 auto / F3 cicla / F4–F8, árbol `orchestrator/` y **enlaces absolutos** (`LICENSE` y `docs/` ya funcionan en la ficha de PyPI).
+- CI: `actions/setup-python` y `astral-sh/setup-uv` a v7; `release.yml` corregido (`setup-uv@v10` inexistente y `fetch-depth` en la acción equivocada).
+
 ## [0.9.0] - 2026-10-26
 
 ### Added — autocompletado de comandos en la TUI
