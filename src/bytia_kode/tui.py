@@ -128,7 +128,8 @@ TUI_COMMANDS: tuple[TuiCommand, ...] = (
     TuiCommand("/load", "/load <id>", "Load session", "",
                "\U0001f4c2  Load session", "load_session"),
     TuiCommand("/escalate", "/escalate <tarea>",
-               "Multi-agent orchestration on the repo (F2)"),
+               "Multi-agent orchestration on the repo (F2)", "",
+               "\U0001f680  Escalate task", "escalate_task"),
     TuiCommand("/clear", "/clear", "Clear screen", "Ctrl+L",
                "\u2715  Clear screen", "clear_screen"),
     TuiCommand("/tools", "/tools", "List tools", "Ctrl+T",
@@ -1515,6 +1516,17 @@ class BytIAKODEApp(App):
                 if handler:
                     handler()
         self.push_screen(CommandMenuScreen(), on_dismiss)
+
+    def action_escalate_task(self) -> None:
+        """Ctrl+P → Escalate task: pide la tarea y reutiliza el flujo F2."""
+
+        def on_dismiss(task: str | None):
+            if task:
+                self.run_worker(
+                    self._run_escalation(task), exclusive=True, group="escalate"
+                )
+
+        self.push_screen(InputScreen("Escalate task:", "Describe the task..."), on_dismiss)
 
     def action_reset_conversation(self):
         self.agent.reset()

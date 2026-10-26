@@ -127,6 +127,9 @@ class TestCommandSource:
         ]
         assert list(CommandMenuScreen.COMMANDS) == expected
 
+    def test_menu_has_escalate_task_entry(self):
+        assert ("\U0001f680  Escalate task", "escalate_task") in CommandMenuScreen.COMMANDS
+
     def test_every_menu_action_exists_on_app(self):
         missing = [
             action
@@ -250,4 +253,37 @@ class TestAutocompletePopup:
                 lambda: app._history == ["hi"] and not app.is_processing,
                 what="turno normal completado",
             )
+
+
+class TestEscalateMenuEntry:
+    """Ctrl+P → Escalate task: pide la tarea y reutiliza _run_escalation."""
+
+    @pytest.mark.asyncio
+    async def test_ctrl_p_escalate_prompts_and_runs_the_existing_flow(self):
+        app = BytIAKODEApp(agent=FakeAgent())
+        async with app.run_test() as pilot:
+            ran: list[str] = []
+
+            async def fake_run_escalation(task: str) -> None:
+                ran.append(task)
+
+            app._run_escalation = fake_run_escalation
+
+            await pilot.press("ctrl+p")
+            await pilot.pause()
+            assert isinstance(app.screen, CommandMenuScreen)
+
+            index = next(
+                i
+                for i, (_, action) in enumerate(CommandMenuScreen.COMMANDS)
+                if action == "escalate_task"
+            )
+            app.screen.query_one("#command-list").index = index
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert isinstance(app.screen, InputScreen)
+            await pilot.press(*"fix the bug")
+            await pilot.press("enter")
+            await _wait_for(pilot, lambda: ran == ["fix the bug"], what="flujo F2 lanzado")
 

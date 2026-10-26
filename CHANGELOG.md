@@ -7,7 +7,8 @@
 Al teclear `/` como primer carácter del prompt aparece una lista filtrable
 de comandos (`/esc` → `/escalate`), con navegación ↑/↓, Enter/Tab para
 completar y Esc para cerrar. La fuente es única (`TUI_COMMANDS`): la usan
-el autocompletado, `/help` y el menú Ctrl+P.
+el autocompletado, `/help` y el menú Ctrl+P. Ctrl+P incorpora «Escalate
+task» (pide la tarea y reutiliza el flujo de `/escalate`).
 
 ### Added — orquestación multi-agente (`/escalate`)
 
