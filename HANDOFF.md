@@ -50,7 +50,7 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 - T6 scratch git-worktree (R3/R4/R6/R2, fixes H1-H7 + H1 de AST-43) · T7 `verify.py` (baseline, timeout, exit 2/3/4/5 = no-ok) · T8 worker agéntico + **jail save/restore (R5)** · T9 providers + circuit → infra · T10 `/escalate` en TUI y Telegram · T11 `patch.diff` · T12 M1-M4 del CTO · T13 e2e.
 - **E2E real ✅ FINAL**: repo con bug (`add` restaba) → **`done` en 1 ronda**, 5.870 tokens, 163,6 s, **patch limpio** (solo `src/calc.py`). Cierre por ground truth (tests verdes + worker solved) tras detectar 4 rondas `budget` con el patch ya correcto.
 - Revisiones del Engineer (AST-43): 2 rondas, NO APROBADO → **H1-H4 + R2-1 + R2-M1 cerrados** (`f4fc6a8`, `dde5947`). Pendiente su re-revisión del HEAD.
-- **Pendiente final: merge a main = decisión del Socio** (tag `pre-f2-merge` + merge `--no-ff` + CI, igual que F1). Sin release hasta F2 cerrado.
+- **Mergeado y release `0.9.0`** (tag `v0.9.0`): F1+F2, `/verify`, `/init`+`/memory`, autocompletado, imports `@ruta` y fix del panel de herdr. **Publish a PyPI pendiente de la aprobación del Socio** (environment `pypi`, required reviewer). Worktrees `kode-f1`, `kode-f2` y `kode-tui` limpiados; ramas de trabajo borradas (los commits viven en `main` y en los tags `pre-f1-merge`/`pre-f2-merge`).
 
 ## Arquitectura en 30 segundos
 

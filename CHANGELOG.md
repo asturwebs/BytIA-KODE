@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-26
+
 ### Added — autocompletado de comandos en la TUI
 
 Al teclear `/` como primer carácter del prompt aparece una lista filtrable
@@ -36,6 +38,11 @@ Corre la suite del **árbol de trabajo** y la compara con un **baseline del
 HEAD** obtenido en un `git worktree` desechable: solo los fallos **nuevos**
 invalidan. Disponible en TUI (`/verify`, también en Ctrl+P) y Telegram.
 Es la pieza práctica de F2 sin orquestación.
+
+### Fixed — panel de agentes de herdr
+
+La TUI se presenta en el panel al arrancar (idle + sesión), sin esperar al
+primer cambio de estado. Antes, un TUI abierto e idle no aparecía.
 
 ### Security — dependencias y escáner
 
