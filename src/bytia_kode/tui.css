@@ -46,15 +46,32 @@ Footer .footer--key {
     content-align: left middle;
 }
 
-/* Input area */
-#input-area {
+/* Input stack: the autocomplete popup sits directly above the prompt */
+#input-stack {
     dock: bottom;
     height: auto;
+    background: $surface;
+}
+
+/* Input area — altura explícita: un 1fr aquí impediría que #input-stack
+   (auto, docked) calcule su altura por contenido y se comería la pantalla. */
+#input-area {
+    height: 8;
     max-height: 8;
     background: $surface;
     border-top: solid $surface;
     padding: 1 2;
     margin-bottom: 0;
+}
+
+/* Slash-command autocomplete (rendered from TUI_COMMANDS) */
+#command-suggestions {
+    width: 100%;
+    height: auto;
+    max-height: 9;
+    background: $surface;
+    border: tall $accent;
+    padding: 0 1;
 }
 
 #input-field {

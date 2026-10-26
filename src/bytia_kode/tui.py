@@ -6,19 +6,21 @@ import asyncio
 import json
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from textual import work, on
 from textual.app import App, ComposeResult
 from textual import events
 from textual.binding import Binding
-from textual.containers import VerticalScroll, Horizontal
+from textual.containers import VerticalScroll, Horizontal, Vertical
 from textual.widgets import Header, Footer, Static, TextArea, Button, ListView, ListItem, Label, Input
 from textual.screen import ModalScreen
 from textual.reactive import reactive
 from textual.message import Message as TextualMessage
 from rich.markdown import Markdown as RichMarkdown
 from textual.widgets import Markdown
+from rich.markup import escape
 from rich.panel import Panel
 from rich.text import Text
 from rich.syntax import Syntax
@@ -81,6 +83,120 @@ def _save_theme(theme: str):
         pass
 
 
+@dataclass(frozen=True)
+class TuiCommand:
+    """Un comando de la TUI — fuente única de /help, autocompletado y Ctrl+P."""
+
+    name: str = ""          # token canónico ("/escalate"); "" = fila solo-tecla
+    usage: str = ""         # como se muestra en /help ("/escalate <tarea>")
+    description: str = ""
+    key: str = ""
+    menu_label: str = ""    # etiqueta en Ctrl+P (con icono); "" = fuera del menú
+    menu_action: str = ""   # acción de la app que dispara el menú
+
+    @property
+    def match_text(self) -> str:
+        """Prefijo de autocompletado: el usage sin placeholders <...> / [...]."""
+        return " ".join(
+            token for token in self.usage.split() if not token.startswith(("<", "["))
+        )
+
+    @property
+    def insert_text(self) -> str:
+        """Texto que se escribe al aceptar: nombre + espacio si lleva argumentos."""
+        if not self.name:
+            return ""
+        return f"{self.name} " if self.usage.strip() != self.name else self.name
+
+
+# Única fuente de comandos: /help, autocompletado y menú Ctrl+P leen de aquí.
+# El orden es el del menú; las filas con name="" son atajos de tecla (sin slash).
+TUI_COMMANDS: tuple[TuiCommand, ...] = (
+    TuiCommand("/quit", "/quit", "Exit", "Ctrl+Q", "\u2630  Quit", "quit"),
+    TuiCommand("/reset", "/reset", "Reset conversation", "Ctrl+R",
+               "\u21ba  Reset conversation", "reset_conversation"),
+    TuiCommand("", "", "Interrupt the running agent", "Esc",
+               "\u23f8  Interrupt agent", "interrupt_agent"),
+    TuiCommand("", "", "Kill a stuck agent", "Ctrl+K",
+               "\U0001f6d1  Kill agent", "kill_agent"),
+    TuiCommand("/new", "/new", "New session", "",
+               "\U0001f4dd  New session", "new_session"),
+    TuiCommand("/sessions", "/sessions", "List saved sessions", "",
+               "\U0001f4c3  List sessions", "list_sessions"),
+    TuiCommand("/session", "/session", "Show current session info", "",
+               "\U0001f3f7  Current session info", "show_current_session"),
+    TuiCommand("/load", "/load <id>", "Load session", "",
+               "\U0001f4c2  Load session", "load_session"),
+    TuiCommand("/escalate", "/escalate <tarea>",
+               "Multi-agent orchestration on the repo (F2)"),
+    TuiCommand("/clear", "/clear", "Clear screen", "Ctrl+L",
+               "\u2715  Clear screen", "clear_screen"),
+    TuiCommand("/tools", "/tools", "List tools", "Ctrl+T",
+               "\U0001f527  List tools", "show_tools"),
+    TuiCommand("/skills", "/skills", "List skills", "Ctrl+S",
+               "\U0001f4da  List skills", "show_skills"),
+    TuiCommand("/skills save", "/skills save <name>", "Create skill"),
+    TuiCommand("/skills show", "/skills show <name>", "Show skill content"),
+    TuiCommand("/skills verify", "/skills verify <name>", "Mark skill verified"),
+    TuiCommand("/use", "/use <model>", "Select local model", "",
+               "\U0001f504  Select model", "select_model"),
+    TuiCommand("/models", "/models", "List local models", "",
+               "\U0001f4c1  List available models", "show_models"),
+    TuiCommand("/history", "/history", "Show input history", "",
+               "\U0001f4ac  Show input history", "show_history"),
+    TuiCommand("/safe", "/safe", "Toggle safe mode", "Ctrl+E",
+               "\u26a1  Toggle safe mode", "toggle_safe_mode"),
+    TuiCommand("", "", "Toggle reasoning view", "Ctrl+D",
+               "\U0001f9e0  Toggle reasoning", "toggle_reasoning"),
+    TuiCommand("", "", "Cycle theme", "F2",
+               "\U0001f3a8  Change theme", "change_theme"),
+    TuiCommand("/workspace", "/workspace [mode]", "Show/switch workspace jail mode", "",
+               "\U0001f512  Workspace mode", "cycle_workspace_mode"),
+    TuiCommand("", "", "Cycle provider", "F3",
+               "\u21c4  Switch provider", "switch_provider"),
+    TuiCommand("", "", "Copy last code block", "Ctrl+X",
+               "\U0001f4cb  Copy last code block", "copy_last_code"),
+    TuiCommand("", "", "Copy last full response", "Ctrl+Shift+C",
+               "\U0001f4cc  Copy last full response", "copy_last_response"),
+    TuiCommand("/model", "/model", "Show model info", "Ctrl+M",
+               "\u2139  Show model info", "show_model"),
+    TuiCommand("/context", "/context", "Regenerate workspace context", "",
+               "\U0001f4c4  Regenerate context", "regenerate_context"),
+    TuiCommand("/cwd", "/cwd", "Show current directory"),
+    TuiCommand("/help", "/help", "Show this help"),
+)
+
+
+def filter_commands(prefix: str) -> list[TuiCommand]:
+    """Comandos cuyo texto de invocación empieza por lo tecleado.
+
+    Sólo actúa cuando el input empieza por "/" como primer carácter. El
+    matching es insensible a mayúsculas y se cierra solo al escribir
+    argumentos: "/escalate " ya no casa con el prefijo "/escalate".
+    """
+    if not prefix or not prefix.startswith("/"):
+        return []
+    typed = prefix.lower()
+    return [
+        command
+        for command in TUI_COMMANDS
+        if command.name and command.match_text.startswith(typed)
+    ]
+
+
+def build_help_table(commands: tuple[TuiCommand, ...] = TUI_COMMANDS) -> Table:
+    """Tabla de /help — misma fuente que el autocompletado y el menú Ctrl+P."""
+    table = Table(title="BytIA KODE Commands", box=box.SIMPLE_HEAVY,
+                  show_lines=False, padding=(0, 1), collapse_padding=True)
+    table.add_column("Command", style="bold cyan", min_width=12)
+    table.add_column("Description", min_width=20)
+    table.add_column("Key", style="dim", min_width=8)
+    for command in commands:
+        # escape(): "/workspace [mode]" no es markup de Rich.
+        table.add_row(escape(command.usage), escape(command.description), escape(command.key))
+    return table
+
+
 class ChatMessage(Static):
     def __init__(self, role: str, content: str, **kwargs):
         self.role = role
@@ -141,13 +257,160 @@ class ChatMessage(Static):
             self.update(Text(f"  {self.msg_content}", style="dim italic"))
 
 
+class CommandSuggestions(Static):
+    """Popup inline de autocompletado de comandos, sobre el prompt."""
+
+    MAX_ROWS = 6
+
+    def __init__(self, **kwargs):
+        self._matches: list[TuiCommand] = []
+        self._index = 0
+        super().__init__("", id="command-suggestions", **kwargs)
+
+    def on_mount(self) -> None:
+        self.display = False
+        self.watch(self.app, "theme", lambda *_: self._refresh_display())
+
+    @property
+    def matches(self) -> list[TuiCommand]:
+        return list(self._matches)
+
+    @property
+    def selected_name(self) -> str:
+        if not self._matches:
+            return ""
+        return self._matches[self._index].name
+
+    def show_matches(self, matches: list[TuiCommand], index: int) -> None:
+        self._matches = list(matches)
+        self._index = index
+        self._refresh_display()
+
+    def hide(self) -> None:
+        self._matches = []
+        self._index = 0
+        self._refresh_display()
+
+    def _refresh_display(self) -> None:
+        if not self._matches:
+            self.display = False
+            self.update("")
+            return
+        self.display = True
+        try:
+            accent = self.app._get_theme_colors()["accent"]
+        except Exception:
+            accent = "#7ee787"
+
+        # Ventana de MAX_ROWS alrededor de la selección: el popup no crece sin límite.
+        start = 0
+        if len(self._matches) > self.MAX_ROWS:
+            start = min(max(0, self._index - self.MAX_ROWS // 2),
+                        len(self._matches) - self.MAX_ROWS)
+        visible = self._matches[start:start + self.MAX_ROWS]
+
+        text = Text()
+        for offset, command in enumerate(visible):
+            selected = start + offset == self._index
+            style = f"bold {accent}" if selected else ""
+            text.append("\u25b8 " if selected else "  ", style=style)
+            text.append(command.usage, style=style)
+            text.append("  ")
+            text.append(command.description, style="dim")
+            text.append("\n")
+        text.append("  up/down select · Enter/Tab apply · Esc close", style="dim")
+        self.update(text)
+
+
 class PromptTextArea(TextArea):
     class Submitted(TextualMessage):
         def __init__(self, text: str):
             self.text = text
             super().__init__()
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._matches: list[TuiCommand] = []
+        self._match_index = 0
+        self._skip_next_change = False
+
+    @property
+    def suggestions_open(self) -> bool:
+        return bool(self._matches)
+
+    def _popup(self) -> CommandSuggestions | None:
+        try:
+            return self.app.query_one(CommandSuggestions)
+        except Exception:
+            return None
+
+    @on(TextArea.Changed)
+    def _on_text_changed(self, event: TextArea.Changed) -> None:
+        if self._skip_next_change:
+            self._skip_next_change = False
+            return
+        self.refresh_suggestions()
+
+    def refresh_suggestions(self) -> None:
+        """Recalcula la lista a partir del texto actual del prompt."""
+        matches = filter_commands(self.text)
+        if matches == self._matches:
+            return
+        self._matches = matches
+        self._match_index = 0
+        popup = self._popup()
+        if popup is not None:
+            if matches:
+                popup.show_matches(matches, self._match_index)
+            else:
+                popup.hide()
+
+    def close_suggestions(self) -> None:
+        if not self._matches:
+            return
+        self._matches = []
+        self._match_index = 0
+        popup = self._popup()
+        if popup is not None:
+            popup.hide()
+
+    def _move_suggestion(self, delta: int) -> None:
+        if not self._matches:
+            return
+        self._match_index = (self._match_index + delta) % len(self._matches)
+        popup = self._popup()
+        if popup is not None:
+            popup.show_matches(self._matches, self._match_index)
+
+    def accept_suggestion(self) -> None:
+        """Escribe el comando seleccionado y cierra la lista (sin ejecutarlo)."""
+        if not self._matches:
+            return
+        command = self._matches[self._match_index]
+        insertion = command.insert_text
+        self.close_suggestions()
+        self._skip_next_change = True
+        self.text = insertion
+        self.cursor_location = (0, len(insertion))
+
     def on_key(self, event: events.Key) -> None:
+        if self._matches:
+            if event.key == "up":
+                self._move_suggestion(-1)
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key == "down":
+                self._move_suggestion(1)
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in ("enter", "tab"):
+                self.accept_suggestion()
+                event.prevent_default()
+                event.stop()
+                return
+            # Esc lo intercepta el App (binding priority) y cierra la lista allí.
         if event.key == "enter":
             event.prevent_default()
             event.stop()
@@ -408,7 +671,7 @@ class ConfirmScreen(ModalScreen):
 
 
 class CommandMenuScreen(ModalScreen):
-    """Ctrl+P popup with available commands."""
+    """Ctrl+P popup with available commands (derived from TUI_COMMANDS)."""
 
     BINDINGS = [
         Binding("escape", "dismiss", "Close", show=False),
@@ -418,29 +681,9 @@ class CommandMenuScreen(ModalScreen):
     ]
 
     COMMANDS = [
-        ("\u2630  Quit", "quit"),
-        ("\u21ba  Reset conversation", "reset_conversation"),
-        ("\u23f8  Interrupt agent", "interrupt_agent"),
-        ("\U0001f6d1  Kill agent", "kill_agent"),
-        ("\U0001f4dd  New session", "new_session"),
-        ("\U0001f4c3  List sessions", "list_sessions"),
-        ("\U0001f3f7  Current session info", "show_current_session"),
-        ("\U0001f4c2  Load session", "load_session"),
-        ("\u2715  Clear screen", "clear_screen"),
-        ("\U0001f527  List tools", "show_tools"),
-        ("\U0001f4da  List skills", "show_skills"),
-        ("\U0001f504  Select model", "select_model"),
-        ("\U0001f4c1  List available models", "show_models"),
-        ("\U0001f4ac  Show input history", "show_history"),
-        ("\u26a1  Toggle safe mode", "toggle_safe_mode"),
-        ("\U0001f9e0  Toggle reasoning", "toggle_reasoning"),
-        ("\U0001f3a8  Change theme", "change_theme"),
-        ("\U0001f512  Workspace mode", "cycle_workspace_mode"),
-        ("\u21c4  Switch provider", "switch_provider"),
-        ("\U0001f4cb  Copy last code block", "copy_last_code"),
-        ("\U0001f4cc  Copy last full response", "copy_last_response"),
-        ("\u2139  Show model info", "show_model"),
-        ("\U0001f4c4  Regenerate context", "regenerate_context"),
+        (command.menu_label, command.menu_action)
+        for command in TUI_COMMANDS
+        if command.menu_action
     ]
 
     def compose(self) -> ComposeResult:
@@ -552,9 +795,11 @@ class BytIAKODEApp(App):
         yield Header(show_clock=True)
         yield VerticalScroll(id="chat-area")
         yield ActivityIndicator()
-        with Horizontal(id="input-area"):
-            yield PromptTextArea(id="input-field", show_line_numbers=False, language="markdown")
-            yield Button("\u25b6", id="send-button")
+        with Vertical(id="input-stack"):
+            yield CommandSuggestions()
+            with Horizontal(id="input-area"):
+                yield PromptTextArea(id="input-field", show_line_numbers=False, language="markdown")
+                yield Button("\u25b6", id="send-button")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -1032,41 +1277,8 @@ class BytIAKODEApp(App):
         self._add_system_message(f"Context regenerated: {path.name}")
 
     def _show_help(self):
-        table = Table(title="BytIA KODE Commands", box=box.SIMPLE_HEAVY,
-                      show_lines=False, padding=(0, 1), collapse_padding=True)
-        table.add_column("Command", style="bold cyan", min_width=12)
-        table.add_column("Description", min_width=20)
-        table.add_column("Key", style="dim", min_width=8)
-        for cmd, desc, key in [
-            ("/help", "Show this help", ""),
-            ("/quit", "Exit", "Ctrl+Q"),
-            ("/reset", "Reset conversation", "Ctrl+R"),
-            ("/new", "New session", ""),
-            ("/sessions", "List saved sessions", ""),
-            ("/session", "Show current session info", ""),
-            ("/load <id>", "Load session", ""),
-            ("/escalate", "Multi-agent orchestration on the repo (F2)", ""),
-            ("/clear", "Clear screen", "Ctrl+L"),
-            ("/model", "Show model info", "Ctrl+M"),
-            ("/tools", "List tools", "Ctrl+T"),
-            ("/skills", "List skills", ""),
-            ("/skills save <name>", "Create skill", ""),
-            ("/skills show <name>", "Show skill content", ""),
-            ("/skills verify <name>", "Mark skill verified", ""),
-            ("/safe", "Toggle safe mode", "Ctrl+E"),
-            ("/workspace [mode]", "Show/switch workspace jail mode", ""),
-            ("", "Toggle reasoning view", "Ctrl+D"),
-            ("/models", "List local models", ""),
-            ("/use <model>", "Select local model", ""),
-            ("/history", "Show history", ""),
-            ("/cwd", "Show current directory", ""),
-            ("/context", "Regenerate workspace context", ""),
-            ("", "Copy last code block", "Ctrl+X"),
-            ("", "Copy last full response", "Ctrl+Shift+C"),
-        ]:
-            table.add_row(cmd, desc, key)
         chat = self.query_one("#chat-area", VerticalScroll)
-        chat.mount(Static(table))
+        chat.mount(Static(build_help_table()))
         chat.scroll_end(animate=False)
 
     def _show_model_info(self):
@@ -1309,6 +1521,14 @@ class BytIAKODEApp(App):
         self._add_system_message("Conversation reset.")
 
     def action_interrupt_agent(self):
+        # Primero el autocompletado: Esc cierra la lista, no corta al agente.
+        try:
+            prompt = self.query_one("#input-field", PromptTextArea)
+        except Exception:
+            prompt = None
+        if prompt is not None and prompt.suggestions_open:
+            prompt.close_suggestions()
+            return
         if self.is_processing:
             self.agent.interrupt()
             self._add_system_message("Interrupting...")
@@ -1332,6 +1552,12 @@ class BytIAKODEApp(App):
 
     def action_show_model(self):
         self._show_model_info()
+
+    def action_show_models(self):
+        self._show_models()
+
+    def action_regenerate_context(self):
+        self._regenerate_context()
 
     def action_show_tools(self):
         self._show_tools()
