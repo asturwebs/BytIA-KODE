@@ -132,6 +132,8 @@ TUI_COMMANDS: tuple[TuiCommand, ...] = (
     TuiCommand("/verify", "/verify",
                "Verify the repo suite vs the HEAD baseline", "",
                "✅  Verify repo", "verify_repo"),
+    TuiCommand("/init", "/init", "Generate B-KODE.md for this repo", "",
+               "📝  Init project (B-KODE.md)", "init_project"),
     TuiCommand("/clear", "/clear", "Clear screen", "Ctrl+L",
                "\u2715  Clear screen", "clear_screen"),
     TuiCommand("/tools", "/tools", "List tools", "Ctrl+T",
@@ -167,6 +169,22 @@ TUI_COMMANDS: tuple[TuiCommand, ...] = (
                "\U0001f4c4  Regenerate context", "regenerate_context"),
     TuiCommand("/cwd", "/cwd", "Show current directory"),
     TuiCommand("/help", "/help", "Show this help"),
+)
+
+
+INIT_PROMPT = (
+    "Crea el fichero B-KODE.md en la raíz de este repositorio (el cwd).\n\n"
+    "Antes de escribir, analiza el repositorio con las tools: árbol de "
+    "directorios, pyproject.toml/package.json, README, tests y CI.\n\n"
+    "El fichero debe incluir, en Markdown y en español:\n"
+    "1. Qué es el proyecto (2-3 frases).\n"
+    "2. Stack y dependencias principales.\n"
+    "3. Comandos: instalar, ejecutar, tests, lint/build.\n"
+    "4. Estructura de directorios (solo lo relevante).\n"
+    "5. Convenciones de código y gotchas reales.\n\n"
+    "Reglas: no inventes datos que no puedas verificar en el repo; si algo no "
+    "está, omítelo. No modifiques ningún otro fichero. Al terminar, di qué has "
+    "escrito y dónde."
 )
 
 
@@ -1169,8 +1187,25 @@ class BytIAKODEApp(App):
                 )
         elif cmd == "/verify":
             self.action_verify_repo()
+        elif cmd == "/init":
+            self._run_init()
         else:
             self._add_system_message(f"Unknown command: {cmd_raw}  |  /help for list")
+
+    def _run_init(self):
+        """Genera B-KODE.md si no existe; nunca sobrescribe."""
+        from bytia_kode.agent import find_bkode
+
+        existing = find_bkode()
+        if existing is not None:
+            self._add_system_message(
+                f"B-KODE.md ya existe en {existing}. Edítalo a mano; no lo sobrescribo."
+            )
+            return
+        self._add_system_message("Generating B-KODE.md (analizando el repo)…")
+        self.is_processing = True
+        self._start_spinner()
+        self._process_message(INIT_PROMPT)
 
     async def _run_verify(self):
         """Suite real del árbol de trabajo vs baseline del HEAD (worktree)."""
@@ -1588,6 +1623,9 @@ class BytIAKODEApp(App):
 
     def action_verify_repo(self):
         self.run_worker(self._run_verify(), exclusive=True, group="verify")
+
+    def action_init_project(self):
+        self._run_init()
 
     def action_show_models(self):
         self._show_models()

@@ -98,6 +98,39 @@ class TestHerdrAnnounce:
             assert "ready" in calls
 
 
+class TestInitCommand:
+    """`/init` genera B-KODE.md y nunca pisa uno existente."""
+
+    @pytest.mark.asyncio
+    async def test_refuses_when_bkode_exists(self, monkeypatch):
+        monkeypatch.setattr(
+            "bytia_kode.agent.find_bkode", lambda *a, **k: "/tmp/B-KODE.md"
+        )
+        app = BytIAKODEApp(agent=FakeAgent())
+        calls: list[str] = []
+        monkeypatch.setattr(app, "_process_message", lambda text: calls.append(text))
+
+        async with app.run_test() as pilot:
+            app._run_init()
+            await pilot.pause()
+            assert calls == []
+            assert any("ya existe" in c for c in _messages(app, "system"))
+
+    @pytest.mark.asyncio
+    async def test_sends_prompt_when_missing(self, monkeypatch):
+        monkeypatch.setattr("bytia_kode.agent.find_bkode", lambda *a, **k: None)
+        app = BytIAKODEApp(agent=FakeAgent())
+        calls: list[str] = []
+        monkeypatch.setattr(app, "_process_message", lambda text: calls.append(text))
+        monkeypatch.setattr(app, "_start_spinner", lambda: None)
+
+        async with app.run_test() as pilot:
+            app._run_init()
+            await pilot.pause()
+            assert len(calls) == 1
+            assert "B-KODE.md" in calls[0]
+
+
 class TestInterruptBinding:
     """Esc = interrupt: llama a agent.interrupt() y avisa al usuario."""
 

@@ -164,6 +164,18 @@ def load_system_prompt() -> str:
     ).strip()
 
 
+def find_bkode(start: Path | None = None) -> Path | None:
+    """Devuelve el B-KODE.md más cercano subiendo desde `start` (cwd por defecto)."""
+    cwd = (start or Path.cwd()).resolve()
+    for candidate in (cwd, *cwd.parents):
+        bk = candidate / "B-KODE.md"
+        if bk.is_file():
+            return bk
+        if candidate == candidate.parent:
+            break
+    return None
+
+
 def _sanitize_user_message(user_message: str) -> str:
     filtered = "".join(ch for ch in user_message if ch.isprintable() or ch in "\n\t")
     lines = [line.rstrip() for line in filtered.splitlines()]
@@ -284,19 +296,16 @@ class Agent:
 
     def _load_bkode(self) -> tuple[Path | None, str]:
         """Walk up from CWD looking for B-KODE.md (like CLAUDE.md, HERMES.md)."""
-        cwd = Path.cwd().resolve()
-        for candidate in (cwd, *cwd.parents):
-            bk = candidate / "B-KODE.md"
-            if bk.is_file():
-                try:
-                    content = bk.read_text(encoding="utf-8").strip()
-                    if content:
-                        logger.info("B-KODE.md loaded from %s", bk)
-                        return bk, content
-                except OSError as exc:
-                    logger.warning("Failed to read B-KODE.md at %s: %s", bk, exc)
-            if candidate == candidate.parent:
-                break
+        bk = find_bkode()
+        if bk is None:
+            return None, ""
+        try:
+            content = bk.read_text(encoding="utf-8").strip()
+            if content:
+                logger.info("B-KODE.md loaded from %s", bk)
+                return bk, content
+        except OSError as exc:
+            logger.warning("Failed to read B-KODE.md at %s: %s", bk, exc)
         return None, ""
 
     def _apply_template_vars(self, payload: dict) -> dict:

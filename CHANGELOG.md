@@ -21,6 +21,12 @@ y claves `KODE_ESCALATION_*`.
 Requiere `KODE_ESCALATION_ENABLED=true`. Guía: [docs/ESCALATION.md](docs/ESCALATION.md).
 E2E real: `done` en 1 ronda, 5.870 tokens, 163,6 s. 647 tests.
 
+### Added — contexto de proyecto (`/init`)
+
+Genera `B-KODE.md` en la raíz del repo a partir del análisis real (stack,
+comandos de setup/test/build, estructura, convenciones y gotchas). No
+sobrescribe si ya existe. Disponible en TUI (`/init`, también en Ctrl+P).
+
 ### Added — verificación real (`/verify`)
 
 Corre la suite del **árbol de trabajo** y la compara con un **baseline del

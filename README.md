@@ -322,6 +322,7 @@ Bot de Telegram activo · token 123456789:AAF…x7Q · usuarios permitidos: 2 ·
 | `/workspace <modo>` | Conmutar el jail: `confined` \| `permissive` \| `open` (con confirmación, sesión en curso) |
 | `/escalate <tarea>` | Orquestación multi-agente sobre el repo del cwd (worktree desechable) |
 | `/verify` | Suite real del repo vs baseline del HEAD (solo fallos nuevos) |
+| `/init` | Genera `B-KODE.md` para el repo (contexto de proyecto) |
 
 ### Atajos
 

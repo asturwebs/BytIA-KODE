@@ -125,6 +125,12 @@ class TestCommandSource:
         verify = next(command for command in TUI_COMMANDS if command.name == "/verify")
         assert verify.menu_action == "verify_repo"
 
+    def test_tui_commands_include_init(self):
+        assert "/init" in _names(TUI_COMMANDS)
+        assert "/init" in _names(filter_commands("/in"))
+        init = next(command for command in TUI_COMMANDS if command.name == "/init")
+        assert init.menu_action == "init_project"
+
     def test_menu_is_derived_from_tui_commands(self):
         expected = [
             (command.menu_label, command.menu_action)
