@@ -17,7 +17,7 @@ jobs:
           # shallow por defecto (depth 1) un commit citado que sí existe
           # reportaría "no resuelve" — un rojo engañoso. Historia completa.
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
       - name: Install dependencies
