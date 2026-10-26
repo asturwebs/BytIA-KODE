@@ -50,7 +50,15 @@ Agente CLI propio (Python 3.11+ / Textual): agente + skills + terminal.
 - T6 scratch git-worktree (R3/R4/R6/R2, fixes H1-H7 + H1 de AST-43) · T7 `verify.py` (baseline, timeout, exit 2/3/4/5 = no-ok) · T8 worker agéntico + **jail save/restore (R5)** · T9 providers + circuit → infra · T10 `/escalate` en TUI y Telegram · T11 `patch.diff` · T12 M1-M4 del CTO · T13 e2e.
 - **E2E real ✅ FINAL**: repo con bug (`add` restaba) → **`done` en 1 ronda**, 5.870 tokens, 163,6 s, **patch limpio** (solo `src/calc.py`). Cierre por ground truth (tests verdes + worker solved) tras detectar 4 rondas `budget` con el patch ya correcto.
 - Revisiones del Engineer (AST-43): 2 rondas, NO APROBADO → **H1-H4 + R2-1 + R2-M1 cerrados** (`f4fc6a8`, `dde5947`). Pendiente su re-revisión del HEAD.
-- **Mergeado y release `0.9.0`** (tag `v0.9.0`): F1+F2, `/verify`, `/init`+`/memory`, autocompletado, imports `@ruta` y fix del panel de herdr. **Publish a PyPI pendiente de la aprobación del Socio** (environment `pypi`, required reviewer). Worktrees `kode-f1`, `kode-f2` y `kode-tui` limpiados; ramas de trabajo borradas (los commits viven en `main` y en los tags `pre-f1-merge`/`pre-f2-merge`).
+- **Mergeado y release `0.9.0`** (tag `v0.9.0`): F1+F2, `/verify`, `/init`+`/memory`, autocompletado, imports `@ruta` y fix del panel de herdr. **Publicado en PyPI** (OIDC, aprobación del Socio) + GitHub Release. Worktrees `kode-f1`, `kode-f2` y `kode-tui` limpiados; ramas de trabajo borradas (los commits viven en `main` y en los tags `pre-f1-merge`/`pre-f2-merge`).
+
+### Cierre de sesión — 2026-10-26
+
+- **PyPI 0.9.0 verificado** en venv limpio: `bytia-kode --version` → `0.9.0+0892714`. La ficha de PyPI aún muestra el README anterior; los arreglos de abajo se reflejarán en el próximo release (0.9.1).
+- **README corregido** (`bd8a9ad`): cadena real (Unsloth → Ollama → nube; router bajo demanda), pin F1/F3/F4-F8, árbol `orchestrator/` y enlaces absolutos para PyPI.
+- **GitHub**: `SECURITY.md` añadido; topics + homepage; ruleset `protect-main` con **required check `validate`** (solo afecta a PRs); PR #8 (aiohttp) cerrado por obsoleto; #9 (setup-python v7) y #10 (setup-uv v7) mergeados; **#11 (mcp `<3`) abierto** — el cap `<2` es deliberado, no mergear sin tests del extra.
+- **Secret scanning**: `non-provider patterns` y `validity checks` **no configurables por API en este repo** (el PATCH los ignora); push protection ya activo. Si se quieren, se activan desde Settings → Code security (requiere GHAS).
+- Suite: **688/688**. Gates del release: verdes.
 
 ## Arquitectura en 30 segundos
 
