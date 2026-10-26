@@ -73,6 +73,7 @@ class TelegramBot:
         self.app.add_handler(CommandHandler("sessions", self._sessions))
         self.app.add_handler(CommandHandler("context", self._context))
         self.app.add_handler(CommandHandler("escalate", self._escalate))
+        self.app.add_handler(CommandHandler("verify", self._verify))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._chat))
 
     def _is_allowed(self, user_id: int) -> bool:
@@ -149,9 +150,43 @@ class TelegramBot:
             "/help - This message\n"
             "/sessions - List available sessions\n"
             "/context - Regenerate workspace context\n"
-            "/escalate <tarea> - Multi-agent orchestration (repo = cwd del bot)\n\n"
+            "/escalate <tarea> - Multi-agent orchestration (repo = cwd del bot)\n"
+            "/verify - Run the repo suite vs the HEAD baseline\n\n"
             "Just send a message to chat!"
         )
+
+    async def _verify(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not update.message or not update.effective_user:
+            return
+        if not self._is_allowed(update.effective_user.id):
+            await self._deny(update)
+            return
+        import asyncio
+        from pathlib import Path
+
+        from bytia_kode.orchestrator.verify_service import VerifyService
+
+        await update.message.reply_text("Verifying repo…")
+        try:
+            outcome = await asyncio.to_thread(
+                VerifyService(repo=Path.cwd()).run
+            )
+        except Exception as exc:  # noqa: BLE001 - el bot reporta, no tumba
+            await update.message.reply_text(f"Verify failed: {exc}")
+            return
+        if outcome.ok:
+            text = (
+                f"VERIFY OK · baseline {outcome.baseline_failures} fallos "
+                f"preexistentes · {outcome.current.passed} passed"
+            )
+        else:
+            nuevos = (
+                ", ".join(outcome.current.new_failures)
+                or outcome.current.error
+                or "error"
+            )
+            text = f"VERIFY FALLO · nuevos: {nuevos}\n" + outcome.current.output_tail[:3000]
+        await update.message.reply_text(text[:4000])
 
     async def _escalate(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not update.message or not update.effective_user:

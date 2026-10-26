@@ -119,6 +119,12 @@ class TestCommandSource:
         # Aceptar el comando deja el cursor listo para escribir la tarea.
         assert escalate.insert_text == "/escalate "
 
+    def test_tui_commands_include_verify(self):
+        assert "/verify" in _names(TUI_COMMANDS)
+        assert "/verify" in _names(filter_commands("/ver"))
+        verify = next(command for command in TUI_COMMANDS if command.name == "/verify")
+        assert verify.menu_action == "verify_repo"
+
     def test_menu_is_derived_from_tui_commands(self):
         expected = [
             (command.menu_label, command.menu_action)

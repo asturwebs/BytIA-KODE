@@ -129,6 +129,9 @@ TUI_COMMANDS: tuple[TuiCommand, ...] = (
                "\U0001f4c2  Load session", "load_session"),
     TuiCommand("/escalate", "/escalate <tarea>",
                "Multi-agent orchestration on the repo (F2)"),
+    TuiCommand("/verify", "/verify",
+               "Verify the repo suite vs the HEAD baseline", "",
+               "✅  Verify repo", "verify_repo"),
     TuiCommand("/clear", "/clear", "Clear screen", "Ctrl+L",
                "\u2715  Clear screen", "clear_screen"),
     TuiCommand("/tools", "/tools", "List tools", "Ctrl+T",
@@ -1161,8 +1164,35 @@ class BytIAKODEApp(App):
                 self.run_worker(
                     self._run_escalation(task), exclusive=True, group="escalate"
                 )
+        elif cmd == "/verify":
+            self.action_verify_repo()
         else:
             self._add_system_message(f"Unknown command: {cmd_raw}  |  /help for list")
+
+    async def _run_verify(self):
+        """Suite real del árbol de trabajo vs baseline del HEAD (worktree)."""
+        import asyncio
+        from pathlib import Path
+
+        from bytia_kode.orchestrator.verify_service import VerifyService
+
+        self._add_system_message("Verifying repo (baseline HEAD vs working tree)…")
+        service = VerifyService(repo=Path.cwd())
+        try:
+            outcome = await asyncio.to_thread(service.run)
+        except Exception as exc:  # noqa: BLE001 - la TUI reporta, no tumba
+            self._add_message("error", f"Verify failed: {exc}")
+            return
+        if outcome.ok:
+            self._add_system_message(
+                f"VERIFY OK · baseline {outcome.baseline_failures} fallos "
+                f"preexistentes · {outcome.current.passed} passed"
+            )
+        else:
+            nuevos = ", ".join(outcome.current.new_failures) or outcome.current.error or "error"
+            self._add_system_message(f"VERIFY FALLO · nuevos: {nuevos}")
+            if outcome.current.output_tail:
+                self._add_system_message(outcome.current.output_tail[:3000])
 
     async def _run_escalation(self, task: str):
         """F2: ciclo multi-agente sobre el repo del cwd (worktree desechable)."""
@@ -1552,6 +1582,9 @@ class BytIAKODEApp(App):
 
     def action_show_model(self):
         self._show_model_info()
+
+    def action_verify_repo(self):
+        self.run_worker(self._run_verify(), exclusive=True, group="verify")
 
     def action_show_models(self):
         self._show_models()

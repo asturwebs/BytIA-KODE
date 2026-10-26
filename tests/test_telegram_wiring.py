@@ -36,6 +36,7 @@ def test_escalate_handler_registered(bot):
                 commands.extend(handler.commands)
 
     assert "escalate" in commands
+    assert "verify" in commands
 
 
 class TestTelegramSubprocessWiring:
