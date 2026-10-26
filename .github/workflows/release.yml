@@ -40,7 +40,7 @@ jobs:
           # AST-35: el gate de citas SHA necesita historia completa para
           # resolver con git cat-file (mismo motivo que en ci.yml).
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: '3.11'
           enable-cache: true
