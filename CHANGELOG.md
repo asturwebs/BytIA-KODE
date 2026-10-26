@@ -21,6 +21,13 @@ y claves `KODE_ESCALATION_*`.
 Requiere `KODE_ESCALATION_ENABLED=true`. Guía: [docs/ESCALATION.md](docs/ESCALATION.md).
 E2E real: `done` en 1 ronda, 5.870 tokens, 163,6 s. 647 tests.
 
+### Added — verificación real (`/verify`)
+
+Corre la suite del **árbol de trabajo** y la compara con un **baseline del
+HEAD** obtenido en un `git worktree` desechable: solo los fallos **nuevos**
+invalidan. Disponible en TUI (`/verify`, también en Ctrl+P) y Telegram.
+Es la pieza práctica de F2 sin orquestación.
+
 ### Security — dependencias y escáner
 
 - aiohttp 3.14.5, certifi 2026.10.23, filelock 4.2.4, setuptools 84.2.1 (9 alertas Dependabot cerradas).

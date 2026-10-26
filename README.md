@@ -61,7 +61,8 @@ La TUI pide lo mínimo: el `.env` con tu provider (ver [Instalación](#instalaci
 ## Características
 
 - **Multi-provider con failover automático** — cadena local-first (router → Ollama → nube) con circuit breaker (CLOSED → OPEN → HALF_OPEN): si el primario cae, el agente cambia solo y se recupera a los 60 s. Pin manual por teclas F1–F8.
-- **Orquestación multi-agente (`/escalate`)** — modo opt-in para tareas duras: instancias frescas coordinadas por un ledger en disco, verificación real con pytest/build y entrega por `patch.diff` sobre un worktree desechable. Ver [docs/ESCALATION.md](docs/ESCALATION.md).
+- **Verificación real (`/verify`)** — corre la suite en tu árbol de trabajo y la compara con un baseline del HEAD en un worktree desechable: solo cuentan los fallos **nuevos**. La forma práctica de comprobar que un cambio no rompió nada.
+- **Orquestación multi-agente (`/escalate`, experimental)** — instancias frescas coordinadas por un ledger en disco, verificación real y entrega por `patch.diff` sobre un worktree desechable. Promoción congelada; ver [docs/ESCALATION.md](docs/ESCALATION.md).
 - **Sesiones persistentes** — todo se guarda en SQLite WAL (`~/.bytia-kode/sessions.db`), compartido entre TUI y Telegram: empieza un chat en una interfaz y résumelo en la otra. Auto-save O(1) por mensaje.
 - **Sistema de skills por capas** — procedimientos Markdown+YAML en `~/.bytia-kode/skills/` con prioridad bytia > user > vendor; las vendor se siembran y actualizan automáticamente con el paquete.
 - **Tools nativas con perímetro de seguridad** — 12 tools (bash, files, grep/glob/tree, web_fetch, sesiones) tras un modelo defense-in-depth: allowlist de binarios, jail de workspace configurable (confined/permissive/open, ver [Política de workspace](#política-de-workspace)), SSRF cerrada, redacción de secretos en logs.
@@ -288,6 +289,7 @@ Bot de Telegram activo · token 123456789:AAF…x7Q · usuarios permitidos: 2 ·
 | `/sessions` | Listar sesiones del usuario |
 | `/context` | Regenerar contexto del workspace |
 | `/escalate` | Orquestación multi-agente; uso: `/escalate <tarea>` (repo = cwd del bot) |
+| `/verify` | Suite real del repo vs baseline del HEAD |
 | `/stop` | Interrumpir el mensaje en curso |
 | `/kill` | Matar el subprocess activo (sesión conservada) |
 
@@ -319,6 +321,7 @@ Bot de Telegram activo · token 123456789:AAF…x7Q · usuarios permitidos: 2 ·
 | `/workspace` | Mostrar política de workspace (modo + trusted) |
 | `/workspace <modo>` | Conmutar el jail: `confined` \| `permissive` \| `open` (con confirmación, sesión en curso) |
 | `/escalate <tarea>` | Orquestación multi-agente sobre el repo del cwd (worktree desechable) |
+| `/verify` | Suite real del repo vs baseline del HEAD (solo fallos nuevos) |
 
 ### Atajos
 

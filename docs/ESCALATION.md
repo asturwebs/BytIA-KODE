@@ -1,8 +1,10 @@
 # Escalation Orchestrator — modo multi-agente
 
-> **Estado:** en `main` desde 2026-10-26 (merge `2f68fed`). Sin release en PyPI.
+> **Estado:** en `main` desde 2026-10-26 (merge `2f68fed`), **promoción congelada** (decisión del Socio 2026-10-26): el modo funciona, pero no convence para uso interactivo. Sin release en PyPI.
+> **Alternativa práctica:** si lo que quieres es verificar de verdad lo que el agente (o tú) habéis cambiado, usa **`/verify`** — misma verificación real, sin orquestación: suite del árbol de trabajo contra un baseline del HEAD en un worktree desechable. Solo cuentan los fallos **nuevos**.
 > **Diseño completo:** [`PLAN-escalation-orchestrator-B-KODE.md`](PLAN-escalation-orchestrator-B-KODE.md) (Anexos C y D: decisiones y requisitos).
 > **Origen:** adaptación de [GVS5H](https://github.com/slee-persis/GVS5H) (MIT) a repos reales, multi-provider y router llama.cpp.
+> **Reactivación:** solo si F5 (comparación pareada con tareas reales) demuestra valor frente al agente único.
 
 ## Qué es
 
