@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Cambiado — docs
+
+- Docstring del cliente OpenAI-compatible sin referencias a MiniMax (slot eliminado el 2026-09-15, `66d7b28`); ejemplos alineados con los providers en uso.
+
 ## [0.9.1] - 2026-10-26
 
 ### Fixed — README y CI

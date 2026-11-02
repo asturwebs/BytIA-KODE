@@ -1,6 +1,6 @@
 """OpenAI-compatible provider client.
 
-Works with: Z.AI, OpenRouter, MiniMax, Ollama, llama.cpp server, vLLM, anything that speaks /v1/chat/completions.
+Works with: Z.AI, DeepSeek, OpenRouter, Ollama, llama.cpp server, vLLM, anything that speaks /v1/chat/completions.
 """
 from __future__ import annotations
 
