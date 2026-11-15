@@ -323,7 +323,9 @@ class ProviderClient:
             data = resp.json()
             for m in data.get("data", []):
                 status = m.get("status", {}).get("value", "")
-                if status != "loaded":
+                # Studio marca el modelo cargado también con `loaded: true`
+                # de primer nivel; el router llama.cpp solo con status.value.
+                if status != "loaded" and m.get("loaded") is not True:
                     continue
                 info["model"] = m.get("id", "")
                 args = m.get("status", {}).get("args", [])
@@ -334,6 +336,22 @@ class ProviderClient:
                         except ValueError:
                             pass
                         break
+                if "ctx_size" not in info:
+                    # No todos los servidores exponen los args de arranque:
+                    # Unsloth Studio publica la ventana EFECTIVA como campo de
+                    # primer nivel. OJO: native_context_length (p. ej. 262144)
+                    # es el máximo nativo del modelo, NO lo que el motor sirve;
+                    # usarlo inflaba el límite 4x y dejaba muerta la
+                    # compactación (_manage_context) — incidente 15-nov-26.
+                    for key in (
+                        "context_length",
+                        "max_context_length",
+                        "vram_fit_context_length",
+                    ):
+                        value = m.get(key)
+                        if isinstance(value, int) and value > 0:
+                            info["ctx_size"] = value
+                            break
                 break
             if info.get("model"):
                 metrics_resp = await client.get(
@@ -351,6 +369,9 @@ class ProviderClient:
                                 info["predicted_tokens"] = int(line.split()[-1])
                             except ValueError:
                                 pass
-        except Exception:
-            pass
+        except Exception as exc:
+            # Nunca morir en silencio: un fallo de parseo aquí dejaba el
+            # límite de contexto en el default durante meses (incidente
+            # 15-nov-26) sin una sola línea en el log.
+            logger.debug("get_router_info failed: %s", exc)
         return info

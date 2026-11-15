@@ -521,3 +521,49 @@ class TestWorkspaceContextInSystemPrompt:
         sp = agent._build_system_prompt()
 
         assert str(trusted) in sp
+
+
+class TestEmptyResponse:
+    """Un turno sin texto ni herramientas no puede quedar mudo.
+
+    Incidente 2026-11-15: con el prompt por encima de la ventana real del motor,
+    el modelo cerraba el stream sin contenido y la UI se quedaba mostrando
+    "[procesando herramientas...]" indefinidamente.
+    """
+
+    @pytest.mark.asyncio
+    async def test_empty_response_emits_error_chunk(self, agent):
+        mock_provider = AsyncMock()
+        mock_provider.chat_stream = _mock_stream_response(
+            text="", reasoning="", tool_calls=None
+        )
+        mock_provider.model = "unsloth/Qwen3.8-27B-GGUF"
+
+        agent.providers._primary = mock_provider
+        agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
+
+        collected = []
+        async for chunk in agent.chat("hola"):
+            collected.append(chunk)
+
+        errors = [c for c in collected if isinstance(c, tuple) and c[0] == "error"]
+        assert errors, "un turno vacío debe emitir un chunk de error visible"
+        assert "respuesta vacía" in errors[0][1]
+
+    @pytest.mark.asyncio
+    async def test_text_response_emits_no_error_chunk(self, agent):
+        mock_provider = AsyncMock()
+        mock_provider.chat_stream = _mock_stream_response(text="Hola.")
+        mock_provider.model = "unsloth/Qwen3.8-27B-GGUF"
+
+        agent.providers._primary = mock_provider
+        agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
+
+        collected = []
+        async for chunk in agent.chat("hola"):
+            collected.append(chunk)
+
+        errors = [c for c in collected if isinstance(c, tuple) and c[0] == "error"]
+        assert not errors

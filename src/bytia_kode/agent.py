@@ -1034,6 +1034,19 @@ class Agent:
                     tool_calls_accum = parsed
 
             if not tool_calls_accum:
+                if not response_text:
+                    # Turno mudo: el modelo cerró sin texto ni herramientas.
+                    # Sin este aviso la UI se quedaba mostrando el último
+                    # "[procesando herramientas...]" para siempre (incidente
+                    # 15-nov-26: prompt por encima de la ventana real del motor).
+                    empty_msg = (
+                        "El modelo devolvió una respuesta vacía "
+                        f"(prompt ~{self._estimate_tokens():,} tok / ventana "
+                        f"{self._max_context_tokens:,} tok). Si el prompt supera "
+                        "la ventana real del motor, usa /reset o cambia de modelo."
+                    )
+                    logger.warning("Empty model response: %s", empty_msg)
+                    yield ("error", empty_msg)
                 self.providers.report_success(provider)
                 break
 
