@@ -86,7 +86,11 @@ def test_primer_notify_identifica_y_reporta(monkeypatch):
     assert LABEL in identify
     assert report[:5] == ["herdr", "pane", "report-agent", "w9:p1", "--source"]
     assert "--state" in report and "working" in report
-    assert report[report.index("--seq") + 1] == "1"
+    # Seq = timestamp en ms, no contador por proceso: herdr exige monotonicidad
+    # por source TAMBIÉN entre reinicios (incidente 15-nov-26)
+    assert "--seq" in identify
+    seq = int(report[report.index("--seq") + 1])
+    assert seq > 1_700_000_000_000  # ≥ nov-2023 en ms
 
 
 def test_dedup_estados_repetidos(monkeypatch):
@@ -113,8 +117,27 @@ def test_transicion_de_estado_y_seq(monkeypatch):
         reports = [c for c in rec.cmds if "report-agent-session" not in c]
         seqs = [int(c[c.index("--seq") + 1]) for c in reports]
         states = [c[c.index("--state") + 1] for c in reports]
-    assert seqs == [1, 2, 3]
+    assert all(b > a for a, b in zip(seqs, seqs[1:]))  # estrictamente crecientes
     assert states == ["working", "working", "idle"]
+
+
+def test_seq_no_colisiona_en_el_mismo_milisegundo(monkeypatch):
+    bridge, _ = _make_bridge(monkeypatch)
+    monkeypatch.setattr("bytia_kode.herdr.time.time", lambda: 1000.0)
+
+    assert bridge._next_seq() == 1_000_000
+    assert bridge._next_seq() == 1_000_001  # misma hora: crece igual
+
+
+def test_seq_sobrevive_al_reinicio_del_proceso(monkeypatch):
+    """Un proceso nuevo no puede volver a seqs ya consumidos (count(1) sí)."""
+    monkeypatch.setattr("bytia_kode.herdr.time.time", lambda: 1000.0)
+    puente_viejo, _ = _make_bridge(monkeypatch)
+    ultimo = puente_viejo._next_seq()
+
+    monkeypatch.setattr("bytia_kode.herdr.time.time", lambda: 2000.0)
+    puente_nuevo, _ = _make_bridge(monkeypatch)
+    assert puente_nuevo._next_seq() > ultimo
 
 
 def test_message_solo_en_working(monkeypatch):

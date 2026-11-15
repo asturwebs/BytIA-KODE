@@ -7,17 +7,23 @@ en el panel de agentes del multiplexor con su nombre y estados working/idle.
 Fuera de herdr el bridge queda inactivo: cero overhead, cero fallos. Los
 errores de reporte se degradan a log debug — nunca rompen la TUI.
 
-Sintaxis CLI verificada contra herdr 0.8.2 (positional del pane ANTES que las
+Sintaxis CLI verificada contra herdr 0.9.5 (positional del pane ANTES que las
 opciones; el parser rechaza valores espaciados si las opciones van primero):
 
-    herdr pane report-agent-session <PANE> --source L --agent L [--agent-session-id ID]
+    herdr pane report-agent-session <PANE> --source L --agent L --seq N [--agent-session-id ID]
     herdr pane report-agent <PANE> --source L --agent L --state S --seq N [--message M]
+
+Seq: herdr exige que --seq CREZCA estrictamente por source — también entre
+sesiones y reinicios del agente (doc oficial 0.9.5: "a timestamp works well") —
+y descarta en silencio los reportes que no superan al último aceptado (rc=0,
+invisible). Por eso el seq es un timestamp en ms con guarda anti-colisión dentro
+del mismo milisegundo, no un contador por proceso: count(1) hacía invisible
+toda TUI reiniciada (incidente 15-nov-26: bytia-kode desaparecía del panel).
 
 Sesión: si hay `session_id_fn`, el bridge re-ancla la identidad cuando el id de
 sesión activa cambia (con lag de un ciclo de estado; `notify_session` lo hace
-inmediato tras /load o /new). NOTA herdr 0.8.2: acepta el reporte de sesión de
-agentes self-reported (exit 0) pero aún no lo expone en agent get/list ni lo
-persiste visiblemente — se envía por forward-compatibility.
+inmediato tras /load o /new). `--agent-session-id` se envía siempre que exista
+(forward-compatibility si la versión de turno no lo expone para self-reported).
 """
 from __future__ import annotations
 
@@ -27,7 +33,7 @@ import queue
 import shutil
 import subprocess
 import threading
-from itertools import count
+import time
 
 log = logging.getLogger(__name__)
 
@@ -69,7 +75,7 @@ class HerdrBridge:
         self._label = label
         self._timeout = timeout
         self._session_id_fn = session_id_fn
-        self._seq = count(1)
+        self._seq = 0
         self._queue: queue.SimpleQueue = queue.SimpleQueue()
         self._last_report: tuple[str, str] | None = None
         self._last_session: str | None = None
@@ -140,10 +146,20 @@ class HerdrBridge:
         except Exception:
             log.debug("herdr: reporte de estado falló", exc_info=True)
 
+    def _next_seq(self) -> int:
+        """Seq estrictamente creciente entre reportes y entre reinicios.
+
+        Timestamp en ms — el patrón que recomienda la doc de herdr — con guarda
+        para dos reportes dentro del mismo milisegundo.
+        """
+        self._seq = max(int(time.time() * 1000), self._seq + 1)
+        return self._seq
+
     def _identify(self, session_id: str | None = None) -> None:
         cmd = [
             "herdr", "pane", "report-agent-session", self._pane_id,
             "--source", self._label, "--agent", self._label,
+            "--seq", str(self._next_seq()),
         ]
         if session_id:
             cmd += ["--agent-session-id", session_id]
@@ -153,7 +169,7 @@ class HerdrBridge:
         cmd = [
             "herdr", "pane", "report-agent", self._pane_id,
             "--source", self._label, "--agent", self._label,
-            "--state", state, "--seq", str(next(self._seq)),
+            "--state", state, "--seq", str(self._next_seq()),
         ]
         if message:
             cmd += ["--message", message]
