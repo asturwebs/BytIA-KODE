@@ -23,6 +23,7 @@ from bytia_kode.providers.manager import ProviderManager
 from bytia_kode.session import SessionStore
 from bytia_kode.skills.loader import SkillLoader
 from bytia_kode.errors import AgentCancelledError
+from bytia_kode.tools.output_guard import guard_tool_output
 from bytia_kode.tools.registry import ToolRegistry, ToolResult
 from bytia_kode.tools.session import SessionListTool, SessionLoadTool, SessionSearchTool
 
@@ -808,10 +809,19 @@ class Agent:
             if result.error and error_key:
                 self._tool_error_memory.setdefault(tool_name, {})[error_key] = result.output[:200]
                 logger.debug("Tool error remembered: %s -> %s", error_key, tool_name)
+            # Política única de tamaño (incidente 15-nov-26): todo resultado pasa
+            # por aquí antes de entrar al contexto. El TUI ya recibió el completo
+            # en on_tool_done; al modelo y a la BD les llega la versión recortada.
+            safe_output = guard_tool_output(
+                result.output or "",
+                tool_name,
+                session_id=self._current_session_id,
+                data_dir=getattr(self.config, "data_dir", None),
+            )
             self.messages.append(
                 Message(
                     role="tool",
-                    content=result.output,
+                    content=safe_output,
                     tool_call_id=tool_call.id,
                     name=tool_name,
                 )
@@ -821,7 +831,7 @@ class Agent:
                 self._session_store.append_message(
                     self._current_session_id,
                     role="tool",
-                    content=result.output or "",
+                    content=safe_output or "",
                     tool_call_id=tool_call.id,
                     name=tool_name,
                 )

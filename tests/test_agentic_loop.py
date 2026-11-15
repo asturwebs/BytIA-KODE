@@ -5,7 +5,7 @@ from pathlib import Path
 from bytia_kode.config import WorkspaceConfig
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from bytia_kode.providers.client import Message
+from bytia_kode.providers.client import Message, ToolCall
 from bytia_kode.agent import Agent
 
 
@@ -567,3 +567,54 @@ class TestEmptyResponse:
 
         errors = [c for c in collected if isinstance(c, tuple) and c[0] == "error"]
         assert not errors
+
+
+class TestToolResultGuard:
+    """El guard de tamaño es el único punto donde se recorta lo que va al modelo."""
+
+    @pytest.mark.asyncio
+    async def test_large_tool_result_is_truncated_in_context(self, agent, monkeypatch):
+        from bytia_kode.tools.registry import ToolResult
+
+        monkeypatch.setenv("KODE_MAX_TOOL_RESULT_CHARS", "500")
+        big = "A" * 5000 + "FINAL"
+        calls = {"n": 0}
+
+        async def fake_execute(name, args, on_subprocess=None):
+            return ToolResult(output=big, error=False)
+
+        agent.tools.execute = fake_execute
+
+        async def chat_stream(**kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                yield (
+                    "tool_calls",
+                    [
+                        ToolCall(
+                            id="tc1",
+                            type="function",
+                            function={"name": "bash", "arguments": "{}"},
+                        )
+                    ],
+                )
+            else:
+                yield ("text", "listo")
+
+        mock_provider = AsyncMock()
+        mock_provider.chat_stream = chat_stream
+        mock_provider.model = "unsloth/Qwen3.8-27B-GGUF"
+        agent.providers._primary = mock_provider
+        agent.providers.get = MagicMock(return_value=mock_provider)
+        agent.providers.get_healthy = MagicMock(return_value=(mock_provider, "primary"))
+
+        async for _chunk in agent.chat("lee algo"):
+            pass
+
+        tool_msgs = [m for m in agent.messages if m.role == "tool"]
+        assert tool_msgs, "debe existir un mensaje de herramienta"
+        assert "resultado truncado" in tool_msgs[0].content
+        assert "FINAL" in tool_msgs[0].content  # la cola se conserva
+        spills = list((agent.config.data_dir / "tool-results").rglob("*.txt"))
+        assert spills, "el original debe quedar en disco"
+        assert spills[0].read_text(encoding="utf-8") == big

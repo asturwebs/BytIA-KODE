@@ -919,7 +919,9 @@ class BashTool(Tool):
                 output += f"\nSTDERR:\n{stderr_text}"
             if on_subprocess:
                 on_subprocess(None)
-            return ToolResult(output=output[:50000], error=process.returncode != 0)
+            # Sin recorte local: la política única de tamaño vive en
+            # tools/output_guard.py (cabeza+cola legibles y spill a disco).
+            return ToolResult(output=output, error=process.returncode != 0)
         except asyncio.TimeoutError:
             # H6: reap the child before reporting the timeout — otherwise the
             # process keeps running detached. on_subprocess(None) must only
